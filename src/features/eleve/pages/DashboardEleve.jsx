@@ -447,231 +447,168 @@ return (
 
               <div className="flex justify-between items-center border-b pb-3 mb-4">
 
-                <h3 className="text-sm font-black text-gray-800 uppercase">
-                  📊 Relevé de Notes Provisoire
+                                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
+                  📝 Relevé Synoptique des Évaluations Continue
                 </h3>
-
-
-                <select
-                  value={trimestre}
-                  onChange={(e)=>setTrimestre(e.target.value)}
-                  className="bg-gray-50 border rounded-lg p-2 text-xs font-bold"
-                >
-
-                  <option value="1">1er Trimestre</option>
-                  <option value="2">2ème Trimestre</option>
-                  <option value="3">3ème Trimestre</option>
-
-                </select>
-
-
+                <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2.5 py-0.5 rounded-md">
+                  Trimestre Live
+                </span>
               </div>
 
-
               {loadingNotes ? (
-
-                <p className="text-center text-xs text-gray-400">
-                  Chargement...
-                </p>
-
-              ) : notes.filter(n=>n.trimestre===Number(trimestre)).length===0 ? (
-
-                <p className="text-center text-xs text-gray-400 py-6">
-                  Aucune note publiée.
-                </p>
-
+                <p className="text-xs text-center py-6 text-gray-400 font-bold animate-pulse">Chargement de votre carnet de notes...</p>
+              ) : notes.length === 0 ? (
+                <p className="text-xs text-center py-6 text-gray-400 font-medium">Aucune note n'a été saisie par vos professeurs pour le moment.</p>
               ) : (
-
                 <div className="overflow-x-auto">
-
-                  <table className="w-full text-xs">
-
-                    <thead>
-
-                      <tr className="bg-gray-50 text-gray-400 uppercase">
-
-                        <th className="p-3 text-left">Matière</th>
-                        <th>Interrogation</th>
-                        <th>Devoir</th>
-                        <th>Commun</th>
-
+                  <table className="w-full text-left text-xs font-bold border-collapse">
+                    <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
+                      <tr>
+                        <th className="p-3">Matière / Discipline</th>
+                        <th className="p-3 text-center">Type</th>
+                        <th className="p-3 text-center">Note Obtenue</th>
+                        <th className="p-3 text-center">Coefficient</th>
                       </tr>
-
                     </thead>
-
-
-                    <tbody>
-
-                    {notes
-                    .filter(n=>n.trimestre===Number(trimestre))
-                    .map(note=>(
-
-                      <tr key={note.id} className="border-b">
-
-                        <td className="p-3 font-black">
-                          {note.matiere}
-                        </td>
-
-                        <td className="text-center">
-                          {note.interrogation ?? "-"}
-                        </td>
-
-                        <td className="text-center">
-                          {note.devoirSurveille ?? "-"}
-                        </td>
-
-                        <td className="text-center font-bold text-purple-600">
-                          {note.devoirCommun ?? "-"}
-                        </td>
-
-                      </tr>
-
-                    ))}
-
+                    <tbody className="divide-y text-gray-700">
+                      {notes.map((n) => (
+                        <tr key={n.id} className="hover:bg-gray-50/40 transition">
+                          <td className="p-3 font-black uppercase text-gray-900">{n.matiere || "Général"}</td>
+                          <td className="p-3 text-center text-gray-400">{n.typeEvaluation || "Interrogation"}</td>
+                          <td className="p-3 text-center font-mono text-base text-purple-700 font-black">{parseFloat(n.valeur).toFixed(2)} / 20</td>
+                          <td className="p-3 text-center font-mono text-gray-400">{n.coefficient || 1}</td>
+                        </tr>
+                      ))}
                     </tbody>
-
                   </table>
+                </div>
+              )}
+            </div>
 
+            {/* 📥 SECTION SCELLÉE DES BULLETINS ET LIVRETS SCOLAIRES (SANS GPS) */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+              <div className="border-b pb-3 mb-4">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
+                  📥 Téléchargement des Bulletins Trimestriels
+                </h3>
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">Vos livrets sont générés et certifiés par la direction après le conseil de classe.</p>
+              </div>
+
+              <div className="space-y-4">
+                {/* TRIMESTRE 1 */}
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs hover:border-orange-500/30 transition">
+                  <div>
+                    <h4 className="text-sm font-black text-gray-800">📊 Livret Scolaire Officiel — Trimestre 1</h4>
+                    <p className="text-[11px] text-emerald-600 font-bold mt-1">
+                      Statut : Clôturé et Certifié par le Professeur Principal
+                    </p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => alert("📥 Préparation du moteur d'impression PDF... Téléchargement imminent du bulletin T1.")}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl transition shadow-xs cursor-pointer self-end sm:self-auto"
+                  >
+                    📥 Télécharger
+                  </button>
                 </div>
 
-              )}
-
+                {/* TRIMESTRE 2 */}
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs opacity-50">
+                  <div>
+                    <h4 className="text-sm font-black text-gray-800">📊 Livret Scolaire Officiel — Trimestre 2</h4>
+                    <p className="text-[11px] text-gray-400 font-medium mt-1">État : Évaluations non ouvertes</p>
+                  </div>
+                  <button type="button" disabled className="bg-gray-200 text-gray-400 font-black text-xs uppercase px-5 py-2.5 rounded-xl cursor-not-allowed">
+                    🔒 Bloqué
+                  </button>
+                </div>
+              </div>
             </div>
 
-
-            <div className="bg-white rounded-2xl border p-2 shadow-sm">
-              <NotificationCentre/>
-            </div>
-
-
-          </div>
-
-
-
-
-          {/* DROITE */}
-
-          <div className="space-y-8">
-
-
-            <div className="bg-white rounded-2xl border p-6 shadow-sm">
-
-              <h3 className="text-xs font-black text-gray-400 uppercase">
-                Suivi Assiduité
-              </h3>
-
-              <p className="text-3xl font-black mt-3">
-                {user?.absences || 0} H
-              </p>
-
-            </div>
-
-
-
-            <div className="bg-white rounded-2xl border p-6 shadow-sm">
-
-              <h3 className="text-xs font-black uppercase mb-4">
-                📂 Documents privés
-              </h3>
-
-
-              {documentsPrives.length===0 ? (
-
-                <p className="text-xs text-gray-400">
-                  Aucun document disponible.
-                </p>
-
+            {/* DOSSIER CIVIL PERSONNEL / DOCUMENTS PRIVÉS */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+              <div className="border-b pb-3 mb-4">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider">🗂️ Pièces Officielles & Actes d'Établissement</h3>
+              </div>
+              
+              {documentsPrives.length === 0 ? (
+                <p className="text-xs text-center py-6 text-gray-400 font-medium">Aucun autre document d'établissement n'a été déposé dans votre casier.</p>
               ) : (
-
-                documentsPrives.map(doc=>(
-
-                  <a
-                  key={doc.id}
-                  href={doc.fileData}
-                  download={doc.titre}
-                  className="block p-3 bg-orange-50 rounded-lg mb-2 text-xs font-bold text-orange-700"
-                  >
-
-                    📥 {doc.titre}
-
-                  </a>
-
-                ))
-
+                <div className="space-y-3">
+                  {documentsPrives.map((docItem) => (
+                    <div key={docItem.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center text-xs">
+                      <div>
+                        <p className="font-black text-gray-800 uppercase">{docItem.naturePiece || "Document Personnel"}</p>
+                        <p className="text-[10px] text-gray-400 font-medium mt-0.5">Déposé le : {new Date(docItem.createdAt).toLocaleDateString('fr-FR')}</p>
+                      </div>
+                      <a href={docItem.fichierUrl} target="_blank" rel="noreferrer" className="text-purple-600 font-black uppercase text-[10px] bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100 hover:bg-purple-100 transition">Voir la pièce</a>
+                    </div>
+                  ))}
+                </div>
               )}
-
-
             </div>
-
-
-
-            <div className="bg-white rounded-2xl border p-6 shadow-sm">
-
-              <h3 className="text-xs font-black uppercase mb-4">
-                📝 Demande administrative
-              </h3>
-
-
-              <form onSubmit={handleSendSecretariatRequest}
-              className="space-y-3">
-
-
-                <select
-                value={objet}
-                onChange={(e)=>setObjet(e.target.value)}
-                className="w-full border rounded-lg p-2 text-xs">
-
-                  <option>
-                    Demande de Certificat de Fréquentation
-                  </option>
-
-                  <option>
-                    Demande de Relevé de Notes Officiel
-                  </option>
-
-                  <option>
-                    Demande Duplicata Badge
-                  </option>
-
-
-                </select>
-
-
-                <textarea
-                value={motif}
-                onChange={(e)=>setMotif(e.target.value)}
-                rows="3"
-                className="w-full border rounded-lg p-2 text-xs"
-                placeholder="Motif..."
-                />
-
-
-                <button
-                disabled={sendingRequest}
-                className="w-full bg-orange-500 text-white rounded-lg py-2 text-xs font-black">
-
-                  {sendingRequest ? "Envoi..." : "🚀 Envoyer"}
-
-                </button>
-
-
-              </form>
-
-
-            </div>
-
-
 
           </div>
 
+
+          {/* COLONNE DROITE : COMMUNICATIONS & DEMANDES ADMINISTRATIVE */}
+          <div className="space-y-8">
+            
+            {/* NOTIFICATION CENTRE CENTRALISE */}
+            <NotificationCentre />
+
+            {/* GUICHET DEMANDE ADMINISTRATIVE SECRÉTARIAT */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+              <div className="border-b pb-3 mb-4">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider">✉️ Guichet Unique Administratif</h3>
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">Soumettez vos demandes de documents civils directement à la direction.</p>
+              </div>
+
+              {requestMsg.text && (
+                <div className={`mb-4 p-2.5 text-xs font-bold rounded-lg border-l-4 ${
+                  requestMsg.type === 'success' ? 'bg-emerald-950 text-emerald-400 border-emerald-500' : 'bg-red-950 text-red-400 border-red-500'
+                }`}>
+                  {requestMsg.text}
+                </div>
+              )}
+
+              <form onSubmit={handleSendSecretariatRequest} className="space-y-4 text-xs font-bold text-gray-700">
+                <div>
+                  <label className="block text-gray-400 uppercase mb-1">Nature de la pièce demandée</label>
+                  <select value={objet} onChange={(e) => setObjet(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer focus:ring-2 focus:ring-orange-500">
+                    <option value="Demande de Certificat de Fréquentation">📜 Certificat de Fréquentation & Scolarité</option>
+                    <option value="Demande de Relevé Provisoire">📊 Relevé de Notes Provisoire</option>
+                    <option value="Demande de Duplicata de Carte">🪪 Duplicata de Carte d'Élève</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-400 uppercase mb-1">Motif justificatif détaillé</label>
+                  <textarea 
+                    rows="4" 
+                    placeholder="Ex: Justification pour le dossier de bourse nationale de l'année scolaire en cours." 
+                    value={motif} 
+                    onChange={(e) => setMotif(e.target.value)}
+                    className="w-full bg-gray-50 border rounded-lg p-2.5 font-medium text-gray-600 outline-none focus:ring-2 focus:ring-orange-500"
+                  ></textarea>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={sendingRequest}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-orange-400 font-black py-2.5 rounded-xl uppercase tracking-wider transition disabled:bg-gray-300 cursor-pointer"
+                >
+                  {sendingRequest ? "Transmission..." : "🚀 Soumettre ma demande"}
+                </button>
+              </form>
+            </div>
+
+          </div>
 
         </div>
 
-
       </>
-
     )}
-
   </div>
 );
 };

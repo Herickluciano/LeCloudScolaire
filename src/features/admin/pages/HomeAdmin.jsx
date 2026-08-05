@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
+import ConfigurationTerminal from './ConfigurationTerminal';
 
 const HomeAdmin = () => {
   const { user, schoolName, schoolId, logout } = useAuth();
@@ -113,6 +114,7 @@ const HomeAdmin = () => {
         </div>
 
       </div>
+      <ConfigurationTerminal/>
     </div>
   );
 };

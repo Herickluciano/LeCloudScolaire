@@ -74,7 +74,7 @@ const navigate = useNavigate();
     <div className="min-h-screen bg-slate-900 text-white p-8 font-sans flex items-center justify-center">
       <div className="w-full max-w-xl bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-orange-400">🚀 Plateforme Midnight — Super Admin SaaS</h2>
+          <h2 className="text-2xl font-bold text-orange-400">Le Cloud Scolaire Securisé — Super Admin </h2>
           <p className="text-xs text-slate-400 mt-1">Génération des accès d'administration et activation des licences clients</p>
         </div>
 

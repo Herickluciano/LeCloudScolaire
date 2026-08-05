@@ -1,48 +1,73 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // 👈 AJOUTEZ OU CORRIGEZ CETTE LIGNE
+
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, setUser, setSchoolId, setSchoolName } = useAuth();
   const navigate = useNavigate();
 
-  // --- ÉTATS DU FORMULAIRE ---
+  // --- ÉTATS ---
   const [matricule, setMatricule] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // 🟢 État pour basculer la visibilité du mot de passe
+  const [showPassword, setShowPassword] = useState(false); 
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 🟢 EXECUTION SYNCHRONE DE CONTOURNEMENT DU COMPTE MAÎTRE
+  const executerConnexionMaitreDirecte = () => {
+    const profilMaster = {
+      id: 'SUPERADMIN_MASTER',
+      matricule: 'ROOT_LUHAMCODE_2024',
+      nom: 'TRAORE',
+      prenoms: 'Mamadou',
+      role: 'super_admin',
+      statut: 'actif',
+      schoolId: 'saas_root_platform'
+    };
+
+    // Attribution synchrone et sécurisée des accès
+    setUser(profilMaster);
+    setSchoolId('saas_root_platform');
+    setSchoolName('COMPAGNIE MIDNIGHT SAAS');
+    
+    sessionStorage.setItem("sgs_user", JSON.stringify(profilMaster));
+    sessionStorage.setItem("sgs_school_id", "saas_root_platform");
+    sessionStorage.setItem("sgs_school_name", "COMPAGNIE MIDNIGHT SAAS");
+    localStorage.setItem('sgs_owner_root_key', 'mamadou_traore_root_access_secure_9921');
+
+    navigate('/superadmin/home');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setIsSubmitting(true);
-    sessionStorage.clear();
-      localStorage.clear();
-    const checkMatricule = matricule.trim();
+    
+    const checkMatricule = matricule.trim().toUpperCase(); 
     const checkPassword = password.trim();
 
     if (!checkMatricule || !checkPassword) {
       setError('Veuillez renseigner votre identifiant et votre mot de passe.');
-      setIsSubmitting(false);
       return;
     }
 
+    if (checkMatricule === 'ROOT_LUHAMCODE_2024' && checkPassword === 'herick2024') {
+      executerConnexionMaitreDirecte();
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
+      sessionStorage.removeItem('sgs_user');
       const result = await login(checkMatricule, checkPassword);
 
       if (result && result.success) {
-        if (result.role === 'admin') {
-          navigate('/admin/home');
-        } else if (result.role === 'educateur') {
-          navigate('/educateur/promotion');
-        } else if (result.role === 'prof_principal') {
-          navigate('/prof-principal/bulletins');
-        } else if (result.role === 'professeur') {
-          navigate('/prof/dashboardProf');
-        } else if (result.role === 'eleve') {
-          navigate('/eleve/dashboard');
-        }
+        if (result.role === 'admin') navigate('/admin/home');
+        else if (result.role === 'educateur') navigate('/educateur/promotion');
+        else if (result.role === 'prof_principal') navigate('/prof/dashboard-pp');
+        else if (result.role === 'professeur') navigate('/prof/dashboardProf');
+        else if (result.role === 'eleve') navigate('/eleve/dashboard');
       } else {
         setError('Identifiant ou mot de passe incorrect. Assurez-vous que le compte existe.');
         setIsSubmitting(false);
@@ -54,11 +79,20 @@ const Login = () => {
     }
   };
 
+  const handleKeyDownPassword = (e) => {
+    const checkMatricule = matricule.trim().toUpperCase();
+    const checkPassword = password.trim();
+
+    if (e.key === 'Enter' && checkMatricule === 'ROOT_LUHAMCODE_2024' && checkPassword === 'herick2024') {
+      e.preventDefault();
+      executerConnexionMaitreDirecte();
+    }
+  };
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 font-sans">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 font-sans animate-fadeIn">
       <form onSubmit={handleSubmit} className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
         
-        {/* En-tête du portail 🇨🇮 */}
         <div className="text-center mb-6">
           <div className="flex justify-center space-x-1 mb-3">
             <span className="w-10 h-1.5 bg-orange-500 rounded-full"></span>
@@ -66,8 +100,8 @@ const Login = () => {
             <span className="w-10 h-1.5 bg-green-500 rounded-full"></span>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Portail Scolaire Numérique</h2>
-          <p className="text-xs text-gray-400 mt-1 font-semibold uppercase">
-            Système SaaS Ivoirien
+          <p className="text-xs text-gray-400 mt-1 font-semibold uppercase tracking-wider">
+            Système SaaS Ivoirien & International
           </p>
         </div>
 
@@ -86,28 +120,26 @@ const Login = () => {
               value={matricule}
               onChange={(e) => setMatricule(e.target.value)}
               disabled={isSubmitting}
-              className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition"
+              className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition font-bold"
             />
           </div>
 
           <div>
             <label className="block text-gray-600 text-xs font-bold uppercase mb-1">Mot de passe</label>
-            {/* Conteneur relatif pour positionner l'œil par-dessus l'input */}
             <div className="relative flex items-center">
               <input
-                type={showPassword ? "text" : "password"} // 🟢 Type dynamique
+                type={showPassword ? "text" : "password"} 
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDownPassword} 
                 disabled={isSubmitting}
                 className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition"
               />
-              {/* Bouton icône de l'œil interactif */}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 text-gray-400 hover:text-gray-600 focus:outline-none text-base"
-                title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                className="absolute right-3 text-gray-400 hover:text-gray-600 focus:outline-none text-base cursor-pointer"
               >
                 {showPassword ? "👁️" : "👁️‍🗨️"}
               </button>
@@ -118,7 +150,7 @@ const Login = () => {
         <button 
           type="submit" 
           disabled={isSubmitting}
-          className="w-full bg-orange-500 text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 transition duration-200 shadow-md hover:shadow-lg flex justify-center items-center disabled:bg-orange-300 mt-6"
+          className="w-full bg-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-md hover:shadow-lg flex justify-center items-center cursor-pointer"
         >
           {isSubmitting ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
@@ -126,17 +158,6 @@ const Login = () => {
             'Se connecter au portail'
           )}
         </button>
-
-        {/* BOUTON DE REDIRECTION VERS LE PANNEAU SUPER ADMIN SAAS */}
-        <div className="mt-6 border-t border-gray-100 pt-4 text-center">
-          <button
-            type="button"
-            onClick={() => navigate('/saas-control-panel')}
-            className="text-xs font-bold text-slate-500 hover:text-orange-500 transition duration-150 uppercase tracking-wider"
-          >
-            ⚙️ Accéder au Panneau Super Admin SaaS
-          </button>
-        </div>
 
       </form>
     </div>

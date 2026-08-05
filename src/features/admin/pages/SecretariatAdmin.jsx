@@ -1,255 +1,302 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../../services/api';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+// 🟢 RECTIFICATION : Ajout de 'updateDoc' dans l'importation Firebase
+import { collection, query, where, onSnapshot, doc, setDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
-import { jsPDF } from 'jspdf';
 
 const SecretariatAdmin = () => {
-  const { schoolId, schoolName, user } = useAuth();
-  const currentSchool = schoolId || 'lycee_Moderne_Gagnoa';
+  const { schoolId, schoolName } = useAuth();
+  
+  // 🟢 COMPORTEMENT SAAS ULTRA-TOLÉRANT : Forçage en minuscules propre
+  const schoolIdRaw = schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_moderne_gagnoa';
+  const currentSchool = schoolIdRaw.trim().toLowerCase();
 
-  // --- ÉTATS ---
-  const [activeTab, setActiveTab] = useState('stats'); // 'stats' ou 'messages'
-  const [messages, setMessages] = useState([]);
-  const [stats, setStats] = useState({ eleves: 0, profs: 0, educs: 0, classes: 0, absences: 0 });
+  // --- ÉTATS DES DONNÉES EN TEMPS RÉEL ---
+  const [listeProfesseurs, setListeProfesseurs] = useState([]);
+  const [listeEducateurs, setListeEducateurs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
-  // 🔄 ÉCOUTEUR MULTI-COLLECTIONS EN TEMPS RÉEL
+  // --- ÉTATS DU FORMULAIRE D'OUVERTURE DE CLASSE ---
+  const [formPromotion, setFormPromotion] = useState('6eme');
+  const [formExtension, setFormExtension] = useState('1');
+  const [selectedEducateurId, setSelectedEducateurId] = useState('');
+  const [selectedProfPrincipalId, setSelectedProfPrincipalId] = useState('');
+  const [formDelegue, setFormDelegue] = useState('');
+
+  // --- ÉTATS DU FORMULAIRE D'ALERTES DOCUMENTS ---
+  const [docMatricule, setFormMatricule] = useState('');
+  const [docType, setDocType] = useState('Bulletin Trimestriel');
+  const [docCommentaire, setDocCommentaire] = useState('');
+
+  // 🔄 1. ÉCOUTEUR EN TEMPS RÉEL CORRIGÉ (S'ÉTEINT À TOUT PRIX)
   useEffect(() => {
-    if (!currentSchool) return;
+    if (!currentSchool) {
+      setLoading(false);
+      return;
+    }
 
-    // 1. Écoute des messages/demandes des élèves
-    const qMessages = query(collection(db, "messages"), where("schoolId", "==", currentSchool));
-    const unsubMessages = onSnapshot(qMessages, (snapshot) => {
-      const list = [];
-      snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
-      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setMessages(list);
+    const qStaff = query(
+      collection(db, "users"),
+      where("schoolId", "==", currentSchool)
+    );
+
+    const unsubscribe = onSnapshot(qStaff, (snapshot) => {
+      const profs = [];
+      const educs = [];
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const roleClean = data.role ? data.role.trim().toLowerCase() : '';
+        const item = { id: docSnap.id, ...data };
+
+        if (roleClean === 'professeur' || roleClean === 'prof_principal') {
+          profs.push(item);
+        } else if (roleClean === 'educateur') {
+          educs.push(item);
+        }
+      });
+
+      setListeProfesseurs(profs);
+      setListeEducateurs(educs);
+
+      // Pré-sélection automatique sécurisée
+      if (profs.length > 0) setSelectedProfPrincipalId(profs[0].id);
+      if (educs.length > 0) setSelectedEducateurId(educs[0].id);
+      
+      setLoading(false); // 🟢 Éteint le loader dès que Firebase répond
+    }, (err) => {
+      console.error("Erreur antenne admin :", err);
+      setLoading(false); // 🟢 SÉCURITÉ CRASH : Éteint le loader même s'il y a un problème de réseau
     });
 
-    // 2. Calcul des statistiques globales
-    const calculerStats = async () => {
-      try {
-        const qUsers = query(collection(db, "users"), where("schoolId", "==", currentSchool));
-        const qClasses = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
-        
-        const [usersSnap, classesSnap] = await Promise.all([getDocs(qUsers), getDocs(qClasses)]);
-        
-        let eleves = 0, profs = 0, educs = 0, totalAbsences = 0;
-        usersSnap.forEach(docSnap => {
-          const u = docSnap.data();
-          if (u.role === 'eleve') {
-            eleves++;
-            totalAbsences += (u.absences || 0);
-          }
-          if (u.role === 'professeur' || u.role === 'prof_principal') profs++;
-          if (u.role === 'educateur') educs++;
-        });
+    return () => unsubscribe();
+  }, [currentSchool]);
 
-        setStats({
-          eleves,
-          profs,
-          educs,
-          classes: classesSnap.size,
-          absences: totalAbsences
-        });
-        setLoading(false);
-      } catch (err) {
-        console.error("Erreur de calcul analytique :", err);
-        setLoading(false);
-      }
-    };
+  // 📥 SOUMISSION A : OUVERTURE D'UNE CLASSE
+  const handleCreateClassePhysique = async (e) => {
+    e.preventDefault();
+    setMessage({ type: '', text: '' });
 
-    calculerStats();
-    return () => {
-      unsubMessages();
-    };
-  }, [currentSchool, messages.length]); // Se recalcule si un message change
+    if (!formExtension.trim()) {
+      setMessage({ type: 'error', text: '⚠️ Spécifiez l\'extension (Ex: 1, A).' });
+      return;
+    }
 
-  // 📜 GÉNÉRATEUR OFFICIEL : Certificat de Fréquentation PDF
-  const imprimerCertificatFrequentation = (msg) => {
-    const docPdf = new jsPDF();
-    
-    // En-tête national 🇨🇮
-    docPdf.setFont('Helvetica', 'bold');
-    docPdf.setFontSize(11);
-    docPdf.text("RÉPUBLIQUE DE CÔTE D'IVOIRE", 15, 20);
-    docPdf.setFontSize(9);
-    docPdf.setFont('Helvetica', 'normal');
-    docPdf.text("Union - Discipline - Travail", 23, 25);
-    docPdf.text("-------------", 32, 29);
-    docPdf.setFont('Helvetica', 'bold');
-    docPdf.text("MINISTÈRE DE L'ÉDUCATION NATIONALE", 15, 34);
-    docPdf.text("ET DE L'ALPHABÉTISATION", 24, 39);
-
-    docPdf.setFont('Helvetica', 'normal');
-    docPdf.text(`ANNÉE SCOLAIRE : 2025-2026`, 140, 20);
-    docPdf.text(`Date : ${new Date().toLocaleDateString('fr-FR')}`, 140, 26);
-
-    docPdf.setDrawColor(15, 23, 42);
-    docPdf.line(15, 45, 195, 45);
-
-    // Titre du document
-    docPdf.setFont('Helvetica', 'bold');
-    docPdf.setFontSize(18);
-    docPdf.setTextColor(211, 84, 0);
-    docPdf.text("CERTIFICAT DE FRÉQUENTATION", 105, 65, { align: 'center' });
-
-    // Corps du texte légal
-    docPdf.setFont('Helvetica', 'normal');
-    docPdf.setFontSize(12);
-    docPdf.setTextColor(0, 0, 0);
-    
-    let texteUsage = `Le Proviseur de l'établissement dénommé ${schoolName || 'Lycée Moderne'}, soussigné, ` +
-      `certifie que l'élève nommé(e) ${msg.eleveName || 'Non renseigné'} est inscrit(e) régulier(e) ` +
-      `dans notre établissement pour l'année scolaire en cours.\n\n` +
-      `Classe d'affectation : ${msg.classeId ? msg.classeId.replace(/_/g, ' ').toUpperCase() : 'N/A'}\n` +
-      `Numéro de Matricule MENA : ${msg.eleveId || 'N/A'}\n\n` +
-      `En foi de quoi, ce certificat lui est délivré pour servir et valoir ce que de droit.`;
-
-    docPdf.text(docPdf.splitTextToSize(texteUsage, 170), 15, 85);
-
-    // Bloc de signature et tampon automatique
-    docPdf.setFont('Helvetica', 'bold');
-    docPdf.setFontSize(11);
-    docPdf.text("Pour l'Administration, Le Proviseur", 130, 150);
-    
-    // Faux tampon de sécurité numérique
-    docPdf.setDrawColor(211, 84, 0);
-    docPdf.setLineWidth(0.5);
-    docPdf.rect(132, 155, 45, 20);
-    docPdf.setFontSize(8);
-    docPdf.setTextColor(211, 84, 0);
-    docPdf.text("TAMPON NUMÉRIQUE", 154, 164, { align: 'center' });
-    docPdf.text("SGS SAAS MIDNIGHT", 154, 169, { align: 'center' });
-
-    docPdf.save(`Certificat_${msg.eleveName?.replace(/\s+/g, '_')}.pdf`);
-  };
-
-  // 🟢 ACTION : Traiter la demande sur le Cloud
-  const modifierStatutMessage = async (id, nouveauStatut) => {
     try {
-      await updateDoc(doc(db, "messages", id), { statut: nouveauStatut });
+      const extensionClean = formExtension.trim().toLowerCase();
+      const documentClasseId = `${currentSchool}_${formPromotion}_${extensionClean}`;
+
+      const profData = listeProfesseurs.find(p => p.id === selectedProfPrincipalId);
+      const educData = listeEducateurs.find(e => e.id === selectedEducateurId);
+
+      // 1. Déploiement de la classe physique
+      await setDoc(doc(db, "classes", documentClasseId), {
+        id: documentClasseId,
+        nom: `${formPromotion.toUpperCase()} ${extensionClean.toUpperCase()}`,
+        promotion: formPromotion.toLowerCase(),
+        schoolId: currentSchool,
+        delegueName: formDelegue.trim() || 'Non désigné',
+        profPrincipalId: selectedProfPrincipalId || 'Aucun',
+        profPrincipalName: profData ? `M. ${profData.nom}` : 'Non assigné',
+        educateurId: selectedEducateurId || 'Aucun',
+        educateurName: educData ? `M. ${educData.nom}` : 'Non assigné',
+        createdAt: new Date().toISOString()
+      });
+
+      // 🟢 AUTOMATISATION DU RÔLE : Modifie le statut de l'enseignant en Prof Principal sur le Cloud
+      if (selectedProfPrincipalId && selectedProfPrincipalId !== 'Aucun') {
+        const profRef = doc(db, "users", selectedProfPrincipalId);
+        await updateDoc(profRef, {
+          role: 'prof_principal',
+          classeId: `${formPromotion}_${extensionClean}` // Ex: 6eme_1
+        });
+      }
+
+      setMessage({ type: 'success', text: `🏛️ Division ${formPromotion.toUpperCase()} ${extensionClean.toUpperCase()} déployée et enseignant promu Professeur Principal !` });
+      setFormExtension('');
+      setFormDelegue('');
     } catch (err) {
       console.error(err);
+      setMessage({ type: 'error', text: '💥 Échec de création de la structure de classe.' });
+    }
+  }; // 🟢 CORRECTION DE SYNTAXE : L'accolade manquante fermant la fonction est rajoutée ici
+
+  // 🚀 SOUMISSION B : ALERTES DOCUMENTS
+  const handleSendDocumentAlert = async (e) => {
+    e.preventDefault();
+    setMessage({ type: '', text: '' });
+
+    const matriculeNettoye = docMatricule.trim().toUpperCase();
+
+    try {
+      const qCheck = query(
+        collection(db, "users"),
+        where("schoolId", "==", currentSchool),
+        where("role", "==", "eleve"),
+        where("matricule", "==", matriculeNettoye)
+      );
+
+      const querySnapshot = await getDocs(qCheck);
+
+      if (querySnapshot.empty) {
+        setMessage({ type: 'error', text: `❌ Le matricule (${matriculeNettoye}) n'existe pas dans l'établissement.` });
+        return;
+      }
+
+      const eleveData = querySnapshot.docs[0].data();
+
+      if (eleveData.email) {
+        await fetch("http://localhost:10000/api/send-document-alert", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to_email: eleveData.email.trim(),
+            to_name: `${eleveData.prenoms || ''} ${eleveData.nom || ''}`,
+            school_name: schoolName || currentSchool.toUpperCase(),
+            type_document: docType,
+            sender_title: "Le Secrétariat Général"
+          })
+        });
+      }
+
+      setMessage({ type: 'success', text: `✉️ Alerte courriel transmise pour ${eleveData.nom} !` });
+      setFormMatricule('');
+      setDocCommentaire('');
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: '❌ Erreur réseau lors de la distribution.' });
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400">Analyse du secrétariat...</div>;
+  if (loading) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center font-sans bg-white p-8 shadow rounded-xl max-w-7xl mx-auto mt-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent mb-3"></div>
+        <p className="text-gray-500 text-xs font-bold animate-pulse">Ouverture des registres du secrétariat...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 font-sans">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen">
       
-      {/* 🧭 Onglets de Navigation Intérieurs */}
-      <div className="flex border-b mb-6">
-        <button 
-          onClick={() => setActiveTab('stats')}
-          className={`py-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition ${activeTab === 'stats' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-        >
-          📊 Tableau de Bord Analytique
-        </button>
-        <button 
-          onClick={() => setActiveTab('messages')}
-          className={`py-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition relative ${activeTab === 'messages' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-        >
-          ✉️ Secrétariat & Courriers ({messages.filter(m => m.statut === 'en_attente').length})
-        </button>
+      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black">🏛️ Secrétariat Général d'Établissement</h1>
+          <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">
+            Pilotage Académique Multi-Écoles — <span className="text-orange-400 font-black">{schoolName || currentSchool.replace(/_/g, ' ').toUpperCase()}</span>
+          </p>
+        </div>
       </div>
 
-      {/* ================= CONTENU 1 : STATISTIQUES GLOBALES ================= */}
-      {activeTab === 'stats' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-              <span className="text-xl">🎓</span>
-              <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mt-1">Élèves Inscrits</h4>
-              <p className="text-2xl font-black text-blue-900 mt-1">{stats.eleves}</p>
-            </div>
-            <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl">
-              <span className="text-xl">👨‍🏫</span>
-              <h4 className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mt-1">Enseignants</h4>
-              <p className="text-2xl font-black text-purple-900 mt-1">{stats.profs}</p>
-            </div>
-            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-              <span className="text-xl">🧑‍💼</span>
-              <h4 className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mt-1">Éducateurs</h4>
-              <p className="text-2xl font-black text-emerald-900 mt-1">{stats.educs}</p>
-            </div>
-            <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl">
-              <span className="text-xl">🏛️</span>
-              <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mt-1">Classes Ouvertes</h4>
-              <p className="text-2xl font-black text-amber-900 mt-1">{stats.classes}</p>
-            </div>
-          </div>
+      {message.text && (
+        <div className={`mb-6 p-3 text-xs font-bold rounded-lg border-l-4 animate-fadeIn ${
+          message.type === 'success' ? 'bg-emerald-950 text-emerald-400 border-emerald-500' : 'bg-red-950 text-red-400 border-red-500'
+        }`}>
+          {message.text}
+        </div>
+      )}
 
-          <div className="bg-red-50/50 border border-red-100 p-4 rounded-xl flex justify-between items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* COMPARTIMENT 1 : OUVERTURE DE CLASSE PHYSIQUE */}
+        <div className="bg-white rounded-2xl border p-5 shadow-sm">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">🏛️ Ouverture d'une Classe Physique</h3>
+          
+          <form onSubmit={handleCreateClassePhysique} className="space-y-4 text-xs font-bold text-gray-700">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-400 uppercase mb-1">1. Promotion / Niveau</label>
+                <select value={formPromotion} onChange={(e) => setFormPromotion(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
+                  <option value="6eme">6ème</option>
+                  <option value="5eme">5ème</option>
+                  <option value="4eme">4ème</option>
+                  <option value="3eme">3ème</option>
+                  <option value="2nde">2nde</option>
+                  <option value="1ere">1ère</option>
+                  <option value="tle">Terminale</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 uppercase mb-1">2. Extension / Numéro</label>
+                <input type="text" placeholder="Ex: 1, 2, A, B..." value={formExtension} onChange={(e) => setFormExtension(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none" required />
+              </div>
+            </div>
+
+                        <div>
+              <label className="block text-gray-400 uppercase mb-1">3. Sélection Éducateur de Niveau référent</label>
+              {listeEducateurs.length === 0 ? (
+                <p className="p-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px]">
+                  ⚠️ Aucun éducateur trouvé dans la base pour l'école "{currentSchool}".
+                </p>
+              ) : (
+                <select value={selectedEducateurId} onChange={(e) => setSelectedEducateurId(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
+                  {listeEducateurs.map(ed => (
+                    <option key={ed.id} value={ed.id}>M. {ed.nom.toUpperCase()} {ed.prenoms || ed.prenom || ''}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             <div>
-              <h4 className="text-xs font-bold text-red-700 uppercase tracking-wide">Alerte Assiduité Établissement</h4>
-              <p className="text-[11px] text-gray-500 mt-0.5">Cumul total des heures de cours manquées par l'ensemble des élèves.</p>
+              <label className="block text-gray-400 uppercase mb-1">4. Sélection Professeur Principal Titulaire</label>
+              {listeProfesseurs.length === 0 ? (
+                <p className="p-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px]">
+                  ⚠️ Aucun enseignant trouvé dans la base pour l'école "{currentSchool}".
+                </p>
+              ) : (
+                <select value={selectedProfPrincipalId} onChange={(e) => setSelectedProfPrincipalId(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
+                  {listeProfesseurs.map(pr => (
+                    <option key={pr.id} value={pr.id}>M. {pr.nom.toUpperCase()} ({pr.matiereEnseignee || "Matière"})</option>
+                  ))}
+                </select>
+              )}
             </div>
-            <p className="text-2xl font-mono font-black text-red-600">{stats.absences} H</p>
-          </div>
-        </div>
-      )}
 
-      {/* ================= CONTENU 2 : SECRÉTARIAT NUMÉRIQUE ================= */}
-      {activeTab === 'messages' && (
-        <div className="space-y-4 animate-fadeIn">
-          {messages.length === 0 ? (
-            <p className="text-xs font-medium text-gray-400 text-center py-6 border border-dashed rounded-xl">Aucune demande reçue au secrétariat de la direction.</p>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div key={msg.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between md:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-sm uppercase tracking-wider ${msg.statut === 'valide' ? 'bg-green-100 text-green-700' : msg.statut === 'refuse' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {msg.statut || 'En attente'}
-                      </span>
-                      <h4 className="text-sm font-bold text-gray-800">{msg.objetMessage}</h4>
-                    </div>
-                    <p className="text-xs text-gray-600 font-medium italic">"{msg.contenuMessage}"</p>
-                                         <p className="text-[10px] text-gray-400 font-bold uppercase">
-                      Demandeur : {msg.eleveName} ({msg.eleveId}) — Classe : {msg.classeId?.replace(/_/g, ' ')}
-                    </p>
-                  </div>
-
-                  {/* 🟢 CORRECTION : Structure des boutons d'actions réactifs réparée */}
-                  <div className="flex items-center gap-2 self-end md:self-auto">
-                    {msg.statut === 'en_attente' && (
-                      <>
-                        <button 
-                          onClick={() => modifierStatutMessage(msg.id, 'refuse')}
-                          className="bg-white hover:bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition"
-                        >
-                          ❌ Rejeter
-                        </button>
-                        <button 
-                          onClick={() => modifierStatutMessage(msg.id, 'valide')}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-2xs transition"
-                        >
-                          ✅ Valider la demande
-                        </button>
-                      </>
-                    )}
-                    
-                    {msg.statut === 'valide' && (
-                      <button 
-                        onClick={() => imprimerCertificatFrequentation(msg)}
-                        className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg shadow-2xs transition flex items-center gap-1"
-                      >
-                        🖨️ Imprimer le Certificat
-                      </button>
-                    )}
-                  </div>
-
-                </div>
-              ))}
+            <div>
+              <label className="block text-gray-400 uppercase mb-1">5. Nom complet du Délégué de classe</label>
+              <input type="text" placeholder="Ex: Traoré Mamadou" value={formDelegue} onChange={(e) => setFormDelegue(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none" />
             </div>
-          )}
-        </div>
-      )}
 
+            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-2.5 rounded-xl uppercase tracking-wider transition shadow-xs cursor-pointer">
+              🏛️ Valider et Déployer la Structure
+            </button>
+          </form>
+        </div>
+
+        {/* COMPARTIMENT 2 : FORMULAIRE ENVOI DES NOTIFICATIONS DOCUMENTS */}
+        <div className="bg-white rounded-2xl border p-5 shadow-sm h-fit">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">🚨 Expédition et Alertes de Documents Personnels</h3>
+          
+          <form onSubmit={handleSendDocumentAlert} className="space-y-4 text-xs font-bold text-gray-700">
+            <div>
+              <label className="block text-gray-400 uppercase mb-1">Matricule MENA Cible de l'Élève *</label>
+              <input type="text" placeholder="Ex: 26_8631W" value={docMatricule} onChange={(e) => setFormMatricule(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none uppercase font-mono tracking-wide" required />
+            </div>
+
+            <div>
+              <label className="block text-gray-400 uppercase mb-1">Nature de la pièce déposée</label>
+              <select value={docType} onChange={(e) => setDocType(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
+                <option value="Bulletin Trimestriel">📊 Bulletin Civil Trimestriel (Relevé Officiel)</option>
+                <option value="Billet de Convocation">⚠️ Billet de Convocation Parent d'Élève</option>
+                <option value="Avis d'Exclusion Provisoire">🛑 Avis de Sanction Pédagogique / Exclusion</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-gray-400 uppercase mb-1">Note explicative / Commentaire de la direction (Optionnel)</label>
+              <textarea rows="3" placeholder="Ex: Votre livret scolaire du 1er trimestre est disponible..." value={docCommentaire} onChange={(e) => setDocCommentaire(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none font-medium text-gray-600"></textarea>
+            </div>
+
+            <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-orange-400 font-black py-2.5 rounded-xl uppercase tracking-wider transition shadow-xs cursor-pointer">
+              🚀 Émettre l'Alerte Courriel Instantanée
+            </button>
+          </form>
+        </div>
+
+      </div>
     </div>
   );
 };

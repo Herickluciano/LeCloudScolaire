@@ -211,6 +211,32 @@ const ListePromotion = () => {
                     🖨️ Fiche PDF MENA
                   </button>
                 </td>
+                                    {/* ONGLET TRIPLE OPTION SÉCURISÉ POUR L'ÉDUCATEUR */}
+                    {activeTab === 'absences' && (
+                      <td className="py-2 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                            onClick={() => handleSetPresenceStatus(student, 'present')}
+                            className={`px-2 py-1 rounded text-[10px] uppercase font-black border transition ${!absentsDuJour.some(a => a.eleveId === student.id) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
+                          >
+                            Présent
+                          </button>
+                          <button 
+                            onClick={() => handleSetPresenceStatus(student, 'retard')}
+                            className={`px-2 py-1 rounded text-[10px] uppercase font-black border transition ${absentsDuJour.find(a => a.eleveId === student.id)?.status === 'retard' ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-400 border-gray-100 hover:text-amber-600'}`}
+                          >
+                            Retard
+                          </button>
+                          <button 
+                            onClick={() => handleSetPresenceStatus(student, 'absent')}
+                            className={`px-2 py-1 rounded text-[10px] uppercase font-black border transition ${absentsDuJour.find(a => a.eleveId === student.id)?.status === 'absent' ? 'bg-red-600 text-white border-red-600' : 'bg-gray-50 text-gray-400 border-gray-100 hover:text-red-600'}`}
+                          >
+                            Absent
+                          </button>
+                        </div>
+                      </td>
+                    )}
+
               </tr>
             ))}
           </tbody>
