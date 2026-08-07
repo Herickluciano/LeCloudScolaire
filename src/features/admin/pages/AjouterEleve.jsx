@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom'; 
+import { Link, useNavigate } from 'react-router-dom'; 
 import { db, enrollStudentOnFirebase } from '../../../services/api';
 import { collection, query, where, onSnapshot } from 'firebase/firestore'; 
 import { useAuth } from '../../../context/AuthContext';
@@ -7,7 +7,9 @@ import { genererFicheAvecQRCodePDF } from '../../../utils/genererPDF.js';
 
 const AjouterEleve = () => {
   const navigate = useNavigate();
-  const { schoolId, schoolName } = useAuth(); // Récupère l'ID de l'école (ex: lycee_oume)
+  const { schoolId, schoolName } = useAuth(); 
+
+  const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_moderne_gagnoa').trim().toLowerCase();
 
   // 1. Matrice des états initiaux contrôlés
   const [formData, setFormData] = useState({
@@ -17,12 +19,13 @@ const AjouterEleve = () => {
     dateNaissance: '',
     ecoleProvenance: '',
     numSecuriteSociale: '',
-    niveauPromotion: '', 
+    niveauPromotion: '', // Ex: "tle_d", "6eme", "2nd_a"
     classeId: '',       
     anneeArrivee: new Date().getFullYear().toString(),
     dispensePhysique: 'Non',
     email: '',      
-    telephone: ''   
+    telephone: '',
+    emailParent: ''
   });
 
   const [classes, setClasses] = useState([]); 
@@ -31,34 +34,66 @@ const AjouterEleve = () => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
-
-  // 2. Écoute réactive en temps réel des classes créées pour CETTE école spécifique
+   const [metaSchool, setMetaSchool] = useState({
+    pays: "RÉPUBLIQUE DE CÔTE D'IVOIRE",
+    devise: "Union - Discipline - Travail",
+    ministere: "MINISTÈRE DE L'ÉDUCATION NATIONALE ET DE L'ALPHABÉTISATION"
+  });
   useEffect(() => {
-    if (!schoolId) return;
+    const extrairePaysMeta = async () => {
+      try {
+        const docRef = doc(db, "schools", currentSchool);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const d = snap.data();
+          setMetaSchool({
+            pays: d.pays || "RÉPUBLIQUE DE CÔTE D'IVOIRE",
+            devise: d.devise || "Union - Discipline - Travail",
+            ministere: d.ministere || "MINISTÈRE DE L'ÉDUCATION NATIONALE"
+          });
+        }
+      } catch (e) { console.error(e); }
+    };
+    extrairePaysMeta();
+  }, [currentSchool]);
+  // 2. Écoute réactive en temps réel de TOUTES les classes de CETTE école (Insensible à la casse de l'ID d'école)
+  useEffect(() => {
+    if (!currentSchool) return;
     setLoadingClasses(true);
     
-    const q = query(collection(db, "classes"), where("schoolId", "==", schoolId));
+    const q = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = [];
-      snapshot.forEach(doc => {
-        list.push({ id: doc.id, ...doc.data() });
+      snapshot.forEach(docSnap => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
       });
       setClasses(list);
       setLoadingClasses(false);
     }, (err) => {
-      console.error("Erreur de synchronisation des classes :", err);
+      console.error("Erreur synchronisation live des classes :", err);
       setLoadingClasses(false);
     });
 
     return () => unsubscribe();
-  }, [schoolId]);
+  }, [currentSchool]);
 
-  // 🟢 PLACEMENT CORRECT : Filtrage calculé à chaque rendu à l'intérieur du composant
+  // 🟢 3. ALGORITHME DE FILTRAGE CHIRURGICAL DOUBLE FLUX (PREMIER & SECOND CYCLE IVOIRIEN)
   const classesFiltrees = classes.filter(c => {
-    const promoClasse = (c.promotion || '').trim().toLowerCase();
-    const promoFormulaire = (formData.niveauPromotion || '').trim().toLowerCase();
-    return promoClasse === promoFormulaire;
+    if (!formData.niveauPromotion) return false;
+
+    const selectionFormulaire = formData.niveauPromotion.trim().toLowerCase(); // Ex: "tle_d" ou "6eme"
+    const promoClasse = (c.promotion || '').trim().toLowerCase(); // Ex: "tle" ou "6eme"
+    const serieClasse = (c.serie || '').trim().toLowerCase(); // Ex: "d" ou "generale"
+
+    // Cas A : Premier Cycle (6eme, 5eme, 4eme, 3eme) -> Pas de série
+    if (!selectionFormulaire.includes('_')) {
+      return promoClasse === selectionFormulaire;
+    }
+
+    // Cas B : Second Cycle (Séries A, C, D) -> Découpage technique de la sélection (ex: "tle_d" -> "tle" + "d")
+    const [promoForm, serieForm] = selectionFormulaire.split('_');
+    return promoClasse === promoForm && serieClasse === serieForm;
   });
 
   // Capture des entrées claviers
@@ -76,22 +111,22 @@ const AjouterEleve = () => {
     }
   };
 
-  // 3. Soumission et écriture Cloud en Temps Réel
+  // 4. Soumission et écriture Cloud en Temps Réel
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
-    setLoading(true);
 
-    if (!formData.nom || !formData.prenom || !formData.niveauPromotion || !formData.classeId) {
-      setMessage({ type: 'error', text: 'Veuillez remplir les champs obligatoires (*)' });
-      setLoading(false);
+    if (!formData.nom || !formData.prenom || !formData.niveauPromotion || !formData.classeId || !formData.emailParent.trim()) {
+      setMessage({ type: 'error', text: 'Veuillez remplir les champs obligatoires (*) incluant l\'e-mail du parent.' });
       return;
     }
 
+    setLoading(true);
+
     try {
-      const currentSchool = schoolId || 'lycee_classique_abidjan';
       const cleanNom = formData.nom.trim().toUpperCase();
       const cleanPrenom = formData.prenom.trim();
+      const mailParentClean = formData.emailParent.trim().toLowerCase();
 
       // Formule de calcul du Matricule Ivoirien (ex: 26_7493K)
       const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -99,23 +134,32 @@ const AjouterEleve = () => {
       const numAleatoire = Math.floor(1000 + Math.random() * 9000);
       const matriculeGenere = `26_${numAleatoire}${lettreFin}`;
 
+      // Formate le mot de passe automatique demandé : matricule@nom_prenom!
+      const nFormate = cleanNom.replace(/\s+/g, '');
+      const pFormate = cleanPrenom.toLowerCase().replace(/\s+/g, '_');
+      const passwordCalcule = `${matriculeGenere.toLowerCase()}@${nFormate.toLowerCase()}_${pFormate}!`;
+
       const targetClass = classes.find(c => c.id === formData.classeId);
 
-      // Payload Cloud relationnel
+      // Payload Cloud relationnel consolidé
       const studentCloudData = {
+        id: matriculeGenere,
         matricule: matriculeGenere,
         nom: cleanNom,
         prenoms: cleanPrenom,
         role: 'eleve',
-        classeId: formData.classeId,
-        promotion: formData.niveauPromotion,
+        classeId: targetClass?.idBrute || formData.classeId, // Sauvegarde la clé propre (ex: tle_d_1)
+        promotion: targetClass?.promotion || formData.niveauPromotion,
         dateNaissance: formData.dateNaissance,
         ecoleProvenance: formData.ecoleProvenance.trim(),
         numSecuriteSociale: formData.numSecuriteSociale.trim(),
         anneeArrivee: formData.anneeArrivee,
         dispensePhysique: formData.dispensePhysique,
-        email: formData.email.trim(), // 🟢 Correction : Enregistre le vrai mail saisi
-        telephone: formData.telephone.trim(), // 🟢 Correction : Enregistre le vrai numéro saisi
+        email: formData.email.trim() || `${matriculeGenere.toLowerCase()}@school.ci`, 
+        telephone: formData.telephone.trim(), 
+        emailParent: mailParentClean,
+        password: passwordCalcule, 
+        statut: "actif",
         absences: 0,
         notes: {},
         schoolId: currentSchool
@@ -126,19 +170,20 @@ const AjouterEleve = () => {
       if (response.success) {
         await genererFicheAvecQRCodePDF({
           ...studentCloudData,
-          prenom: cleanPrenom
+          prenom: cleanPrenom,
+          password: passwordCalcule
         }, 'eleve');
 
         setMessage({
           type: 'success',
-          text: `🎉 L'élève ${cleanPrenom} ${cleanNom} a été inscrit avec succès dans la classe ${targetClass?.nom || ''} !\n\n🔑 Matricule attribué : ${matriculeGenere}\n🔐 Code secret d'accès : ${matriculeGenere}@${cleanNom}!`
+          text: `🎉 L'élève ${cleanPrenom} ${cleanNom} a été inscrit avec succès dans la classe ${targetClass?.nom || ''} !\n\n🔑 Matricule attribué : ${matriculeGenere}\n🔐 Clé d'accès générée : ${passwordCalcule}\n📧 Alertes parents associées à : ${mailParentClean}`
         });
 
         setFormData({
-          nom: '', prenom: '', dateNaissance: '', ecoleProvenance: '',
+          nom: '', prenom: '', genre: '', dateNaissance: '', ecoleProvenance: '',
           numSecuriteSociale: '', niveauPromotion: '', classeId: '',
           anneeArrivee: new Date().getFullYear().toString(),
-          dispensePhysique: 'Non', email: '', telephone: ''
+          dispensePhysique: 'Non', email: '', telephone: '', emailParent: ''
         });
         setPhotoPreview(null);
         setPhotoFile(null);
@@ -153,19 +198,32 @@ const AjouterEleve = () => {
     }
   };
 
-   return (
-    <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md my-6 font-sans relative">
-      
-      {/* Bouton de retour vers l'espace d'administration de l'école */}
+  return (
+    <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md my-6 font-sans relative animate-fadeIn">
+       {/* 🟢 FICHE D'IDENTIFICATION & EN-TÊTE BADGE ÉLÈVE DYNAMIQUE INTERNATIONALE */}
+      <div className="flex justify-between items-start border-b pb-4 mb-6 text-[11px] font-black uppercase text-gray-500 tracking-tight leading-relaxed">
+        <div>
+          <p className="text-gray-900 font-extrabold text-xs">{metaSchool.pays}</p>
+          <p className="font-medium italic text-[10px] lowercase first-letter:uppercase text-gray-400">{metaSchool.devise}</p>
+          <p className="mt-1 text-gray-700">{metaSchool.ministere}</p>
+        </div>
+        <div className="text-right font-mono text-[10px] text-gray-400">
+          <p>FICHE D'IDENTIFICATION & BADGE ÉLÈVE</p>
+          <p className="text-emerald-700 font-bold mt-0.5">SECTION : ACCÈS SÉCURISÉ</p>
+        </div>
+      </div>
+      {/* Bouton de retour */}
       <Link
-        to="/admin/dashboard"
+        to="/admin/home"
         className="absolute top-6 right-6 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-xs transition shadow-xs"
       >
-        ← Retour au Dashboard
+        ← Retour au Secrétariat
       </Link>
 
       <h2 className="text-2xl font-bold text-gray-800 border-b pb-4 mb-2">🏛️ Inscription d'un Nouvel Élève (Temps Réel)</h2>
-      <p className="text-xs text-orange-600 font-extrabold uppercase tracking-wider mb-6">Établissement : {schoolName}</p>
+      <p className="text-xs text-orange-600 font-extrabold uppercase tracking-wider mb-6">
+        Établissement : {schoolName || currentSchool.replace(/_/g, ' ').toUpperCase()}
+      </p>
 
       {message.text && (
         <div className={`p-4 mb-6 rounded-lg text-sm font-semibold whitespace-pre-line border ${
@@ -198,22 +256,23 @@ const AjouterEleve = () => {
             </div>
 
             {/* État civil et Contacts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-3">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-3">
               <div>
                 <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Nom de famille *</label>
-                <input type="text" name="nom" value={formData.nom || ''} onChange={handleChange} placeholder="Ex: KOFFI" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 uppercase font-bold outline-none" />
+                <input type="text" name="nom" value={formData.nom || ''} onChange={handleChange} placeholder="Ex: KOFFI" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 uppercase font-bold outline-none" required />
               </div>
               <div>
                 <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Tous les Prénoms *</label>
-                <input type="text" name="prenom" value={formData.prenom || ''} onChange={handleChange} placeholder="Ex: Yao Ama" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 font-medium outline-none" />
+                <input type="text" name="prenom" value={formData.prenom || ''} onChange={handleChange} placeholder="Ex: Yao Ama" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 font-medium outline-none" required />
               </div>
-                            <div>
-                <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Genre / Sexe *</label>
+              <div>
+                <label className="block text-gray-400 text-xs font-bold uppercase mb-1">Genre / Sexe *</label>
                 <select
                   name="genre"
-                  value={formData.genre}
+                  value={formData.genre || ''}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-medium outline-none"
+                  required
                 >
                   <option value="">-- Choisir le genre --</option>
                   <option value="Masculin">♂️ Masculin</option>
@@ -221,17 +280,34 @@ const AjouterEleve = () => {
                 </select>
               </div>
 
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Date de Naissance *</label>
-                <input type="date" name="dateNaissance" value={formData.dateNaissance || ''} onChange={handleChange} className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 outline-none" />
+                <input type="date" name="dateNaissance" value={formData.dateNaissance || ''} onChange={handleChange} className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 outline-none" required />
               </div>
               <div>
-                <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Adresse Mail Parent / Élève *</label>
+                <label className="block text-gray-700 text-xs font-bold uppercase mb-1">E-mail de l'Élève (Optionnel)</label>
                 <input type="email" name="email" value={formData.email || ''} onChange={handleChange} placeholder="eleve@gmail.com" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 outline-none font-mono" />
               </div>
               <div>
                 <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Numéro Parent / Tuteur *</label>
-                <input type="tel" name="telephone" value={formData.telephone || ''} onChange={handleChange} placeholder="Ex: 0708091011" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 outline-none font-mono" />
+                <input type="tel" name="telephone" value={formData.telephone || ''} onChange={handleChange} placeholder="Ex: 0708091011" className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 outline-none font-mono" required />
+              </div>
+
+              {/* 🟢 BLOC CHAMP TECHNIQUE PARENTAL AJOUTÉ AVEC SUCCÈS */}
+              <div className="md:col-span-2 bg-purple-50/50 p-3 rounded-lg border border-purple-100">
+                <label className="block text-purple-800 text-xs font-bold uppercase mb-1">📧 Adresse E-mail Parental *</label>
+                <input 
+                  type="email" 
+                  name="emailParent" 
+                  value={formData.emailParent || ''} 
+                  onChange={handleChange} 
+                  placeholder="parent-tuteur@gmail.com" 
+                  className="w-full px-3 py-2.5 border bg-white text-sm rounded-md focus:ring-2 focus:ring-purple-500 outline-none font-mono font-bold text-slate-900" 
+                  required 
+                />
+                <p className="text-[10px] text-purple-500 mt-1 font-medium leading-tight">
+                  🚨 Vitale : C'est sur cette adresse mail que seront envoyés en temps réel les bulletins PDF officiels, les relevés de notes et les alertes automatiques cumulées de 10H d'absences.
+                </p>
               </div>
             </div>
           </div>
@@ -253,10 +329,9 @@ const AjouterEleve = () => {
           <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wide mb-4 border-b pb-1">2. Affectation Pédagogique (12 Promotions Ivoiriennes)</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Sélection de la promotion */}
             <div>
               <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Niveau de la Promotion *</label>
-              <select name="niveauPromotion" value={formData.niveauPromotion || ''} onChange={handleChange} className="w-full px-3 py-2.5 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-medium outline-none">
+              <select name="niveauPromotion" value={formData.niveauPromotion || ''} onChange={handleChange} className="w-full px-3 py-2.5 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-medium outline-none" required>
                 <option value="">-- Sélectionner la promotion --</option>
                 <optgroup label="Premier Cycle">
                   <option value="6eme">6ème</option>
@@ -264,84 +339,69 @@ const AjouterEleve = () => {
                   <option value="4eme">4ème</option>
                   <option value="3eme">3ème</option>
                 </optgroup>
-                <optgroup label="Second Cycle - Secondes">
-                  <option value="2nd_A">2nd A</option>
-                  <option value="2nd_C">2nd C</option>
+                <optgroup label="Second Cycle — Secondes">
+                  <option value="2nd_a">2nd A</option>
+                  <option value="2nd_c">2nd C</option>
                 </optgroup>
-                <optgroup label="Second Cycle - Premières">
-                  <option value="1ere_A">1ere A</option>
-                  <option value="1ere_C">1ere C</option>
+                <optgroup label="Second Cycle — Premières">
+                  <option value="1ere_a">1ere A</option>
+                  <option value="1ere_c">1ere C</option>
+                  <option value="1ere_d">1ere D</option>
                 </optgroup>
-                <optgroup label="Second Cycle - Terminales">
-                  <option value="T_A1">Terminale A1</option>
-                  <option value="T_A2">Terminale A2</option>
-                  <option value="T_D">Terminale D</option>
-                  <option value="T_C">Terminale C</option>
+                <optgroup label="Second Cycle — Terminales">
+                  <option value="tle_a">Terminale A</option>
+                  <option value="tle_c">Terminale C</option>
+                  <option value="tle_d">Terminale D</option>
                 </optgroup>
               </select>
             </div>
 
-                        {/* Liste déroulante des classes physiques de l'école */}
+            {/* Division de classe dynamique */}
             <div>
-              <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Classe Physique Disponible *</label>
-              <select 
-                name="classeId" 
-                value={formData.classeId || ''} 
-                onChange={handleChange} 
-                disabled={loadingClasses || !formData.niveauPromotion}
-                className="w-full px-3 py-2.5 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-semibold outline-none disabled:bg-gray-100"
-              >
-                <option value="">-- Choisir la structure cloud active --</option>
-                {classesFiltrees.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.nom} (Effectif : {c.elevesCount || 0} / 50)
-                  </option>
-                ))}
-              </select>
-              {formData.niveauPromotion && classesFiltrees.length === 0 && !loadingClasses && (
-                <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ Aucune classe créée par l'admin pour ce niveau.</p>
+              <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Division Pédagogique de la Classe *</label>
+              {loadingClasses ? (
+                <p className="p-2 border text-xs text-gray-400 animate-pulse font-bold bg-gray-50 rounded-md">⏳ Chargement des structures...</p>
+              ) : classesFiltrees.length === 0 ? (
+                <p className="p-2.5 border text-xs text-red-600 bg-red-50 font-bold rounded-md">⚠️ Aucune classe créée en base pour ce niveau.</p>
+              ) : (
+                <select name="classeId" value={formData.classeId || ''} onChange={handleChange} className="w-full px-3 py-2.5 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-bold outline-none" required>
+                  <option value="">-- Assigner la classe --</option>
+                  {classesFiltrees.map(cl => (
+                    <option key={cl.id} value={cl.id}>🏛️ {cl.nom || (cl.idBrute || '').toUpperCase()}</option>
+                  ))}
+                </select>
               )}
-            </div>
-
-            <div>
-              <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Année Scolaire d'Arrivée</label>
-              <input type="number" name="anneeArrivee" value={formData.anneeArrivee || ''} onChange={handleChange} className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 outline-none font-mono" />
-            </div>
-
-            <div>
-              <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Aptitude Médicale Éducation Physique (EPS)</label>
-              <div className="flex items-center space-x-4 mt-2">
-                <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-gray-700">
-                  <input type="radio" name="dispensePhysique" value="Non" checked={formData.dispensePhysique === 'Non'} onChange={handleChange} className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300" />
-                  <span>Apte (Normal)</span>
-                </label>
-                                <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-gray-700">
-                  <input 
-                    type="radio" 
-                    name="dispensePhysique" 
-                    value="Oui" 
-                    checked={formData.dispensePhysique === 'Oui'} 
-                    onChange={handleChange} 
-                    className="focus:ring-orange-500 h-4 w-4 text-orange-600 border-gray-300" 
-                  />
-                  <span className="text-red-600 font-bold">Dispensé(e) d'EPS</span>
-                </label>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Bouton de validation d'envoi Cloud unique */}
-        <div className="flex justify-end border-t pt-4">
-          <button 
-            type="submit" 
-            disabled={loading || loadingClasses}
-            className="bg-orange-500 text-white font-extrabold px-8 py-2.5 rounded-lg text-sm hover:bg-orange-600 shadow-md transition duration-150 disabled:bg-orange-300 min-w-[200px] flex items-center justify-center"
+        {/* ================= 3. DISPENSES ================= */}
+        <div className="border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Aptitude Physique (EPS)</label>
+            <select name="dispensePhysique" value={formData.dispensePhysique} onChange={handleChange} className="w-full px-3 py-2 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-medium outline-none">
+              <option value="Non">✅ Apte (Pratique Régulière)</option>
+              <option value="Oui">🏥 Inapte (Billet de Dispense Médicale)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Année d'Affectation</label>
+            <input type="text" name="anneeArrivee" value={formData.anneeArrivee} onChange={handleChange} className="w-full px-3 py-2 border text-sm rounded-md bg-gray-50 cursor-not-allowed outline-none font-mono" disabled />
+          </div>
+        </div>
+
+        {/* Bouton de validation d'inscription */}
+        <div className="pt-4">
+          <button
+            type="submit"
+            disabled={loading || classesFiltrees.length === 0}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs shadow-md transition disabled:bg-gray-300 cursor-pointer flex justify-center items-center"
           >
             {loading ? (
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
             ) : (
-              "Valider l'Inscription MENA"
+              "💾 Valider et Immatriculer l'Élève"
             )}
           </button>
         </div>

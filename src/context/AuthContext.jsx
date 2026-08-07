@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [schoolId, setSchoolId] = useState(sessionStorage.getItem('sgs_school_id') || '');
   const [loading, setLoading] = useState(true);
 
-  // 🔄 ÉCOUTEUR ET SYNC EN TEMPS RÉEL
+  // 🔄 ÉCOUTEUR ET SYNC EN TEMPS RÉEL (Insensible aux conflits de Casse)
   useEffect(() => {
     const refreshUserStatus = async () => {
       const matriculeCible = user?.matricule || user?.id || (sessionStorage.getItem('sgs_user') ? JSON.parse(sessionStorage.getItem('sgs_user'))?.matricule : null);
@@ -45,15 +45,15 @@ export const AuthProvider = ({ children }) => {
           if (!classSnapshot.empty) {
             roleDetermine = 'prof_principal'; 
             const classeDoc = classSnapshot.docs[0].data();
-            classeAssigneeOfficielle = classeDoc.id || '5eme_1'; 
+            classeAssigneeOfficielle = classeDoc.idBrute || classeDoc.id || '5eme_1'; 
           }
 
           const updatedUser = {
             ...user,
             id: matriculeCible.trim(),
             matricule: matriculeCible.trim(),
-            nom: cloudData.nom || cloudData.name || 'BLEGUY',
-            prenoms: cloudData.prenoms || cloudData.prenom || 'Eric Luciano',
+            nom: cloudData.nom || cloudData.name || '',
+            prenoms: cloudData.prenoms || cloudData.prenom || '',
             role: roleDetermine, 
             statut: (cloudData.statut || "actif").trim().toLowerCase(),
             schoolId: cloudData.schoolId || 'lycee_Moderne_Gagnoa',
@@ -77,13 +77,19 @@ export const AuthProvider = ({ children }) => {
     refreshUserStatus();
   }, [user?.matricule, user?.id]);
 
-  // 🔑 CONNEXION INITIALE CLIENTS
+  // 🔑 CONNEXION INITIALE CLIENTS DÉBLOQUÉE
   const login = async (matricule, password) => {
     setLoading(true);
     try {
       const result = await verifyUserOnCloud(matricule, password);
 
       if (result?.success) {
+        // Extraction et sécurisation de la clé d'établissement d'origine
+        const originalSchoolId = result.user.schoolId ? result.user.schoolId.trim() : 'lycee_Moderne_Gagnoa';
+        
+        // Label d'affichage cosmétique propre pour l'interface
+        const cleanDisplayName = originalSchoolId.replace(/_/g, " ").toUpperCase();
+
         const profil = {
           id: result.user.matricule, 
           matricule: result.user.matricule,
@@ -92,7 +98,7 @@ export const AuthProvider = ({ children }) => {
           role: result.user.role || 'professeur',
           statut: (result.user.statut || "actif").trim().toLowerCase(),
           classeId: result.user.classeId || '5eme_1',
-          schoolId: result.user.schoolId,
+          schoolId: originalSchoolId, // 🟢 FIXE IMMUTABLE : Conserve la vraie clé Firestore (ex: lycee_Moderne_Gagnoa)
           matiereEnseignee: result.user.matiereEnseignee || 'Français', 
           grade: result.user.grade || 'A3',
           experience: result.user.anneesExperience || "20",
@@ -101,12 +107,13 @@ export const AuthProvider = ({ children }) => {
         };
 
         setUser(profil);
-        setSchoolId(profil.schoolId);
-        setSchoolName(profil.schoolId ? profil.schoolId.replace(/_/g, " ").toUpperCase() : "LYCEE MODERNE GAGNOA");
+        setSchoolId(originalSchoolId);
+        setSchoolName(cleanDisplayName);
 
+        // Remplissage étanche du stockage persistant
         sessionStorage.setItem("sgs_user", JSON.stringify(profil));
-        sessionStorage.setItem("sgs_school_id", profil.schoolId);
-        sessionStorage.setItem("sgs_school_name", profil.schoolId ? profil.schoolId.replace(/_/g, " ").toUpperCase() : "LYCEE MODERNE GAGNOA");
+        sessionStorage.setItem("sgs_school_id", originalSchoolId);
+        sessionStorage.setItem("sgs_school_name", cleanDisplayName);
 
         setLoading(false);
         return { success: true, role: profil.role };
@@ -130,7 +137,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    // 🟢 RECTIFICATION MAJEURE : Les fonctions setSchoolId et setSchoolName sont maintenant partagées
     <AuthContext.Provider value={{ user, schoolName, schoolId, loading, login, logout, setUser, setSchoolId, setSchoolName }}>
       {children}
     </AuthContext.Provider>

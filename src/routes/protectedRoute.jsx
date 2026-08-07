@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 
 const ProtectedRoute = ({allowedRoles=[]})=>{
-
+const rolesAutorisesNettoyes = allowedRoles.map(r => r.trim().toLowerCase());
 
 const {user,loading}=useAuth();
 

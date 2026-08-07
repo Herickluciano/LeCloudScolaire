@@ -1,219 +1,246 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../../../context/AuthContext';
-import { db } from '../../../../services/api';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 
+// --- CHEMINS RELATIFS SÉCURISÉS (4 niveaux depuis espacePP/) ---
+import { useAuth } from '../../../../context/AuthContext';
+import { db } from '../../../../services/api';
+import ConseilClasse from './ConseilClasse';
+
 const DashboardPP = () => {
-  const { user, schoolId, schoolName } = useAuth();
-  const currentSchool = schoolId || 'lycee_Moderne_Gagnoa';
+  const { user, schoolId } = useAuth();
+  
+  const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_Moderne_Gagnoa').trim().toLowerCase();
+  const classePP = (user?.classeId || 'tle_d_1').trim().toLowerCase(); 
 
-  // --- ÉTATS ---
-  const [eleves, setEleves] = useState([]);
-  const [classeNom, setClasseNom] = useState('5EME 1');
+  // --- ÉTATS CLOUD ---
+  const [elevesClasse, setElevesClasse] = useState([]);
+  const [toutesNotes, setToutesNotes] = useState([]);
+  const [appreciationsPP, setAppreciationsPP] = useState({});
   const [loading, setLoading] = useState(true);
-  const [trimestre] = useState('1');
 
-  // --- STATISTIQUES CALCULÉES ---
-  const [stats, setStats] = useState({
-    totalEleves: 0,
-    moyenneGenerale: 0,
-    totalAbsences: 0,
-    elevesEnDanger: 0
-  });
+  // Éléments de filtrage de l'espace de synthèse
+  const [trimestreSelectionne, setTrimestreSelectionne] = useState('1');
+  const [eleveSelectionneId, setEleveSelectionneId] = useState('');
+  const [sendingAppreciation, setSendingAppreciation] = useState(false);
+  const [texteAppreciation, setTexteAppreciation] = useState('');
 
-  // 🔄 ÉCOUTEUR EN TEMPS RÉEL (onSnapshot) : Synthèse de la classe du Titulaire
+  // 🔄 ÉCOUTEUR MULTI-FLUX COMPLÈTEMENT RÉACTIF TEMPS RÉEL
   useEffect(() => {
-    const maClasseId = user?.classeId || '5eme_1'; 
+    if (!currentSchool || !classePP) {
+      setLoading(false);
+      return;
+    }
 
-    const q = query(
+    // A. Écoute des élèves de la classe (Récupère le compteur live d'absences de l'éducateur)
+    const qEleves = query(
       collection(db, "users"),
-      where("role", "==", "eleve"),
       where("schoolId", "==", currentSchool),
-      where("classeId", "==", maClasseId.trim().toLowerCase())
+      where("role", "==", "eleve"),
+      where("classeId", "==", classePP)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubEleves = onSnapshot(qEleves, (snapshot) => {
       const list = [];
-      let sommeMoyennes = 0;
-      let countMoyennes = 0;
-      let cumulAbsences = 0;
-      let enDanger = 0;
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      list.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+      setElevesClasse(list);
+      if (list.length > 0 && !eleveSelectionneId) {
+        setEleveSelectionneId(list[0].id);
+      }
+    });
 
+    // B. Écoute de TOUTES les notes de l'établissement pour croiser les moyennes
+    const qNotes = query(collection(db, "notes"), where("schoolId", "==", currentSchool));
+    const unsubNotes = onSnapshot(qNotes, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => list.push({ id: docSnap.id, ...docSnap.data() }));
+      setToutesNotes(list);
+    });
+
+    // C. Écoute des appréciations globales déjà validées par le PP
+    const qAppreciations = query(collection(db, "appreciations_conseil"), where("schoolId", "==", currentSchool));
+    const unsubAppreciations = onSnapshot(qAppreciations, (snapshot) => {
+      const map = {};
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        list.push({ id: docSnap.id, ...data });
-
-        cumulAbsences += (data.absences || 0);
-
-        if (data.absences > 4) enDanger++;
-
-        const moy = data.moyennesTrimestrielles?.[`trimestre_${trimestre}`];
-        if (moy !== undefined && moy !== null) {
-          sommeMoyennes += parseFloat(moy);
-          countMoyennes++;
-        }
+        map[`${data.eleveId}_trim_${data.trimestre}`] = data.contenu;
       });
-
-      setEleves(list);
-      setStats({
-        totalEleves: list.length,
-        moyenneGenerale: countMoyennes > 0 ? parseFloat((sommeMoyennes / countMoyennes).toFixed(2)) : 0,
-        totalAbsences: cumulAbsences,
-        elevesEnDanger: enDanger
-      });
-      // 📡 SYNC DE SÉCURITÉ : Vérification du seuil d'absences hebdomadaires (10 Heures)
-const verifierEtAlerterParent = async (eleveData) => {
-  const heuresAbsences = eleveData.absences || 0;
-  const emailDuParent = eleveData.emailParent;
-
-  // Si l'élève atteint 10h ou plus et que le parent a un mail
-  if (heuresAbsences >= 10 && emailDuParent) {
-    try {
-      await fetch("http://localhost:10000/api/send-parent-absence-alert", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          parent_email: emailDuParent.trim(),
-          student_name: `${eleveData.nom} ${eleveData.prenoms || ''}`.toUpperCase(),
-          school_name: schoolName || "L'Établissement",
-          total_hours: heuresAbsences
-        })
-      });
-      console.log(`✉️ Alerte d'absences (>=10h) transmise au parent de ${eleveData.nom}`);
-    } catch (err) {
-      console.error("Échec d'envoi de l'alerte parent :", err);
-    }
-  }
-};
-      setLoading(false);
-    }, (err) => {
-      console.error("Erreur antenne Dashboard PP :", err);
+      setAppreciationsPP(map);
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [user, currentSchool, trimestre]);
+    return () => {
+      unsubEleves();
+      unsubNotes();
+      unsubAppreciations();
+    };
+  }, [currentSchool, classePP, eleveSelectionneId]);
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-purple-600 animate-pulse">Ouverture de la Tour de Contrôle du Titulaire...</div>;
+  // Déclencher la mise à jour du champ d'appréciation lors du changement d'élève ou de trimestre
+  useEffect(() => {
+    const cleMap = `${eleveSelectionneId}_trim_${trimestreSelectionne}`;
+    setTexteAppreciation(appreciationsPP[cleMap] || '');
+  }, [eleveSelectionneId, trimestreSelectionne, appreciationsPP]);
+
+  // Extraction de l'élève actif pour le livrable
+  const eleveActif = elevesClasse.find(e => e.id === eleveSelectionneId);
+
+  // 🟢 FILTRAGE COMPATIBLE DES NOTES POUR CONSTRUIRE LE PRÉ-BULLETIN
+  const extraireNotesEleveCourant = () => {
+    return toutesNotes.filter(n => n.eleveId === eleveSelectionneId && n.trimestre === trimestreSelectionne);
+  };
+
+  // 🚀 ACTION : Enregistrer le verdict du Conseil de classe
+  const handleSaveVerdictPP = async (e) => {
+    e.preventDefault();
+    if (!eleveSelectionneId || !texteAppreciation.trim()) return;
+
+    setSendingAppreciation(true);
+    const documentKey = `${currentSchool}_verdict_${eleveSelectionneId}_t${trimestreSelectionne}`;
+
+    try {
+      await setDoc(doc(db, "appreciations_conseil", documentKey), {
+        id: documentKey,
+        schoolId: currentSchool,
+        eleveId: eleveSelectionneId,
+        classeId: classePP,
+        trimestre: trimestreSelectionne,
+        contenu: texteAppreciation.trim(),
+        signePar: `M. ${user?.nom || 'Professeur Principal'}`,
+        updatedAt: new Date().toISOString()
+      });
+      alert("🎯 Verdict et avis du Conseil de classe enregistrés avec succès !");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSendingAppreciation(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-xs font-bold text-purple-600 animate-pulse uppercase">Centralisation des livrets de notes live...</div>;
+
+  const notesFiltrees = extraireNotesEleveCourant();
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen text-gray-700 animate-fadeIn text-left">
       
-      {/* BOUTON RETOUR DASHBOARD GÉNÉRAL */}
-      <div className="mb-4">
-        <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs">
-          ⬅️ Bureau Enseignant
+      {/* BOUTON RETOUR */}
+      <div className="mb-4 text-left">
+        <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition">
+          ⬅️ Retour au Bureau Virtuel
         </Link>
       </div>
 
-      {/* BANDEAU PROFIL CLASSE */}
-      <div className="bg-purple-900 text-white p-6 rounded-2xl shadow-md mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-purple-200 bg-purple-950/60 px-3 py-1 rounded-full">
-            👑 Tableau de Bord Professeur Principal
-          </span>
-          <h1 className="text-xl md:text-2xl font-black mt-2">Division Pédagogique : {classeNom}</h1>
-          <p className="text-xs text-purple-200 font-medium">Établissement : <span className="font-bold text-orange-400 uppercase">{schoolName}</span> — Titulaire : M. {user?.nom || 'Enseignant'}</p>
-        </div>
-        
-        <span className="text-xs font-mono font-black bg-purple-950 text-orange-400 px-3 py-1.5 rounded-xl border border-purple-800">
-          Trimestre {trimestre} Actif
+      {/* BANNIÈRE PP */}
+      <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl shadow-md mb-8 text-left">
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-950/60 px-2.5 py-1 rounded-full">
+          👑 Supervision Pédagogique Connectée
         </span>
+        <h1 className="text-xl md:text-2xl font-black mt-2">Espace Enseignant Principal</h1>
+        <p className="text-xs text-slate-400 mt-1">Titulaire de la division : <span className="text-orange-400 font-bold uppercase">{classePP}</span> — Enseignant : <span className="font-bold text-white uppercase">{user?.nom || "BLEGUY"}</span></p>
       </div>
 
-      {/* 📊 CARTES DE PERFORMANCES */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-          <p className="text-[10px] font-black text-gray-400 uppercase">Effectif Inscrit</p>
-          <p className="text-xl font-black text-gray-800 mt-1">{stats.totalEleves} Apprenants</p>
+      {/* ZONE DE SÉLECTION DE L'ÉLÈVE ET DU TRIMESTRE */}
+      <div className="bg-white border p-4 rounded-xl shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-bold">
+        <div>
+          <label className="block text-gray-400 uppercase mb-1">1. Choisir l'Apprenant</label>
+          <select value={eleveSelectionneId} onChange={(e) => setEleveSelectionneId(e.target.value)} className="w-full bg-gray-50 border p-2.5 rounded-lg outline-none cursor-pointer">
+            {elevesClasse.map(e => (
+              <option key={e.id} value={e.id}>{e.nom?.toUpperCase()} {e.prenoms || ''} ({e.matricule || e.id})</option>
+            ))}
+          </select>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-          <p className="text-[10px] font-black text-gray-400 uppercase">Moyenne Générale</p>
-          <p className="text-xl font-black text-purple-700 mt-1">{stats.moyenneGenerale} / 20</p>
+        <div>
+          <label className="block text-gray-400 uppercase mb-1">2. Période Évaluative</label>
+          <select value={trimestreSelectionne} onChange={(e) => setTrimestreSelectionne(e.target.value)} className="w-full bg-gray-50 border p-2.5 rounded-lg outline-none cursor-pointer">
+            <option value="1">Premier Trimestre</option>
+            <option value="2">Deuxième Trimestre</option>
+            <option value="3">Troisième Trimestre</option>
+          </select>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-          <p className="text-[10px] font-black text-gray-400 uppercase">Absences Trimestre</p>
-          <p className="text-xl font-black text-red-600 mt-1">{stats.totalAbsences} Heures</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-          <p className="text-[10px] font-black text-gray-400 uppercase">Élèves à Convoquer</p>
-          <p className="text-xl font-black text-amber-600 mt-1">{stats.elevesEnDanger} Alertes</p>
+        <div className="bg-purple-50 p-2.5 rounded-lg border border-purple-100 text-purple-900 flex flex-col justify-center">
+          <p className="text-[10px] uppercase font-black tracking-wide">Assiduité Live Éducateur</p>
+          <p className="text-sm font-mono font-black mt-1">⚠️ {eleveActif?.absences || 0} Heures d'Absence</p>
         </div>
       </div>
 
-      {/* 🚀 PANNEAU DES ACCÈS RAPIDES */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* ================= PANNEAU DU PRÉ-BULLETIN INTERCONNECTÉ ================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <div className="bg-white p-5 rounded-xl border border-gray-100 flex flex-col justify-between shadow-2xs">
-          <div>
-            <div className="text-lg">📋</div>
-            <h4 className="text-sm font-black text-gray-800 mt-2">Registre des Présences</h4>
-            <p className="text-[11px] text-gray-400 mt-1 font-medium">Contrôler la feuille d'appel du jour ou régulariser les billets de retards.</p>
-          </div>
-          <Link to="/prof/faire-appel" className="w-full text-center bg-slate-900 text-white font-black text-[10px] uppercase py-2 rounded-lg transition mt-4 block">Ouvrir l'Appel</Link>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-gray-100 flex flex-col justify-between shadow-2xs">
-          <div>
-            <div className="text-lg">📝</div>
-            <h4 className="text-sm font-black text-gray-800 mt-2">Suivi des Évaluations</h4>
-            <p className="text-[11px] text-gray-400 mt-1 font-medium">Accéder au carnet de notes numérique pour insérer les interrogations de votre matière.</p>
-          </div>
-          <Link to="/prof/saisie-notes" className="w-full text-center bg-slate-900 text-white font-black text-[10px] uppercase py-2 rounded-lg transition mt-4 block">Saisir mes Notes</Link>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-purple-100 bg-linear-to-b from-white to-purple-50/20 flex flex-col justify-between shadow-2xs">
-          <div>
-            <div className="text-lg">👑</div>
-            <h4 className="text-sm font-black text-purple-900 mt-2">Clôture du Conseil</h4>
-            <p className="text-[11px] text-purple-500/80 mt-1 font-medium">Arrêter définitivement le trimestre et sceller le livret scolaire de la classe.</p>
-          </div>
-          <Link to="/prof/espace-pp" className="w-full text-center bg-purple-700 hover:bg-purple-800 text-white font-black text-[10px] uppercase py-2 rounded-lg transition mt-4 block shadow-xs">Clôturer Trimestre</Link>
-        </div>
-
-      </div>
-
-      {/* 📋 TABLEAU SYNOPTIQUE DE L'EFFECTIF CIVILE */}
-      <div className="bg-white rounded-xl border shadow-xs overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider">Répertoire provisoire des dossiers élèves</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm border-collapse">
-            <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
-              <tr>
-                <th className="p-3">Matricule</th>
-                <th className="p-3">Nom & Prénoms de l'Apprenant</th>
-                <th className="p-3 text-center">Moyenne Provisoire</th>
-                <th className="p-3 text-center">Cumul Heures</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y text-gray-700 font-bold">
-              {eleves.map((student) => {
-                const moyenneAffiche = student.moyennesTrimestrielles?.[`trimestre_${trimestre}`];
-                return (
-                  <tr key={student.id} className="hover:bg-gray-50/30 transition">
-                    <td className="p-3 font-mono text-gray-400 text-xs">{student.matricule || student.id}</td>
-                    <td className="p-3 uppercase text-gray-900 font-black">
-                      {student.nom} <span className="font-normal lowercase first-letter:uppercase text-gray-600">{student.prenoms || student.prenom}</span>
-                    </td>
-                    <td className="p-3 text-center font-mono text-purple-700 font-black">
-                      {moyenneAffiche !== undefined && moyenneAffiche !== null ? `${parseFloat(moyenneAffiche).toFixed(2)}` : '-- / 20'}
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs ${student.absences > 4 ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-green-100 text-green-700'}`}>
-                        {student.absences || 0} H
-                      </span>
-                    </td>
+        {/* GRILLE RECAPITULATIVE DES MATIÈRES & NOTES */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border p-5 shadow-sm">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">📄 Relevé de Notes Trimestriel Provisoire</h3>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-bold text-gray-700 border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-gray-400 uppercase border-b border-gray-100">
+                  <th className="p-3">Discipline</th>
+                  <th className="p-3">Intervenant</th>
+                  <th className="p-3 text-center">Note /20</th>
+                  <th className="p-3">Appréciation Enseignant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notesFiltrees.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="p-12 text-center text-gray-400 italic">Aucune note n'a encore été saisie pour cet élève sur ce trimestre.</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ) : (
+                  notesFiltrees.map((note) => (
+                    <tr key={note.id} className="border-b border-gray-100 hover:bg-gray-50/40 transition">
+                      <td className="p-3 text-purple-700 uppercase font-black">{note.matiere}</td>
+                      <td className="p-3 text-gray-600 font-medium">{note.profName || 'Enseignant'}</td>
+                      <td className="p-3 text-center font-mono text-sm font-black text-gray-900">
+                        {parseFloat(note.valeur).toFixed(2)}
+                      </td>
+                      <td className="p-3 text-gray-500 font-medium italic truncate max-w-[200px]">
+                        {note.appreciation || 'Aucun commentaire renseigné.'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
+                {/* PANNEAU DE VERDICT DU CONSEIL POUR LE PROFESSEUR PRINCIPAL */}
+        <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-xl h-fit">
+          <h3 className="text-xs font-black text-orange-400 uppercase tracking-wider border-b border-slate-800 pb-3 mb-4">👑 Avis du Professeur Principal</h3>
+          
+          <div className="text-xs font-bold space-y-3 mb-4 text-slate-300">
+            <p>● <span className="text-slate-500">Élève :</span> {eleveActif?.nom?.toUpperCase()} {eleveActif?.prenoms}</p>
+            <p>● <span className="text-slate-500">Total Absences :</span> <strong className="text-red-400">{eleveActif?.absences || 0} H</strong> (Donnée Éducateur)</p>
+          </div>
+
+          <form onSubmit={handleSaveVerdictPP} className="space-y-4 text-xs font-bold">
+            <div>
+              <label className="block text-slate-400 uppercase mb-1">Appréciation Générale du Conseil *</label>
+              <textarea 
+                rows="5" 
+                placeholder="Ex: Trimestre satisfaisant. Élève sérieux et discipliné. Poursuivez ainsi..." 
+                value={texteAppreciation} 
+                onChange={(e) => setTexteAppreciation(e.target.value)} 
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 font-medium outline-none focus:ring-2 focus:ring-orange-500" 
+                required
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={sendingAppreciation || !eleveSelectionneId} 
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-extrabold py-3 rounded-xl uppercase tracking-wider transition disabled:bg-slate-700 cursor-pointer"
+            >
+              {sendingAppreciation ? "Validation Conseil..." : "💾 Valider le Livret de Classe"}
+            </button>
+          </form>
+        </div>
+        <ConseilClasse/>
+      </div>
     </div>
   );
 };

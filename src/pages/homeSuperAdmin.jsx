@@ -1,6 +1,8 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
+import SuperAdminSaaS from './SuperAdminSaaS';
+import AjouterPersonneSuperAdmin from './AjouterPersonneSuperAdmin';
 
 const HomeSuperAdmin = () => {
   const { logout } = useAuth();
@@ -38,17 +40,14 @@ const HomeSuperAdmin = () => {
       {/* 🏛️ BANDEAU PROFIL SÉCURISÉ */}
       <div className="max-w-5xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 text-white shadow-xl mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-950/60 px-3 py-1 rounded-full">
-            🔓 ACCÈS MAÎTRE PROPRIÉTAIRE (ZÉRO LOGIN)
-          </span>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight mt-2 uppercase">
-            👑 M. TRAORE <span className="font-normal text-slate-400 font-sans lowercase first-letter:uppercase">Mamadou</span>
+            👑 M. LUCIANO <span className="font-normal text-slate-400 font-sans lowercase first-letter:uppercase"> HAMILTOM</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1.5 font-bold uppercase tracking-wide">
-            🌍 Contrôle Global du SaaS Scolaire International — Côte d'Ivoire & Burkina Faso
+            🔓 LeCloudScolaire Informatisém et Centalisé 
           </p>
         </div>
-        
+        <SuperAdminSaaS/>
         <button 
           onClick={handleLogout}
           className="bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition shadow-md self-end md:self-auto cursor-pointer"
@@ -71,7 +70,7 @@ const HomeSuperAdmin = () => {
           </div>
           <Link 
             to="/superadmin/dashboard" 
-            className="w-full text-center bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider py-3 rounded-xl shadow-md transition mt-6 block"
+            className="w-full text-center bg-orange-500 hover:bg-orange-600 font-black text-xs uppercase tracking-wider py-3 rounded-xl shadow-md transition mt-6 block"
           >
             🚀 Ouvrir le Panel Licences SaaS
           </Link>
@@ -93,14 +92,13 @@ const HomeSuperAdmin = () => {
             🔒 Ouvrir le Scellage Matériel
           </Link>
         </div>
-
+        <AjouterPersonneSuperAdmin/>
       </div>
 
       <div className="max-w-5xl mx-auto mt-12 p-4 bg-slate-900/40 border border-slate-900 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-        <span>Version Plateforme : <strong className="text-slate-400">v1.2.0 - Stable Core</strong></span>
+        <span>Version LeCloudScolaire : <strong className="text-slate-400">v1.2.0 - Stable Core </strong></span>
         <span>Statut de l'appareil : <strong className="text-emerald-400">Poste d'administration d'origine certifié</strong></span>
       </div>
-
     </div>
   );
 };

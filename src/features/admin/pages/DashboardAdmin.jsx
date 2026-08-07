@@ -74,7 +74,7 @@ const DashboardAdmin = () => {
 
             <Link 
               to={`/educateur/promotion/${promoSelectionnee}`} 
-              className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition shadow-xs flex items-center"
+              className="bg-orange-500 hover:bg-orange-600  px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition shadow-xs flex items-center"
             >
               📚 Voir Promotion
             </Link>

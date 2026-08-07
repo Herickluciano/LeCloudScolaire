@@ -238,7 +238,6 @@ const ConseilClasse = () => {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
