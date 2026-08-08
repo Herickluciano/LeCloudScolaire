@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+// 🟢 RECTIFICATION : Réintégration de Link aux côtés du hook de navigation pour le mot de passe oublié
+import { useNavigate, Link } from 'react-router-dom';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // 👈 AJOUTEZ OU CORRIGEZ CETTE LIGNE
 
 
@@ -158,7 +159,14 @@ const Login = () => {
             'Se connecter au portail'
           )}
         </button>
-
+         <div className="mt-4 text-right">
+          <Link 
+            to="/recuperation-cle" 
+            className="text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider"
+          >
+            Mot de passe oublié ?
+          </Link>
+        </div>
       </form>
     </div>
   );

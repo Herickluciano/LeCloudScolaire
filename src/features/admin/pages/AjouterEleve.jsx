@@ -213,13 +213,6 @@ const AjouterEleve = () => {
         </div>
       </div>
       {/* Bouton de retour */}
-      <Link
-        to="/admin/home"
-        className="absolute top-6 right-6 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-xs transition shadow-xs"
-      >
-        ← Retour au Secrétariat
-      </Link>
-
       <h2 className="text-2xl font-bold text-gray-800 border-b pb-4 mb-2">🏛️ Inscription d'un Nouvel Élève (Temps Réel)</h2>
       <p className="text-xs text-orange-600 font-extrabold uppercase tracking-wider mb-6">
         Établissement : {schoolName || currentSchool.replace(/_/g, ' ').toUpperCase()}
@@ -405,8 +398,13 @@ const AjouterEleve = () => {
             )}
           </button>
         </div>
-
       </form>
+        <Link
+        to="/admin/home"
+        className="absolute top-6 right-6 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold text-xs transition shadow-xs"
+      >
+        ← Retour au Secrétariat
+      </Link>
     </div>
   );
 };

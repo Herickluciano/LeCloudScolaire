@@ -242,13 +242,13 @@ const ListePromotion = () => {
           </tbody>
         </table>
       </div>
-
+        
       {eleves.length === 0 && (
         <div className="p-12 text-center text-gray-400 font-medium border border-dashed rounded-xl mt-4">
           Aucun élève inscrit sur le réseau cloud pour la promotion {niveau?.toUpperCase()} dans votre établissement.
         </div>
       )}
-
+     
     </div>
   );
 };

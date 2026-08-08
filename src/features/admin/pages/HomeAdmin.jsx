@@ -1,5 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
+import NotificationCentre from '../../../component/Shared/NotificationCentre';
+import ReceptionAdmin from './messages/ReceptionAdmin';
 
 const HomeAdmin = () => {
   const { user, schoolName, schoolId, logout } = useAuth();
@@ -11,9 +13,9 @@ const HomeAdmin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6 lg:p-8 animate-fadeIn">
+    <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6 lg:p-8 animate-fadeIn text-left text-gray-700">
       
-      {/* En-tête de bienvenue institutionnel 🇨ICI */}
+      {/* En-tête de bienvenue institutionnel */}
       <div className="max-w-7xl mx-auto bg-slate-900 rounded-2xl p-6 md:p-8 text-white shadow-xl mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-950/40 px-3 py-1 rounded-full">
@@ -39,43 +41,48 @@ const HomeAdmin = () => {
       {/* 🗂️ GRILLE DES GRANDS PÔLES DE REDIRECTION MULTI-RÔLES SAAS */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {/* Carte 1 : Communications & Alertes (Centre de Diffusion) */}
+        {/* 🟢 CARTE 1 AJOUTÉE : REDIRECTION VERS LE DASHBOARD DE PILOTAGE GLOBAL */}
+        <div className="bg-purple-900 text-purple-100 p-6 rounded-2xl shadow-md border border-purple-950 flex flex-col justify-between">
+          <div>
+            <div className="h-10 w-10 bg-purple-950 text-orange-400 rounded-xl flex items-center justify-center text-lg font-bold">📈</div>
+            <h3 className="text-base font-black mt-4 uppercase tracking-tight">RH & GESTION DE CRISE</h3>
+            <p className="text-xs text-purple-200 mt-1 leading-relaxed font-medium">
+              Consulter les rapports statistiques financiers, l'état global des effectifs et l'audit d'activité cloud de l'établissement [local].
+            </p>
+          </div>
+          <Link 
+            to="/admin/dashboard" 
+            className="w-full text-center bg-orange-500 hover:bg-orange-600 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-md transition mt-6 block cursor-pointer"
+          >
+            📈 Ouvrir le Dashboard
+          </Link>
+        </div>
+
+        {/* Carte 2 : Communications & Alertes (Centre de Diffusion) */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-purple-500/20 transition flex flex-col justify-between">
           <div>
             <div className="h-10 w-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-lg font-bold">📢</div>
             <h3 className="text-base font-black text-gray-800 mt-4 uppercase tracking-tight">Centre de Diffusion</h3>
             <p className="text-xs text-gray-400 mt-1 leading-relaxed font-medium">Diffuser des communiqués officiels par espace et expédier des e-mails avec pièces jointes de l'ordinateur.</p>
           </div>
-          <Link to="/notifications" className="w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
+          <Link to="/notifications" className="w-full text-center bg-purple-600 hover:bg-purple-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
             🚀 Rédiger un message
           </Link>
         </div>
 
-        {/* Carte 2 : Inscription des Élèves & Badges */}
+        {/* Carte 3 : Inscription des Élèves & Badges */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-500/20 transition flex flex-col justify-between">
           <div>
             <div className="h-10 w-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-lg font-bold">👤</div>
             <h3 className="text-base font-black text-gray-800 mt-4 uppercase tracking-tight">Inscriptions & Badges</h3>
             <p className="text-xs text-gray-400 mt-1 leading-relaxed font-medium">Enregistrer de nouveaux élèves, renseigner le genre, le mail parental et générer leur reçu d'accès QR Code obligatoire.</p>
           </div>
-          <Link to="/admin/AjouterEleve" className="w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
+          <Link to="/admin/AjouterEleve" className="w-full text-center bg-emerald-600 hover:bg-emerald-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
             👤 Inscrire un Élève
           </Link>
         </div>
-
-        {/* Carte 3 : Recrutement Personnel RH (Professeurs & Éducateurs) */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-slate-500/30 transition flex flex-col justify-between">
-          <div>
-            <div className="h-10 w-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-lg font-bold">💼</div>
-            <h3 className="text-base font-black text-gray-800 mt-4 uppercase tracking-tight">Ressources Humaines</h3>
-            <p className="text-xs text-gray-400 mt-1 leading-relaxed font-medium">Recruter et enregistrer les professeurs et les éducateurs de niveau pour cet établissement scolaire.</p>
-          </div>
-          <Link to="/admin/recrutement-personnel" className="w-full text-center bg-slate-700 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
-            💼 Recruter du Personnel
-          </Link>
-        </div>
-                {/* Carte : GESTION TECHNIQUE DES EMPLOIS DU TEMPS */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-purple-500/20 transition flex flex-col justify-between animate-fadeIn">
+        {/* Carte 5 : GESTION TECHNIQUE DES EMPLOIS DU TEMPS */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-purple-500/20 transition flex flex-col justify-between">
           <div>
             <div className="h-10 w-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-lg font-bold">📅</div>
             <h3 className="text-base font-black text-gray-800 mt-4 uppercase tracking-tight">Emplois du Temps</h3>
@@ -85,14 +92,30 @@ const HomeAdmin = () => {
           </div>
           <Link 
             to="/admin/emploi-temps" 
-            className="w-full text-center bg-purple-600 hover:bg-purple-700 text-slate-100 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer"
+            className="w-full text-center bg-purple-600 hover:bg-purple-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer"
           >
             📅 Planifier les Cours
           </Link>
         </div>
 
+        {/* Carte 6 : MOTEUR TEMPOREL ET CLÔTURE DES TRIMESTRES */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-purple-500/20 transition flex flex-col justify-between">
+          <div>
+            <div className="h-10 w-10 bg-purple-100 text-purple-900 rounded-xl flex items-center justify-center text-lg font-bold">🔐</div>
+            <h3 className="text-base font-black text-gray-800 mt-4 uppercase tracking-tight">Gestion des Trimestres</h3>
+            <p className="text-xs text-gray-400 mt-1 leading-relaxed font-medium">
+              Ouvrir, suspendre ou clôturer une période scolaire globale. Réinitialise automatiquement les compteurs d'absences en direct.
+            </p>
+          </div>
+          <Link 
+            to="/admin/gestion-trimestres" 
+            className="w-full text-center bg-purple-600 hover:bg-purple-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer"
+          >
+            🔐 Piloter l'Année Scolaire
+          </Link>
+        </div>
 
-        {/* Carte 4 : PARAMÈTRES DE SÉCURITÉ ACCÈS CLOUD (DÉBLOQUÉE 🔓) */}
+        {/* Carte 7 : PARAMÈTRES DE SÉCURITÉ */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-orange-500/20 transition flex flex-col justify-between">
           <div>
             <div className="h-10 w-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-lg font-bold">🛡️</div>
@@ -109,7 +132,7 @@ const HomeAdmin = () => {
           </Link>
         </div>
 
-        {/* Carte 5 : ENREGISTREMENT DU TERMINAL FIXE MACHINE BIOMÉTRIQUE (DÉBLOQUÉE 🔓) */}
+        {/* Carte 8 : SECRÉTARIAT INFORMATIQUE */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:border-purple-500/20 transition flex flex-col justify-between">
           <div>
             <div className="h-10 w-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-lg font-bold">📟</div>
@@ -118,12 +141,16 @@ const HomeAdmin = () => {
               Enregistrement du Terminal Fixe : Configurez cet ordinateur comme poste d'émargement officiel des présences.
             </p>
           </div>
-          <Link 
+                   <Link 
             to="/admin/configure-terminal" 
-            className="w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider py-2.5 rounded-xl transition shadow-xs mt-6 block cursor-pointer"
+            className="w-full text-center bg-purple-600 hover:bg-purple-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl transition shadow-xs mt-6 block cursor-pointer"
           >
             📟 Configurer ce Poste Fixe
           </Link>
+        </div>
+        <div>
+          <NotificationCentre/>
+          <ReceptionAdmin/>
         </div>
       </div>
     </div>
@@ -131,3 +158,4 @@ const HomeAdmin = () => {
 };
 
 export default HomeAdmin;
+

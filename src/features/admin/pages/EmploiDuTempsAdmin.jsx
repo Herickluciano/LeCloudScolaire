@@ -177,21 +177,6 @@ const EmploiDuTempsAdmin = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen text-gray-700 animate-fadeIn">
-      
-      <div className="mb-4 text-left">
-        <Link to="/admin/home" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs">
-          ⬅️ Retour au Secrétariat
-        </Link>
-      </div>
-
-      <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl shadow-md mb-8 text-left">
-        <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 bg-orange-950/60 px-2.5 py-1 rounded-full">
-          Consoles Administrateur Générale
-        </span>
-        <h1 className="text-xl md:text-2xl font-black mt-2">Diffusion Officielle des Emplois du Temps (Fichiers PDF)</h1>
-        <p className="text-xs text-slate-400 mt-1">Établissement connecté : <span className="font-bold uppercase">{schoolName || currentSchool}</span></p>
-      </div>
-
       {message.text && (
         <div className={`p-4 mb-6 rounded-xl text-xs font-bold text-left border ${
           message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
@@ -204,7 +189,7 @@ const EmploiDuTempsAdmin = () => {
         
         {/* COMPARTIMENT DE TÉLÉVERSEMENT */}
         <div className="bg-white p-5 rounded-2xl border shadow-sm h-fit text-left">
-          <h3 className="text-xs font-black text-purple-700 uppercase tracking-wider border-b pb-3 mb-4">🔐 Assigner un Créneau Horaire</h3>
+          <h3 className="text-xs font-black text-purple-700 uppercase tracking-wider border-b pb-3 mb-4">🔐 Diffusion Officielle des Emplois du Temps (Fichiers PDF)</h3>
           <form onSubmit={handleUploadEmploiTempsPdf} className="space-y-4 text-xs font-bold">
             
             <div>

@@ -3,6 +3,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { db } from '../../../services/api';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Link, useNavigate } from 'react-router-dom';
+import NotificationCentre from '../../../component/Shared/NotificationCentre';
+import ReceptionProf from './message/ReceptionProf';
 
 const DashboardProf = () => {
   const { user, schoolId, logout } = useAuth();
@@ -201,7 +203,6 @@ const DashboardProf = () => {
             ✉️ Ouvrir la Réception
           </Link>
         </div>
-
       </div>
     </div>
   );

@@ -1,163 +1,187 @@
 import { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
-import { useAuth } from '../../../../context/AuthContext'; // 🟢 FIX : Remonte de 4 niveaux vers le contexte global
-import { Link, useParams } from 'react-router-dom';
-
-// Configuration Firebase intégrée
-const firebaseConfig = {
-  apiKey: "AIzaSyBlbV_ExAmPlE_KeY_LuHaMcOdE_2026",
-  authDomain: "://firebaseapp.com",
-  projectId: "midnight-9d901",
-  storageBucket: "midnight-9d901.firebasestorage.app",
-  messagingSenderId: "360989143638",
-  appId: "1:360989143638:web:737249c340719924e1c1f7"
-};
-const localApp = initializeApp(firebaseConfig);
-const localDb = getFirestore(localApp);
+import { db } from '../../../../services/api';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const RegistreAppelEleves = () => {
-  const { user, schoolId, schoolName } = useAuth();
-  const { classIdUrl } = useParams();
-
-  const currentClasseId = (classIdUrl || user?.classeId || 'tle_d_1').trim().toLowerCase();
+  const { user, schoolId } = useAuth();
+  
   const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_Moderne_Gagnoa').trim().toLowerCase();
+  
+  const matiereReelleProf = (user?.matiereEnseignee || "Général").trim();
+  const nomEmetteurProf = (user?.nom || user?.name || "Enseignant").trim();
 
-  const [listeEleves, setListeEleves] = useState([]);
+  // 🟢 ACCÈS GLOBAL : La variable dateAujourdhui est désormais accessible partout dans le composant
+  const dateAujourdhui = new Date().toLocaleDateString('fr-FR');
+
+  // --- ÉTATS FORMULAIRE ET SUIVI ---
+  const [classes, setClasses] = useState([]);
+  const [selectedClasse, setSelectedClasse] = useState('');
+  const [eleves, setEleves] = useState([]);
+  const [heureSelectionnee, setHeureSelectionnee] = useState('H1 (07h-08h)');
+  const [statutsAppel, setStatutsAppel] = useState({}); 
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState({ type: '', text: '' });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
+  // 🔄 ÉCOUTEUR 1 : Charger toutes les classes de l'école
   useEffect(() => {
-    if (!currentSchool || !currentClasseId) {
-      setLoading(false);
-      return;
-    }
-
-    const q = query(
-      collection(localDb, "users"),
-      where("schoolId", "==", currentSchool),
-      where("role", "==", "eleve"),
-      where("classeId", "==", currentClasseId)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    if (!currentSchool) return;
+    const q = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
+    const unsub = onSnapshot(q, (snapshot) => {
       const list = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      list.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-      setListeEleves(list);
-      setLoading(false);
-    }, (err) => {
-      console.error(err);
+      snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+      setClasses(list);
+      if (list.length > 0 && !selectedClasse) {
+        setSelectedClasse(list[0].id);
+      }
       setLoading(false);
     });
+    return () => unsub();
+  }, [currentSchool, selectedClasse]);
 
-    return () => unsubscribe();
-  }, [currentSchool, currentClasseId]);
+  // 🔄 ÉCOUTEUR 2 : Charger les élèves dès qu'une classe est sélectionnée
+  useEffect(() => {
+    if (!selectedClasse || !currentSchool) return;
+    
+    const morceaux = selectedClasse.toLowerCase().split('gagnoa_');
+    const racineClasse = morceaux.length > 1 ? morceaux[1] : selectedClasse.toLowerCase();
 
-  const handleChangerStatutAssiduite = async (eleve, typeAction) => {
-    setToast({ type: '', text: '' });
-    const eleveRef = doc(localDb, "users", eleve.id);
-    const heureActuelle = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    const dateActuelle = new Date().toLocaleDateString('fr-FR');
+    const q = query(collection(db, "users"), where("role", "==", "eleve"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const list = [];
+      const statutsInitiaux = {};
+      
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const schoolClean = (data.schoolId || '').trim().toLowerCase();
+        const classeClean = (data.classeId || '').trim().toLowerCase();
+
+        if (schoolClean === currentSchool && (classeClean === racineClasse || selectedClasse.toLowerCase().includes(classeClean))) {
+          list.push({ id: docSnap.id, ...data });
+          statutsInitiaux[docSnap.id] = 'present'; 
+        }
+      });
+
+      list.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+      setEleves(list);
+      setStatutsAppel(statutsInitiaux);
+    });
+
+    return () => unsub();
+  }, [selectedClasse, currentSchool]);
+
+  const handleChangerStatut = (eleveId, nouveauStatut) => {
+    setStatutsAppel(prev => ({ ...prev, [eleveId]: nouveauStatut }));
+  };
+
+  // 🚀 ACTIONNEUR : Enregistrement de l'appel et calcul d'assiduité
+  const handleValiderFicheAppel = async (e) => {
+    e.preventDefault();
+    if (!selectedClasse || eleves.length === 0) return;
+
+    setSaving(true);
+    setMessage('');
 
     try {
-      let incAbs = 0; let incRet = 0; let msg = ''; let col = '';
-      if (typeAction === 'absent') {
-        incAbs = 2;
-        msg = `🛑 ${(eleve.nom || '').toUpperCase()} marqué ABSENT(E).`;
-        col = 'error';
-      } else if (typeAction === 'retard') {
-        incRet = 1;
-        msg = `🟡 ${(eleve.nom || '').toUpperCase()} signalé(E) en RETARD.`;
-        col = 'amber';
-      } else {
-        msg = `🟢 ${(eleve.nom || '').toUpperCase()} marqué PRÉSENT(E).`;
-        col = 'success';
+      for (const eleve of eleves) {
+        const statutEleve = statutsAppel[eleve.id] || 'present';
+        
+        await addDoc(collection(db, "registre_appels"), {
+          schoolId: currentSchool,
+          classeId: selectedClasse.replace(`${currentSchool}_`, '').toLowerCase(),
+          eleveId: eleve.id,
+          eleveName: `${eleve.nom || ''} ${eleve.prenoms || ''}`.trim(),
+          date: dateAujourdhui,
+          heure: heureSelectionnee,
+          profName: nomEmetteurProf,
+          matiere: matiereReelleProf, 
+          statut: statutEleve,
+          createdAt: new Date().toISOString()
+        });
+
+       if (statutEleve === 'absent') {
+          const eleveRef = doc(db, "users", eleve.id);
+          await updateDoc(eleveRef, {
+            // 🟢 CLOISONNEMENT : L'absence est stockée dans un objet dédié au trimestre actif (ex: absences_trimestre_1)
+            [`absences_trimestre_${trimestre}`]: increment(2),
+            updatedAt: new Date().toISOString()
+          });
+        }
+        
+        if (eleve.id && statutEleve === 'retard') {
+          const eleveRef = doc(db, "users", eleve.id);
+          await updateDoc(eleveRef, {
+            retards: increment(1),
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
 
-      const totalAbsencesFutur = (eleve.absences || 0) + incAbs;
-
-      await updateDoc(eleveRef, {
-        absences: totalAbsencesFutur,
-        retards: (eleve.retards || 0) + incRet
-      });
-
-      await addDoc(collection(localDb, "registre_appels"), {
-        eleveId: eleve.id,
-        matricule: eleve.matricule || eleve.id,
-        eleveName: `${eleve.nom || ''} ${eleve.prenoms || ''}`.toUpperCase(),
-        classeId: currentClasseId,
-        schoolId: currentSchool,
-        typeStatut: typeAction,
-        heureAppel: heureActuelle,
-        dateAppel: dateActuelle,
-        declarePar: user?.name || "Enseignant",
-        createdAt: new Date().toISOString()
-      });
-
-      if (typeAction === 'absent' && totalAbsencesFutur > 10 && eleve.emailParent) {
-        fetch("http://localhost:10000/api/send-document-alert", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to_email: eleve.emailParent.trim(),
-            to_name: `${eleve.prenoms || ''} ${eleve.nom || ''}`.toUpperCase(),
-            school_name: schoolName || currentSchool.toUpperCase(),
-            type_document: `🛑 CRITIQUE : SEUIL D'ABSENCES DÉPASSÉ (${totalAbsencesFutur} Heures Cumulées)`,
-            sender_title: "Bureau de Suivi de la Discipline"
-          })
-        }).catch(e => console.error(e));
-        msg += `\n📧 Alerte automatique expédiée au tuteur (>10H) !`;
-      }
-
-      setToast({ type: col, text: msg });
+      setMessage(`🎉 Fiche d'appel validée avec succès pour le cours de ${matiereReelleProf} !`);
+      setTimeout(() => setMessage(''), 4000);
     } catch (err) {
-      console.error(err);
-      setToast({ type: 'error', text: "💥 Erreur réseau cloud." });
+      console.error("Erreur validation appel :", err);
+      alert("💥 Erreur lors du scellage de la feuille d'appel.");
     } finally {
-      setTimeout(() => setToast({ type: '', text: '' }), 5000);
+      setSaving(false);
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">Ouverture du cahier d'appel de classe...</div>;
+  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">Ouverture du registre d'assiduité...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen relative animate-fadeIn">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 font-sans text-gray-700 text-left animate-fadeIn">
       
-      {toast.text && (
-        <div className={`fixed top-6 right-6 z-50 p-4 rounded-xl shadow-2xl border-l-4 bg-slate-900 text-xs font-bold ${
-          toast.type === 'success' ? 'border-emerald-500 text-emerald-400' :
-          toast.type === 'amber' ? 'border-amber-500 text-amber-400' : 'border-red-500 text-red-400'
-        }`}>
-          <p className="whitespace-pre-line text-left">{toast.text}</p>
-        </div>
-      )}
-
       <div className="mb-4 text-left">
         <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs">
           ⬅️ Retour au Bureau Virtuel
         </Link>
       </div>
 
-      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md mb-6 text-left">
-        <div className="flex justify-between items-start flex-wrap gap-2">
-          <div>
-            <h2 className="text-xl font-black uppercase tracking-tight">Cahier d'Appel Électronique</h2>
-            <p className="text-xs text-slate-400 mt-1">Enseignant : <span className="text-orange-400 font-bold">{user?.name || "M. GOUZI"}</span> — Établissement : <span className="text-white font-bold uppercase">{schoolName || currentSchool}</span></p>
+           <div className="bg-white p-5 rounded-2xl border shadow-2xs mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="text-left">
+          <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">
+            Registre d'Assiduité Numérique
+          </span>
+          <h2 className="text-base font-black text-gray-900 mt-1 uppercase">Cahier d'Appel Électronique</h2>
+          <p className="text-[11px] text-gray-400 font-medium">Discipline active : <span className="font-bold text-purple-700">{matiereReelleProf}</span> — Enseignant : M. {nomEmetteurProf}</p>
+        </div>
+
+        <div className="flex gap-3 text-xs font-bold w-full sm:w-auto">
+          <div className="w-1/2 sm:w-36">
+            <label className="block text-[10px] text-gray-400 uppercase mb-1">Classe</label>
+            <select value={selectedClasse} onChange={(e) => setSelectedClasse(e.target.value)} className="w-full bg-gray-50 border p-2 rounded-lg outline-none cursor-pointer bg-white">
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.nom || c.id.replace(`${currentSchool}_`, '').toUpperCase()}</option>
+              ))}
+            </select>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-right">
-            <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Division active</p>
-            <p className="text-sm font-mono font-black text-orange-400">{currentClasseId.toUpperCase()}</p>
+          <div className="w-1/2 sm:w-40">
+            <label className="block text-[10px] text-gray-400 uppercase mb-1">Plage Horaire (Fin 18h)</label>
+            <select value={heureSelectionnee} onChange={(e) => setHeureSelectionnee(e.target.value)} className="w-full bg-gray-50 border p-2 rounded-lg outline-none cursor-pointer bg-white">
+              <option value="H1 (07h-08h)">H1 (07H00 - 08H00)</option>
+              <option value="H2 (08h-09h)">H2 (08H00 - 09H00)</option>
+              <option value="H3 (09h-10h)">H3 (09H00 - 10H00)</option>
+              <option value="H4 (10h-11h)">H4 (10H00 - 11H00)</option>
+              <option value="H5 (11h-12h)">H5 (11H00 - 12H00)</option>
+              <option value="H6 (13h-14h)">H6 (13H00 - 14H00)</option>
+              <option value="H7 (14h-15h)">H7 (14H00 - 15H00)</option>
+              <option value="H8 (15h-16h)">H8 (15H00 - 16H00)</option>
+              <option value="H9 (16h-17h)">H9 (16H00 - 17H00)</option>
+              <option value="H10 (17h-18h)">H10 (17H00 - 18H00)</option>
+            </select>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border p-6 shadow-sm">
-        <div className="flex justify-between items-center border-b pb-3 mb-4 font-bold text-xs uppercase text-gray-400">
-          <h3>Registre d'appel en temps réel</h3>
-          <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded text-[11px] font-black">Effectif : {listeEleves.length}</span>
+      {message && <div className="mb-6 p-3 bg-slate-900 text-orange-400 text-xs font-bold rounded-lg border-l-4 border-orange-500 animate-pulse">{message}</div>}
+
+      <form onSubmit={handleValiderFicheAppel} className="bg-white rounded-2xl border shadow-2xs overflow-hidden">
+        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider">Liste de pointage de la division ({eleves.length} Élèves)</h3>
+          <p className="text-[11px] font-mono font-bold text-gray-400">Date du jour : {dateAujourdhui}</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -165,40 +189,76 @@ const RegistreAppelEleves = () => {
             <thead>
               <tr className="bg-gray-50 text-gray-400 uppercase border-b border-gray-100">
                 <th className="p-3">Matricule</th>
-                <th className="p-3">Nom & Prénoms de l'Élève</th>
-                <th className="p-3">Absences Cumulées</th>
-                <th className="p-3 text-center">Actions d'Assiduité</th>
+                <th className="p-3">Nom & Prénoms</th>
+                <th className="p-3 text-center">Présence</th>
+                <th className="p-3 text-center">Absence (2H)</th>
+                <th className="p-3 text-right">Retard</th>
               </tr>
             </thead>
             <tbody>
-              {listeEleves.length === 0 ? (
+              {eleves.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="p-6 text-center text-gray-400 italic">Aucun élève enregistré dans cette classe.</td>
+                  <td colSpan="5" className="p-12 text-center text-gray-400 italic">
+                    Aucun élève trouvé dans cette classe pour le moment.
+                  </td>
                 </tr>
               ) : (
-                listeEleves.map((el) => (
-                  <tr key={el.id} className="border-b border-gray-100 hover:bg-gray-50/60 transition">
-                    <td className="p-3 font-mono text-gray-500 tracking-wide">{el.matricule}</td>
-                    <td className="p-3 text-gray-900 uppercase font-black text-left">{el.nom} {el.prenoms || el.prenom || ''}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded font-mono ${el.absences >= 10 ? 'bg-red-950 text-red-400 border border-red-900' : 'bg-gray-100 text-gray-600'}`}>
-                        {el.absences || 0} H / 10H Max
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button type="button" onClick={() => handleChangerStatutAssiduite(el, 'present')} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black transition cursor-pointer">🟢 Présent</button>
-                        <button type="button" onClick={() => handleChangerStatutAssiduite(el, 'absent')} className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/60 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black transition cursor-pointer">🛑 Absent</button>
-                        <button type="button" onClick={() => handleChangerStatutAssiduite(el, 'retard')} className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/60 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black transition cursor-pointer"> Retard</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                eleves.map((el) => {
+                  const statutCourant = statutsAppel[el.id] || 'present';
+                  return (
+                    <tr key={el.id} className="border-b border-gray-100 hover:bg-gray-50/30 transition">
+                      <td className="p-3 font-mono text-gray-400">{el.matricule || el.id}</td>
+                      <td className="p-3 text-gray-900 uppercase font-black">{el.nom} {el.prenoms || ''}</td>
+                      
+                      <td className="p-3 text-center">
+                        <button 
+                          type="button" 
+                          onClick={() => handleChangerStatut(el.id, 'present')}
+                          className={`px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-wide transition ${statutCourant === 'present' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        >
+                          🟢 Présent
+                        </button>
+                      </td>
+
+                      <td className="p-3 text-center">
+                        <button 
+                          type="button" 
+                          onClick={() => handleChangerStatut(el.id, 'absent')}
+                          className={`px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-wide transition ${statutCourant === 'absent' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        >
+                          🛑 Absent
+                        </button>
+                      </td>
+
+                      <td className="p-3 text-right">
+                        <button 
+                          type="button" 
+                          onClick={() => handleChangerStatut(el.id, 'retard')}
+                          className={`px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-wide transition ${statutCourant === 'retard' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        >
+                          🟡 Retard
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-      </div>
+
+        {eleves.length > 0 && (
+          <div className="p-4 bg-gray-50 border-t text-right">
+            <button 
+              type="submit" 
+              disabled={saving} 
+              className="bg-slate-900 hover:bg-slate-800 text-orange-400 font-black text-xs uppercase tracking-wider px-6 py-3 rounded-xl transition shadow-md cursor-pointer disabled:bg-gray-200"
+            >
+              {saving ? "Sauvegarde Cloud en cours..." : "⚡ Enregistrer la Feuille d'Appel"}
+            </button>
+          </div>
+        )}
+      </form>
 
     </div>
   );

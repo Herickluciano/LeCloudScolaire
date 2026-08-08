@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { db } from '../../../services/api';
@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, addDoc, getDocs } from 'firebase/
 
 const MessagerieProf = () => {
   const { user, schoolId, schoolName } = useAuth();
-  const currentSchool = schoolId || 'lycee_Moderne_Gagnoa';
+  const currentSchool = (schoolId || 'lycee_Moderne_Gagnoa').trim().toLowerCase();
 
   // --- ÉTATS ---
   const [activeTab, setActiveTab] = useState('lire'); 
@@ -25,19 +25,28 @@ const MessagerieProf = () => {
   // 🔄 ÉCOUTEUR RÉACTIF TEMPS RÉEL (onSnapshot) : Messages reçus de la Direction
   useEffect(() => {
     if (!currentSchool) return;
-    const q = query(collection(db, "notifications"), where("schoolId", "==", currentSchool));
+    const q = query(collection(db, "notifications"));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        if (data.audience === 'all' || data.audience === 'professeur') {
-          list.push({ id: docSnap.id, ...data });
+        const schoolCleanDoc = (data.schoolId || '').trim().toLowerCase();
+        
+        if (schoolCleanDoc === currentSchool) {
+          if (data.audience === 'all' || data.audience === 'professeur') {
+            list.push({ id: docSnap.id, ...data });
+          }
         }
       });
-      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      list.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
       setMessagesRecus(list);
       setLoading(false);
+    }, (err) => {
+      console.error(err);
+      setLoading(false);
     });
+    
     return () => unsubscribe();
   }, [currentSchool]);
 
@@ -47,14 +56,14 @@ const MessagerieProf = () => {
     setFormMessage({ type: '', text: '' });
 
     if (!titre.trim() || !corps.trim() || !classeCible.trim()) {
-      setFormMessage({ type: 'error', text: 'Veuillez remplir l\'objet, le message et spécifier la classe.' });
+      setFormMessage({ type: 'error', text: "Veuillez remplir l'objet, le message et spécifier la classe." });
       return;
     }
 
     setSending(true);
     try {
       const cleanClasse = classeCible.trim().toLowerCase();
-      const disciplineProf = user?.matiereEnseignee || 'Matière';
+      const disciplineProf = user?.matiereEnseignee || user?.matiere || 'Matière';
       const enTeteOfficiel = `Message du Professeur de ${disciplineProf} : ${titre.trim()}`;
 
       // 1. Insertion sur Firestore pour l'affichage permanent dans l'Espace Élève
@@ -64,42 +73,37 @@ const MessagerieProf = () => {
         audience: 'eleve',
         classeId: cleanClasse, 
         schoolId: currentSchool,
-        expediteur: `M. ${user.nom} (${disciplineProf})`,
+        expediteur: `M. ${user?.nom || user?.name || 'Enseignant'} (${disciplineProf})`,
         createdAt: new Date().toISOString(),
         date: dateAujourdhui,
         lusPar: []
       });
 
       // 2. Récupération instantanée de tous les élèves inscrits dans cette classe spécifique
-      const emailQuery = query(
-        collection(db, "users"), 
-        where("schoolId", "==", currentSchool),
-        where("role", "==", "eleve"),
-        where("classeId", "==", cleanClasse)
-      );
-      
+      const emailQuery = query(collection(db, "users"));
       const usersSnapshot = await getDocs(emailQuery);
       
       // 3. Boucle d'envoi vers le serveur d'e-mails asynchrone Node.js
       usersSnapshot.forEach((userDoc) => {
         const student = userDoc.data();
+        const studentSchool = (student.schoolId || '').trim().toLowerCase();
+        const studentClass = (student.classeId || '').trim().toLowerCase();
         
-        // 🚨 DÉCLENCHEMENT DE L'E-MAIL DE L'ÉLÈVE SI RENSEIGNÉ
-        if (student.email) {
+        if (studentSchool === currentSchool && student.role === 'eleve' && studentClass === cleanClasse && student.email) {
           fetch("http://localhost:10000/api/send-email", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to_email: student.email.trim(),
-              to_name: `${student.prenoms || ''} ${student.nom || ''}`,
-              school_name: schoolName,
+              to_name: `${student.prenoms || ''} ${student.nom || ''}`.toUpperCase(),
+              school_name: schoolName || "LeCloudScolaire",
               subject_title: enTeteOfficiel,
-              sender_title: `M. ${user.nom} - Enseignant de ${disciplineProf}`
+              sender_title: `M. ${user?.nom || 'Enseignant'} - Enseignant de ${disciplineProf}`,
+              body_text: corps.trim()
             })
           })
           .then(res => res.json())
-          .then(data => console.log("Confirmation d'envoi e-mail élève :", data))
-          .catch(err => console.error("Erreur de liaison backend e-mail :", err));
+          .catch(err => console.error("Erreur e-mail élève :", err));
         }
       });
 
@@ -109,39 +113,41 @@ const MessagerieProf = () => {
       setClasseCible('');
     } catch (err) {
       console.error(err);
-      setFormMessage({ type: 'error', text: 'Erreur réseau lors de l\'envoi.' });
+      setFormMessage({ type: 'error', text: "Erreur réseau lors de l'envoi." });
     } finally {
       setSending(false);
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse">Ouverture du centre d'alertes...</div>;
+  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase tracking-wider">Ouverture du centre d'alertes...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 font-sans">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 font-sans text-gray-700 text-left animate-fadeIn">
       
       <div className="mb-4">
-        <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs">
+        <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-black bg-white border hover:bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl transition shadow-2xs">
           ⬅️ Retour au Bureau Virtuel
         </Link>
       </div>
 
-      <div className="bg-white border rounded-xl p-4 shadow-2xs mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border rounded-2xl p-5 shadow-3xs mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-black text-gray-800">✉️ Centre de Messagerie Enseignant</h2>
           <p className="text-[11px] text-gray-400 font-medium">Consultez les directives de la Direction ou transmettez une alerte à vos classes.</p>
         </div>
 
-        <div className="flex bg-gray-100 p-1 rounded-lg border w-fit">
+        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 text-xs font-black uppercase shadow-3xs">
           <button 
+            type="button"
             onClick={() => setActiveTab('lire')}
-            className={`text-[11px] font-extrabold px-3 py-1.5 rounded-md transition uppercase tracking-wider ${activeTab === 'lire' ? 'bg-white text-purple-700 shadow-2xs' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 py-2 rounded-lg transition uppercase tracking-wider cursor-pointer ${activeTab === 'lire' ? 'bg-white text-purple-700 shadow-2xs' : 'text-gray-400 hover:text-gray-600'}`}
           >
             🔔 Notes Reçues ({messagesRecus.length})
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('ecrire')}
-            className={`text-[11px] font-extrabold px-3 py-1.5 rounded-md transition uppercase tracking-wider ${activeTab === 'ecrire' ? 'bg-white text-purple-700 shadow-2xs' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 py-2 rounded-lg transition uppercase tracking-wider cursor-pointer ${activeTab === 'ecrire' ? 'bg-white text-purple-700 shadow-2xs' : 'text-gray-400 hover:text-gray-600'}`}
           >
             ✍️ Alerter une Classe
           </button>
@@ -149,28 +155,28 @@ const MessagerieProf = () => {
       </div>
 
       {activeTab === 'lire' && (
-        <div className="bg-white rounded-xl border p-5 shadow-2xs space-y-4">
+        <div className="bg-white rounded-2xl border p-5 shadow-3xs space-y-4">
           <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-2">Directives Officielles et Circulaires</h3>
           {messagesRecus.length === 0 ? (
-            <p className="text-xs text-center text-gray-400 py-6 font-medium">Aucun message reçu de la direction pour le moment.</p>
+            <p className="text-xs text-center text-gray-400 py-8 font-medium italic">Aucune note de service reçue de la direction pour le moment.</p>
           ) : (
             <div className="space-y-4">
               {messagesRecus.map((notif) => (
-                <div key={notif.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/40 hover:bg-gray-50 transition relative">
+                <div key={notif.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/40 hover:bg-gray-50 transition relative text-left">
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="text-sm font-black text-gray-900">{notif.titre}</h4>
-                    <span className="text-[10px] text-gray-400 font-mono font-bold bg-white border px-2 py-0.5 rounded">{notif.date}</span>
+                    <h4 className="text-sm font-black text-purple-950 uppercase">📣 {notif.titre}</h4>
+                    <span className="text-[10px] text-gray-400 font-mono font-bold bg-white border px-2 py-0.5 rounded shadow-3xs">{notif.date}</span>
                   </div>
-                  <p className="text-xs text-gray-600 whitespace-pre-line mb-3">{notif.corps}</p>
+                  <p className="text-xs text-gray-600 whitespace-pre-line mb-3 font-medium leading-relaxed">"{notif.corps || notif.message}"</p>
                   
                   {notif.pjData && (
-                    <a href={notif.pjData} download={notif.pjName} className="inline-flex items-center text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1.5 rounded-md hover:bg-purple-100 transition">
+                    <a href={notif.pjData} download={notif.pjName} className="inline-flex items-center text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-3 py-2 rounded-xl hover:bg-purple-100 transition shadow-3xs">
                       📥 Télécharger la pièce : {notif.pjName}
                     </a>
                   )}
 
-                  <div className="mt-3 pt-2 border-t border-dashed border-gray-200 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                    Émetteur : <span className="text-slate-600">{notif.expediteur || 'La Direction'}</span>
+                  <div className="mt-4 pt-2 border-t border-dashed border-gray-200 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                    Émetteur : <span className="text-slate-600 font-black">{notif.expediteur || 'La Direction'}</span>
                   </div>
                 </div>
               ))}
@@ -180,49 +186,37 @@ const MessagerieProf = () => {
       )}
 
       {activeTab === 'ecrire' && (
-        <div className="bg-slate-900 text-white p-6 rounded-xl border border-slate-700 shadow-xl">
-          <h3 className="text-sm font-extrabold text-orange-400 uppercase mb-4">📢 Émettre un Communiqué de Classe</h3>
+        <div className="bg-white rounded-2xl border p-5 shadow-3xs space-y-4">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-2">✍️ Rédiger un communiqué de classe</h3>
           
           {formMsg.text && (
-            <div className={`p-3 mb-4 rounded-lg text-xs font-bold ${formMsg.type === 'success' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+            <div className={`p-3 rounded-xl text-xs font-bold border ${formMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
               {formMsg.text}
             </div>
           )}
 
-          <form onSubmit={handleProfPublishNotification} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input 
-                type="text" 
-                placeholder="Objet / Titre de l'alerte" 
-                value={titre} 
-                onChange={(e) => setTitre(e.target.value)} 
-                className="md:col-span-2 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
-              />
-              <input 
-                type="text" 
-                placeholder="Code Classe Élève (Ex: 6eme_1)" 
-                value={classeCible} 
-                onChange={(e) => setClasseCible(e.target.value)} 
-                className="bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-orange-400 font-bold focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-slate-500" 
-                required
-              />
+          <form onSubmit={handleProfPublishNotification} className="space-y-4 text-xs font-bold text-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-gray-400 uppercase mb-1">Objet du message *</label>
+                <input type="text" placeholder="Ex: Devoir de rattrapage ou Note de cours" value={titre} onChange={(e) => setTitre(e.target.value)} className="w-full bg-gray-50 border p-3 rounded-xl outline-none text-gray-900 bg-white" required />
+              </div>
+                            <div>
+                <label className="block text-gray-400 uppercase mb-1">Classe ciblée (ID exact) *</label>
+                <input type="text" placeholder="Ex: 5eme_1, 4eme_2" value={classeCible} onChange={(e) => setClasseCible(e.target.value)} className="w-full bg-gray-50 border p-3 rounded-xl outline-none text-gray-900 uppercase bg-white" required />
+              </div>
             </div>
 
-                        <textarea 
-              rows="4" 
-              placeholder="Rédigez les consignes, devoirs de maison ou alertes de comportement pour vos élèves..." 
-              value={corps} 
-              onChange={(e) => setCorps(e.target.value)} 
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            ></textarea>
+            <div>
+              <label className="block text-gray-400 uppercase mb-1">Message destiné aux élèves *</label>
+              <textarea rows="5" placeholder="Rédigez les consignes de travail..." value={corps} onChange={(e) => setCorps(e.target.value)} className="w-full bg-gray-50 border p-3 rounded-xl outline-none font-medium leading-relaxed text-gray-900 bg-white" required />
+            </div>
 
-            <button 
-              type="submit" 
-              disabled={sending} 
-              className="bg-orange-500 hover:bg-orange-600 text-white font-extrabold px-6 py-2.5 rounded-lg text-xs uppercase ml-auto block transition disabled:bg-slate-700"
-            >
-              {sending ? "Envoi..." : "🚀 Diffuser à la classe"}
-            </button>
+            <div className="text-right">
+              <button type="submit" disabled={sending || !titre.trim() || !corps.trim() || !classeCible.trim()} className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase px-6 py-3 rounded-xl shadow-md transition cursor-pointer border-0 disabled:bg-gray-200">
+                {sending ? "Transmission SMTP..." : "🚀 Envoyer le communiqué"}
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -232,4 +226,3 @@ const MessagerieProf = () => {
 };
 
 export default MessagerieProf;
-
