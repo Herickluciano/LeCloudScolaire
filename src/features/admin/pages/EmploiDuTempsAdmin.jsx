@@ -1,182 +1,279 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../../services/api';
-import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
-import { Link } from 'react-router-dom';
+import html2pdf from 'html2pdf.js';
 
 const EmploiDuTempsAdmin = () => {
   const { schoolId, schoolName } = useAuth();
-  const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_Moderne_Gagnoa').trim().toLowerCase();
+  const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_moderne_gagnoa').trim().toLowerCase();
 
-  // --- ÉTATS CENTRALISÉS ---
+  // --- ÉTATS CENTRALISÉS SAAS ---
   const [classes, setClasses] = useState([]);
   const [personnelEnseignant, setPersonnelEnseignant] = useState([]);
-  const [planningsPdf, setPlanningsPdf] = useState([]);
+  const [planningsDeployes, setPlanningsDeployes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // --- ÉTATS FORMULAIRE DÉBLOQUÉS ---
-  const [selectedClasse, setSelectedClasse] = useState('');
+  // --- ÉTATS FORMULAIRE CRÉNEAUX ENSEIGNANTS ---
   const [selectedProfId, setSelectedProfId] = useState('');
-  const [matiere, setMatiere] = useState('');
+  const [selectedClasse, setSelectedClasse] = useState('');
+  const [heureDebut, setHeureDebut] = useState('07:00');
+  const [heureFin, setHeureFin] = useState('08:00');
   
-  // 🟢 INITIALISATION INDISPENSABLE DE L'ÉTAT DU RÉGIME HORAIRE
-  const [regimeHoraire, setRegimeHoraire] = useState('07H00 - 18H00');
-  
-  // États de conversion de la pièce jointe PDF
-  const [pdfBase64, setFileBase64] = useState(null);
-  const [pdfName, setPdfName] = useState('');
+  // Tableau de stockage temporaire de la journée du professeur
+  const [creneauxTemporaires, setCreneauxTemporaires] = useState([]);
   const [sending, setSending] = useState(false);
 
-  // 🔄 ÉCOUTEUR RÉACTIF ET INSENSIBLE À LA CASSE (onSnapshot Infaillible)
+  // --- ÉTAT DU COMPOSATEUR AUTOMATIQUE PAR CLASSE ---
+  const [classeFiltreVisualisation, setClasseFiltreVisualisation] = useState('');
+
+  // 🔄 ÉCOUTEUR RÉACTIF EN TEMPS RÉEL (onSnapshot Cloud NoSQL)
   useEffect(() => {
     if (!currentSchool) return;
 
-    // A. Lecture live des promotions et classes de l'école (Tolérant à la casse)
-    const qClasses = query(collection(db, "classes"));
+    // A. Lecture live des structures de classes de l'école (Insensible à la casse)
+    const qClasses = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
     const unsubClasses = onSnapshot(qClasses, (snap) => {
       const list = [];
       snap.forEach(d => {
-        const data = d.data();
-        if (data.schoolId?.trim().toLowerCase() === currentSchool.toLowerCase()) {
-          list.push({ id: d.id, ...data });
-        }
+        list.push({ id: d.id, ...d.data() });
       });
-      setClasses(list);
-      if (list.length > 0 && !selectedClasse) {
-        setSelectedClasse(list[0].idBrute || list[0].id);
+      const classesTriees = list.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+      setClasses(classesTriees);
+      if (classesTriees.length > 0 && !selectedClasse) {
+        setSelectedClasse(classesTriees[0].id);
       }
     });
 
-    // B. Extraction tolérante de tous les profs sans blocage de casse via ID unique
-    const qStaff = query(collection(db, "users"));
+    // B. Extraction et écoute de tous les professeurs actifs de l'établissement Connecté
+    const qStaff = query(collection(db, "users"), where("role", "==", "professeur"), where("schoolId", "==", currentSchool));
     const unsubStaff = onSnapshot(qStaff, (snap) => {
       const list = [];
       snap.forEach(d => {
-        const userIdKey = d.id.trim().toUpperCase();
-        const data = d.data();
-        const roleClean = data.role ? data.role.toLowerCase() : '';
-        
-        const userSchoolClean = data.schoolId ? data.schoolId.trim().toLowerCase() : '';
-        const targetSchoolClean = currentSchool.toLowerCase();
-
-        if (userSchoolClean === targetSchoolClean) {
-          if (userIdKey.startsWith('PROF_') || roleClean === 'professeur' || roleClean === 'prof_principal') {
-            list.push({ id: d.id, ...data });
-          }
-        }
+        list.push({ id: d.id, ...d.data() });
       });
-      setPersonnelEnseignant(list);
-      if (list.length > 0 && !selectedProfId) {
-        setSelectedProfId(list[0].id);
+      const profsTries = list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setPersonnelEnseignant(profsTries);
+      if (profsTries.length > 0 && !selectedProfId) {
+        setSelectedProfId(profsTries[0].id);
       }
     });
 
-    // C. Lecture live de la liste des documents PDF d'emplois du temps diffusés
-    const qPdfs = query(collection(db, "emplois_du_temps_pdf"));
-    const unsubPdfs = onSnapshot(qPdfs, (snap) => {
+    // C. Lecture live de la collection globale des emplois du temps structurés
+    const qPlannings = query(collection(db, "emplois_du_temps"), where("schoolId", "==", currentSchool));
+    const unsubPlannings = onSnapshot(qPlannings, (snap) => {
       const list = [];
       snap.forEach(d => {
-        const data = d.data();
-        if (data.schoolId?.trim().toLowerCase() === currentSchool.toLowerCase()) {
-          list.push({ id: d.id, ...data });
-        }
+        list.push({ id: d.id, ...d.data() });
       });
-      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setPlanningsPdf(list);
+      setPlanningsDeployes(list);
       setLoading(false);
     });
 
     return () => {
       unsubClasses();
       unsubStaff();
-      unsubPdfs();
+      unsubPlannings();
     };
-  }, [currentSchool, selectedClasse, selectedProfId]);
+  }, [currentSchool]);
 
-  // Synchronisation dynamique de la discipline de l'enseignant sélectionné
-  useEffect(() => {
-    const enseignant = personnelEnseignant.find(p => p.id === selectedProfId);
-    if (enseignant) {
-      setMatiere(enseignant.matiereEnseignee || 'Général');
-    }
+  // Synchronisation dynamique et automatique de la matière du professeur choisi
+  const professeurSelectionne = useMemo(() => {
+    return personnelEnseignant.find(p => p.id === selectedProfId) || null;
   }, [selectedProfId, personnelEnseignant]);
 
-  // 🟢 CONVERTISSEUR PDF SÉCURISÉ : Encode le fichier en Base64
-  const handlePdfFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const matiereEnseignee = professeurSelectionne?.matiere || professeurSelectionne?.specialite || 'Mathématiques';
 
-    if (file.type !== "application/pdf") {
-      alert("🛑 Format invalide. Veuillez charger uniquement un document officiel sous format PDF.");
-      e.target.value = "";
+  // ➕ ACTION 1 : AJOUTER UN CRÉNEAU CHRONOLOGIQUE À LA LISTE TEMPORAIRE
+  const handleAjouterCreneauLocal = (e) => {
+    e.preventDefault();
+    if (!selectedProfId || !selectedClasse || !heureDebut || !heureFin) {
+      alert("⚠️ Configuration incomplète. Veuillez renseigner tous les champs requis.");
       return;
     }
 
-    setPdfName(file.name);
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => setFileBase64(reader.result);
+    const classeTarget = classes.find(c => c.id === selectedClasse);
+
+    // Détection NoSQL des conflits et chevauchements d'heures locaux
+    const conflitDHeure = creneauxTemporaires.some(c => 
+      (heureDebut >= c.heureDebut && heureDebut < c.heureFin) || 
+      (heureFin > c.heureDebut && heureFin <= c.heureFin)
+    );
+
+    if (conflitDHeure) {
+      alert("❌ Conflit Horaire : Cet enseignant possède déjà un cours programmé sur cette plage.");
+      return;
+    }
+
+    const nouveauCreneau = {
+      idUniqueTemp: Math.random().toString(36).substring(2, 7),
+      classeId: selectedClasse,
+      nomClasse: classeTarget?.nom || selectedClasse.toUpperCase().replace(/_/g, ' '),
+      heureDebut,
+      heureFin
+    };
+
+    // Injection et tri chronologique immédiat
+    setCreneauxTemporaires([...creneauxTemporaires, nouveauCreneau].sort((a, b) => a.heureDebut.localeCompare(b.heureDebut)));
   };
 
-  // 🚀 ACTION DE TRANSMISSION DU FICHIER PDF AVEC RÉGIME DYNAMIQUE
-  const handleUploadEmploiTempsPdf = async (e) => {
+  // ❌ SUPPRIMER UN CRÉNEAU PARTICULIER DU TABLEAU AVANT SAUVEGARDE
+  const handleRetirerCreneauLocal = (idTemp) => {
+    setCreneauxTemporaires(creneauxTemporaires.filter(c => c.idUniqueTemp !== idTemp));
+  };
+
+  // 💾 ACTION 2 : ENREGISTRER DANS FIRESTORE ET GÉNÉRER LE RENDU PDF OFFICIEL
+  const handleEnregistrerEtImprimerPDF = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
-    if (!selectedClasse || !pdfBase64) {
-      setMessage({ type: 'error', text: 'Veuillez désigner la classe et téléverser le document PDF officiel.' });
+    if (!selectedProfId || creneauxTemporaires.length === 0) {
+      setMessage({ type: 'error', text: 'La liste des cours programmés est vide. Ajoutez au moins un créneau.' });
       return;
     }
 
     setSending(true);
-    const classeData = classes.find(c => (c.idBrute === selectedClasse || c.id === selectedClasse));
-    const labelClasse = (classeData?.nom || selectedClasse).toUpperCase();
-    const cleanClasseId = (classeData?.idBrute || selectedClasse).toLowerCase();
+    const nomCompletProf = professeurSelectionne?.name || professeurSelectionne?.nom || 'Enseignant';
 
-    const currentProf = personnelEnseignant.find(p => p.id === selectedProfId);
-    const documentIdKey = `${currentSchool}_pdf_${cleanClasseId}`;
+    const payloadEmploiTemps = {
+      professeurId: selectedProfId,
+      professeurName: nomCompletProf,
+      matiere: matiereEnseignee,
+      schoolId: currentSchool,
+      createdAt: new Date().toISOString(),
+      creneaux: creneauxTemporaires.map(({ classeId, nomClasse, heureDebut, heureFin }) => ({
+        classeId,
+        nomClasse,
+        heureDebut,
+        heureFin
+      }))
+    };
 
     try {
-      await setDoc(doc(db, "emplois_du_temps_pdf", documentIdKey), {
-        id: documentIdKey,
-        schoolId: currentSchool,
-        classeId: cleanClasseId,
-        classeNom: labelClasse,
-        pdfDocumentData: pdfBase64, 
-        pdfDocumentName: pdfName,
-        profId: selectedProfId || 'ADMIN',
-        profName: currentProf ? `M. ${currentProf.nom}` : 'Direction',
-        matiere: matiere,
-        regimeHoraire: regimeHoraire.trim().toUpperCase(), // Enregistrement de la valeur libre
-        datePublication: new Date().toLocaleDateString('fr-FR'),
-        createdAt: new Date().toISOString()
+      // 1. Écriture Cloud
+      await addDoc(collection(db, 'emplois_du_temps'), payloadEmploiTemps);
+
+      setMessage({ 
+        type: 'success', 
+        text: `🎉 Réussite ! L'emploi du temps de M. ${nomCompletProf} a été déployé. Édition du binaire PDF en cours...` 
       });
 
-      setMessage({ type: 'success', text: `🎉 Succès ! L'emploi du temps de la classe ${labelClasse} a été scellé en PDF et publié.` });
-      setFileBase64(null);
-      setPdfName('');
-      if (document.getElementById('pdfInput')) document.getElementById('pdfInput').value = '';
+      // 2. Génération automatique du document A4 Clean
+      const elementImprimable = document.createElement('div');
+      elementImprimable.innerHTML = `
+        <div style="font-family: Arial, sans-serif; padding: 40px; color: #0f172a; background: #ffffff;">
+          <table style="width: 100%; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
+            <tr>
+              <td>
+                <h2 style="font-size: 14px; text-transform: uppercase; margin: 0; color: #475569;">${schoolName?.toUpperCase() || 'EDULINK SYSTEM'}</h2>
+                <h1 style="font-size: 20px; font-weight: 900; text-transform: uppercase; margin: 4px 0 0 0;">Planning Général du Personnel Enseignant</h1>
+              </td>
+            </tr>
+          </table>
+          
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px;">
+            <p style="margin: 4px 0;"><strong>PROV_ID :</strong> <span style="font-family: monospace;">${selectedProfId}</span></p>
+            <p style="margin: 4px 0;"><strong>ENSEIGNANT TITULAIRE :</strong> M. ${nomCompletProf.toUpperCase()}</p>
+            <p style="margin: 4px 0;"><strong>DISCIPLINE ENSEIGNÉE :</strong> ${matiereEnseignee.toUpperCase()}</p>
+            <p style="margin: 4px 0;"><strong>ANNEE SCOLAIRE :</strong> 2025 - 2026</p>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+            <thead>
+              <tr style="background: #0f172a; color: #ffffff; text-transform: uppercase;">
+                <th style="padding: 10px; border: 1px solid #cbd5e1;">Régime Horaires</th>
+                <th style="padding: 10px; border: 1px solid #cbd5e1;">Structure Pédagogique Assignée</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payloadEmploiTemps.creneaux.map(c => `
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: bold; color: #c2410c;">⏰ ${c.heureDebut} — ${c.heureFin}</td>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; color: #1e3a8a;">🏛️ ${c.nomClasse.toUpperCase()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div style="margin-top: 40px; text-align: right; font-size: 10px; font-style: italic; color: #94a3b8;">[ Emploi du Temps Officiel Archivé par la Direction ]</div>
+        </div>
+      `;
+
+      const options = {
+        margin: 10,
+        filename: `EMPLOI_DU_TEMPS_PROF_${nomCompletProf.replace(/\s+/g, '_')}.pdf`,
+        html2canvas: { scale: 2.5, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(options).from(elementImprimable).save();
+
+      // Réinitialisation après insertion réussie
+      setCreneauxTemporaires([]);
+
     } catch (err) {
       console.error(err);
-      setMessage({ type: 'error', text: "💥 Erreur technique lors de la transmission réseau." });
+      setMessage({ type: 'error', text: "💥 Échec lors de la synchronisation au serveur." });
     } finally {
       setSending(false);
     }
   };
 
-  const handleSupprimerPdf = async (idDoc) => {
-    if (!window.confirm("Voulez-vous révoquer et effacer ce planning PDF ?")) return;
+  const handleSupprimerPlanningGlobal = async (idDoc) => {
+    if (!window.confirm("Voulez-vous révoquer et détruire ce planning ?")) return;
     try {
-      await deleteDoc(doc(db, "emplois_du_temps_pdf", idDoc));
-      setMessage({ type: 'success', text: "🗑️ Document PDF supprimé de l'infrastructure." });
+      await deleteDoc(doc(db, "emplois_du_temps", idDoc));
+      setMessage({ type: 'success', text: "🗑️ Fiche d'emploi du temps révoquée du cloud." });
     } catch (err) { console.error(err); }
   };
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">Ouverture de la centrale des plannings...</div>;
+    // =========================================================================
+  // 3. 📊 COMPOSATEUR AUTOMATIQUE PAR CLASSE (CORRECTION DE CASSE ET NORMALISATION)
+  // =========================================================================
+   const emploiDuTempsClasseReconstitue = useMemo(() => {
+    if (!classeFiltreVisualisation) return [];
+    
+    const cibleIdNettoye = classeFiltreVisualisation.toString().trim().toLowerCase();
+    const list = [];
+
+    planningsDeployes.forEach(p => {
+      if (Array.isArray(p.creneaux)) {
+        p.creneaux.forEach(c => {
+          const creneauClasseIdNettoye = (c.classeId || '').toString().trim().toLowerCase();
+
+          // 🟢 Match flexible insensible à la présence de suffixes de séries (A, C, D, A1...)
+          if (
+            creneauClasseIdNettoye === cibleIdNettoye ||
+            creneauClasseIdNettoye.includes(cibleIdNettoye) ||
+            cibleIdNettoye.includes(creneauClasseIdNettoye)
+          ) {
+            list.push({
+              professeurName: p.professeurName,
+              matiere: p.matiere,
+              heureDebut: c.heureDebut,
+              heureFin: c.heureFin,
+              parentDocumentId: p.id
+            });
+          }
+        });
+      }
+    });
+
+    return list.sort((a, b) => a.heureDebut.localeCompare(b.heureDebut));
+  }, [classeFiltreVisualisation, planningsDeployes]);
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">
+        Ouverture de la centrale de planification...
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen text-gray-700 animate-fadeIn">
+      
+      {/* Alertes d'états */}
       {message.text && (
         <div className={`p-4 mb-6 rounded-xl text-xs font-bold text-left border ${
           message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
@@ -185,136 +282,170 @@ const EmploiDuTempsAdmin = () => {
         </div>
       )}
 
+      {/* SECTION 1 : LOGIQUE DE CONFECTION INTERACTIVE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* COMPARTIMENT DE TÉLÉVERSEMENT */}
+        {/* BLOC DES CRITÈRES ET DES CHOIX */}
         <div className="bg-white p-5 rounded-2xl border shadow-sm h-fit text-left">
-          <h3 className="text-xs font-black text-purple-700 uppercase tracking-wider border-b pb-3 mb-4">🔐 Diffusion Officielle des Emplois du Temps (Fichiers PDF)</h3>
-          <form onSubmit={handleUploadEmploiTempsPdf} className="space-y-4 text-xs font-bold">
-            
+          <h3 className="text-xs font-black text-purple-700 uppercase tracking-wider border-b pb-3 mb-4">
+            🔐 Confection Horaires par Enseignant
+          </h3>
+          
+          <form onSubmit={handleAjouterCreneauLocal} className="space-y-4 text-xs font-bold">
             <div>
-              <label className="block text-gray-400 uppercase mb-1">1. Sélectionner la Classe *</label>
-              <select value={selectedClasse} onChange={(e) => setSelectedClasse(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer" required>
-                <option value="">-- Choisir la division --</option>
-                {classes.map(c => <option key={c.id} value={c.idBrute || c.id}>{c.nom || c.id}</option>)}
+              <label className="block text-gray-400 uppercase mb-1">1. Enseignant Titulaire *</label>
+              <select value={selectedProfId} onChange={(e) => { setSelectedProfId(e.target.value); setCreneauxTemporaires([]); }} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white font-bold cursor-pointer" required>
+                <option value="">-- Sélectionner l'enseignant --</option>
+                {personnelEnseignant.map(p => (
+                  <option key={p.id} value={p.id}>
+                    👨‍🏫 Enseignant : {p.name || p.nom} ({p.matiere || 'Discipline'})
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-gray-400 uppercase mb-1">2. Enseignant Titulaire / Principal *</label>
-              <select 
-                value={selectedProfId} 
-                onChange={(e) => setSelectedProfId(e.target.value)} 
-                className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer text-xs font-bold text-gray-800" 
-                required
-              >
-                <option value="">-- Assigner l'enseignant responsable --</option>
-                                {personnelEnseignant.map(p => {
-                  const idUniqueClean = (p.id || '').trim().toUpperCase();
-                  const estPP = p.role?.trim().toLowerCase() === 'prof_principal' || idUniqueClean === 'PROF_BLEGUY_978';
-                  const nomProf = (p.nom || p.name || '').toUpperCase();
-                  const matiereProf = p.matiereEnseignee || 'Discipline';
-                  
-                  return (
-                    <option key={idUniqueClean} value={idUniqueClean}>
-                      {estPP ? `👑 PP : M. ${nomProf} (${matiereProf})` : `👨‍🏫 Prof : M. ${nomProf} (${matiereProf})`}
-                    </option>
-                  );
-                })}
+              <label className="block text-gray-400 uppercase mb-1">Matière Enseignée</label>
+              <input type="text" value={matiereEnseignee} className="w-full bg-gray-100 text-gray-500 border rounded-lg p-2.5 outline-none font-bold cursor-not-allowed" readOnly />
+            </div>
+
+            <div>
+              <label className="block text-gray-400 uppercase mb-1">2. Sélectionner la Classe *</label>
+              <select value={selectedClasse} onChange={(e) => setSelectedClasse(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer" disabled={!selectedProfId} required>
+                <option value="">-- Assigner à la classe --</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>🏛️ {c.nom}</option>
+                ))}
               </select>
             </div>
 
-            {/* LA GRILLE DE GRANDE INTERACTIVITE HORAIRE CORRIGÉE */}
-                          <div className="grid grid-cols-2 gap-4 text-left">
-                <div>
-                  <label className="block text-gray-400 uppercase mb-1">Matière Enseignée</label>
-                  <input 
-                    type="text" 
-                    value={matiere} 
-                    disabled 
-                    className="w-full bg-gray-100 border border-gray-200 text-gray-500 rounded-lg p-2.5 outline-none cursor-not-allowed text-xs font-bold" 
-                  />
-                </div>
-                <div>
-                  {/* 🟢 SAISIE MANUELLE PURE : Champ vierge et modifiable librement sans suggestions */}
-                  <label className="block text-gray-600 uppercase mb-1">Régime horaire *</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: 07H00 - 18H00" 
-                    value={regimeHoraire} 
-                    onChange={(e) => setRegimeHoraire(e.target.value)} 
-                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-purple-500 text-xs font-black uppercase" 
-                    required 
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-gray-400 uppercase mb-1">⏰ De (Heure) *</label>
+                <input type="time" value={heureDebut} onChange={(e) => setHeureDebut(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2 font-mono" disabled={!selectedProfId} />
               </div>
-
-            {/* CHARGEMENT DU PDF DEPUIS LA MACHINE */}
-            <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100 text-left">
-              <label className="block text-purple-900 uppercase mb-1">Joindre le planning Officiel en PDF *</label>
-              <input 
-                id="pdfInput"
-                type="file" 
-                accept="application/pdf"
-                onChange={handlePdfFileChange}
-                className="w-full text-gray-700 font-mono file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-black file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-                required
-              />
-              {pdfName && <p className="text-[10px] text-emerald-600 font-mono mt-1.5">✓ Chargé : {pdfName}</p>}
+              <div>
+                <label className="block text-gray-400 uppercase mb-1">⏰ À (Heure) *</label>
+                <input type="time" value={heureFin} onChange={(e) => setHeureFin(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2 font-mono" disabled={!selectedProfId} />
+              </div>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={sending || !pdfBase64} 
-              className="w-full bg-purple-600 hover:bg-purple-700 text-slate-100 font-black py-3 rounded-xl uppercase tracking-wider transition shadow-xs mt-4 cursor-pointer text-center text-xs disabled:bg-gray-200"
-            >
-              {sending ? "Chiffrement et Publication Cloud..." : "💾 Enregistrer & Imprimer la Fiche PDF"}
+            <button type="submit" disabled={!selectedProfId} className="w-full bg-slate-900 text-orange-400 hover:bg-slate-800 p-3 rounded-lg text-xs font-black uppercase tracking-wider transition disabled:opacity-50">
+              ➕ Ajouter ce créneau
             </button>
           </form>
         </div>
 
-        {/* REGISTRE ARCHIVES PDF DES COMMUNIQUÉS EMPLOIS DU TEMPS */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border p-5 shadow-sm text-left">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">📋 Récapitulatif des plannings PDF déployés ({planningsPdf.length})</h3>
-          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-            {planningsPdf.length === 0 ? (
-              <p className="text-gray-400 text-center py-12 font-medium">Aucun document PDF d'emploi du temps n'a encore été diffusé.</p>
-            ) : (
-              planningsPdf.map((p) => (
-                <div key={p.id} className="p-4 bg-gray-50 border border-gray-100 rounded-xl flex justify-between items-center text-xs font-bold hover:border-purple-500/20 transition">
-                  <div>
-                    <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] uppercase font-black">🏛️ {p.classeNom}</span>
-                    <h4 className="text-gray-900 font-black text-[12px] mt-2 font-mono">📄 Fichier : {p.pdfDocumentName}</h4>
-                    <div className="flex gap-4 mt-2 text-[10px] text-gray-400 uppercase font-semibold">
-                      <span>Diffusé le : {p.datePublication}</span>
-                      <span>• Éducateur / PP : <strong className="text-purple-600">{p.profName}</strong></span>
-                      {p.regimeHoraire && <span>• Régime : <strong className="text-orange-600">{p.regimeHoraire}</strong></span>}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <a 
-                      href={p.pdfDocumentData} 
-                      download={p.pdfDocumentName}
-                      className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black transition text-center"
-                    >
-                      📥 Ouvrir
-                    </a>
-                    <button 
-                      type="button" 
-                      onClick={() => handleSupprimerPdf(p.id)}
-                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg text-[10px] uppercase font-black transition cursor-pointer"
-                    >
-                      ✕ Retirer
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        {/* BLOC TABLEAU DE CONSTITUTION EN DIRECT DES COURS */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border shadow-sm text-left">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">
+            📋 Feuille de Route Journalière du Professeur Sélectionné
+          </h3>
+          
+          {creneauxTemporaires.length === 0 ? (
+            <div className="py-20 text-center text-xs font-medium text-gray-400 bg-gray-50 border border-dashed rounded-xl">
+              Ajoutez des plages de cours à l'aide du bouton à gauche pour monter l'emploi du temps de l'enseignant.
+            </div>
+          ) : (
+            <div className="border rounded-xl overflow-hidden bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-white uppercase font-black text-[10px] tracking-wider">
+                    <th className="p-3">Créneaux horaires</th>
+                    <th className="p-3">Classe assignée</th>
+                    <th className="p-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {creneauxTemporaires.map((c) => (
+                    <tr key={c.idUniqueTemp} className="hover:bg-slate-50 transition">
+                      <td className="p-3 font-mono font-bold text-orange-600">⏰ {c.heureDebut} — {c.heureFin}</td>
+                      <td className="p-3 font-bold text-gray-900 uppercase">🏛️ {c.nomClasse}</td>
+                      <td className="p-3 text-center">
+                        <button type="button" onClick={() => handleRetirerCreneauLocal(c.idUniqueTemp)} className="text-red-500 font-bold hover:underline">Retirer</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
+              <div className="p-4 bg-gray-50 border-t flex justify-end">
+                <button type="button" onClick={handleEnregistrerEtImprimerPDF} disabled={sending} className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase px-6 py-3 rounded-lg tracking-widest shadow-md transition disabled:opacity-50">
+                  {sending ? "🔄 Écriture NoSQL..." : "💾 Enregistrer & Imprimer la Fiche PDF"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* =========================================================================
+          SECTION 2 : COMPOSATEUR AUTOMATIQUE PAR CLASSE (FUSION EN DIRECT)
+          ========================================================================= */}
+      <div className="bg-white p-6 rounded-2xl border shadow-sm text-left mt-8">
+        <h2 className="text-base font-black text-blue-900 uppercase border-b pb-3 mb-6 flex items-center gap-2">
+          📊 Compositeur Automatique : Emploi du Temps Reconstitué par Classe
+        </h2>
+
+        <div className="space-y-6">
+          <div className="max-w-xs text-xs font-bold">
+            <label className="block text-gray-400 uppercase mb-1">Choisir une classe pour assembler ses cours</label>
+            <select value={classeFiltreVisualisation} onChange={(e) => setClasseFiltreVisualisation(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer font-bold">
+              <option value="">-- Sélectionner la classe cible --</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>🏛️ {c.nom}</option>
+              ))}
+            </select>
+          </div>
+
+          {!classeFiltreVisualisation ? (
+            <p className="text-xs text-gray-400 italic py-8 bg-slate-50 text-center rounded-xl border border-dashed">
+              💡 Sélectionnez une structure de classe ci-dessus pour fusionner en temps réel les plages horaires de vos professeurs.
+            </p>
+          ) : emploiDuTempsClasseReconstitue.length === 0 ? (
+            <p className="text-xs text-red-600 font-black py-8 bg-red-50 text-center rounded-xl border border-dashed border-red-200 uppercase">
+              ⚠️ Aucun cours n'a encore été planifié ou rattaché à cette classe.
+            </p>
+       ) : (
+  <div className="border rounded-xl overflow-hidden bg-white max-w-4xl shadow-sm">
+    <div className="p-4 bg-blue-50 border-b flex justify-between items-center text-xs">
+      <span className="font-black text-blue-950 uppercase">
+        📅 Emploi du Temps Assemblé : {classes.find(c => c.id === classeFiltreVisualisation)?.nom.toUpperCase()}
+      </span>
+      <span className="px-2.5 py-1 bg-blue-200 text-blue-800 text-[10px] font-black rounded uppercase">
+        Généré en Temps Réel
+      </span>
+    </div>
+    <table className="w-full text-left text-xs border-collapse">
+      <thead>
+        <tr className="bg-slate-900 text-white uppercase font-black text-[10px] tracking-wider">
+          <th className="p-3">Heures Cours</th>
+          <th className="p-3">Discipline / Matière</th>
+          <th className="p-3">Professeur Titulaire</th>
+          <th className="p-3 text-center">Action Admin</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200 font-medium">
+        {emploiDuTempsClasseReconstitue.map((cours, idx) => (
+          <tr key={idx} className="hover:bg-slate-50 transition">
+            <td className="p-3 font-mono font-bold text-orange-600">⏰ {cours.heureDebut} — {cours.heureFin}</td>
+            <td className="p-3 font-black text-blue-900 uppercase">📚 {cours.matiere}</td>
+            <td className="p-3 text-gray-800 font-bold">👨‍🏫 M. {cours.professeurName}</td>
+            <td className="p-3 text-center">
+              <button type="button" onClick={() => handleSupprimerPlanningGlobal(cours.parentDocumentId)} className="text-red-500 hover:underline font-bold">
+                Révoquer
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
+        </div>
+      </div>
+
     </div>
   );
 };

@@ -1,22 +1,21 @@
+// src/pages/login.jsx
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-// 🟢 RECTIFICATION : Réintégration de Link aux côtés du hook de navigation pour le mot de passe oublié
 import { useNavigate, Link } from 'react-router-dom';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // 👈 AJOUTEZ OU CORRIGEZ CETTE LIGNE
-
 
 const Login = () => {
+  // Récupération des mutations de session du contexte central
   const { login, setUser, setSchoolId, setSchoolName } = useAuth();
   const navigate = useNavigate();
 
-  // --- ÉTATS ---
+  // --- ÉTATS PURS ET VIERGES AU DÉMARRAGE ---
   const [matricule, setMatricule] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); 
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🟢 EXECUTION SYNCHRONE DE CONTOURNEMENT DU COMPTE MAÎTRE
+  // 🟢 COMPTE MAÎTRE DU PROPRIÉTAIRE INFRASTRUCTURE
   const executerConnexionMaitreDirecte = () => {
     const profilMaster = {
       id: 'SUPERADMIN_MASTER',
@@ -25,27 +24,27 @@ const Login = () => {
       prenoms: 'Mamadou',
       role: 'super_admin',
       statut: 'actif',
-      schoolId: 'saas_root_platform'
+      schoolId: 'lycee_saint_bernard'
     };
 
-    // Attribution synchrone et sécurisée des accès
     setUser(profilMaster);
-    setSchoolId('saas_root_platform');
+    setSchoolId('lycee_saint_bernard');
     setSchoolName('COMPAGNIE MIDNIGHT SAAS');
     
     sessionStorage.setItem("sgs_user", JSON.stringify(profilMaster));
-    sessionStorage.setItem("sgs_school_id", "saas_root_platform");
+    sessionStorage.setItem("sgs_school_id", "lycee_saint_bernard");
     sessionStorage.setItem("sgs_school_name", "COMPAGNIE MIDNIGHT SAAS");
-    localStorage.setItem('sgs_owner_root_key', 'mamadou_traore_root_access_secure_9921');
+    sessionStorage.setItem("sgs_user_role", "super_admin");
 
     navigate('/superadmin/home');
   };
 
   const handleSubmit = async (e) => {
+    // 🔒 ARRÊTE LE COMPORTEMENT DE RECHARGEMENT NATIF DU NAVIGATEUR
     e.preventDefault();
     setError('');
     
-    const checkMatricule = matricule.trim().toUpperCase(); 
+    const checkMatricule = matricule.trim(); 
     const checkPassword = password.trim();
 
     if (!checkMatricule || !checkPassword) {
@@ -53,38 +52,59 @@ const Login = () => {
       return;
     }
 
-    if (checkMatricule === 'ROOT_LUHAMCODE_2024' && checkPassword === 'herick2024') {
+    // Bypass du compte ROOT d'urgence local (Cas insensible au formulaire)
+    if (checkMatricule.toUpperCase() === 'ROOT_LUHAMCODE_2024' && checkPassword === 'HERICK2024') {
       executerConnexionMaitreDirecte();
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // Nettoyage préventif des sessions expirées
       sessionStorage.removeItem('sgs_user');
+      
+      // 📡 APPEL DYNAMIQUES DE L'INFRASTRUCTURE NoSQL
       const result = await login(checkMatricule, checkPassword);
 
-      if (result && result.success) {
-        if (result.role === 'admin') navigate('/admin/home');
-        else if (result.role === 'educateur') navigate('/educateur/promotion');
-        else if (result.role === 'prof_principal') navigate('/prof/dashboard-pp');
-        else if (result.role === 'professeur') navigate('/prof/dashboardProf');
-        else if (result.role === 'eleve') navigate('/eleve/dashboard');
+      // 🟢 OPTIMISATION CRITIQUE : Analyse de la promesse ou du stockage mis à jour
+      const savedUserStr = sessionStorage.getItem('sgs_user');
+      const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+      
+      if ((result && result.success) || savedUser) {
+        const roleActif = (result?.role || savedUser?.role || 'professeur').toString().toLowerCase().trim();
+        console.log("🚀 Authentification validée. Routage vers :", roleActif);
+
+        // Libération préventive de l'état de soumission avant le changement de page
+        setIsSubmitting(false);
+
+        // 🟢 ALIGNEMENT DE TOUTES LES TRAJECTOIRES DE REDIRECTION CORRIGÉES
+        if (roleActif === 'super_admin') navigate('/superadmin/home');
+        else if (roleActif === 'admin') navigate('/admin/home');
+        
+        // 🟢 REDIRECTION COMPILÉE : L'éducateur atterrit directement sur la Liste des Promotions
+        else if (roleActif === 'educateur') navigate('/educateur/promotions'); 
+        
+        else if (roleActif === 'prof_principal') navigate('/professeur/principal');
+        else if (roleActif === 'professeur') navigate('/professeur/dashboard');
+        else if (roleActif === 'eleve') navigate('/eleve/dashboard');
+        else navigate('/login');
+        
       } else {
-        setError('Identifiant ou mot de passe incorrect. Assurez-vous que le compte existe.');
+        setError(result?.msg || 'Identifiant ou mot de passe incorrect. Assurez-vous que le compte existe.');
         setIsSubmitting(false);
       }
     } catch (err) {
-      console.error(err);
-      setError('Une erreur technique est survenue lors de la connexion.');
+      console.error("Erreur critique attrapée lors du routage :", err);
+      setError('Une erreur technique est survenue lors de la connexion avec le cloud.');
       setIsSubmitting(false);
     }
   };
 
   const handleKeyDownPassword = (e) => {
-    const checkMatricule = matricule.trim().toUpperCase();
+    const checkMatricule = matricule.trim();
     const checkPassword = password.trim();
 
-    if (e.key === 'Enter' && checkMatricule === 'ROOT_LUHAMCODE_2024' && checkPassword === 'herick2024') {
+    if (e.key === 'Enter' && checkMatricule.toUpperCase() === 'ROOT_LUHAMCODE_2024' && checkPassword === 'HERICK2024') {
       e.preventDefault();
       executerConnexionMaitreDirecte();
     }
@@ -112,12 +132,12 @@ const Login = () => {
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-4 mb-6">
           <div>
             <label className="block text-gray-600 text-xs font-bold uppercase mb-1">Identifiant / Matricule</label>
             <input
               type="text"
-              placeholder="Ex: ADMIN, EDUC_6..."
+              placeholder="Ex: EDUC_N'GUESSAN_243..."
               value={matricule}
               onChange={(e) => setMatricule(e.target.value)}
               disabled={isSubmitting}
@@ -151,7 +171,7 @@ const Login = () => {
         <button 
           type="submit" 
           disabled={isSubmitting}
-          className="w-full bg-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-md hover:shadow-lg flex justify-center items-center cursor-pointer"
+          className="w-full bg-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-md hover:shadow-lg flex justify-center items-center cursor-pointer mb-4"
         >
           {isSubmitting ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
@@ -159,9 +179,10 @@ const Login = () => {
             'Se connecter au portail'
           )}
         </button>
-         <div className="mt-4 text-right">
+
+        <div className="text-right">
           <Link 
-            to="/recuperation-cle" 
+            to="/recuperer-cle" 
             className="text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider"
           >
             Mot de passe oublié ?

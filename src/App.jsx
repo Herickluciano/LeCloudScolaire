@@ -1,127 +1,413 @@
+// src/App.jsx
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
 
-import Login from './pages/login'; 
+import './App.css';
+
+// =====================================================
+// CONTEXTES ET SÉCURITÉ
+// =====================================================
+
+import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
+
+// =====================================================
+// ÉCRAN DE VEILLE
+// =====================================================
+
+import EcranEveilSecurite from './components/EcranEveilSecurite.jsx';
+
+// =====================================================
+// PUBLIC
+// =====================================================
+
+import Login from './pages/login';
 import ChangerMotDePasse from './pages/ChangerMotDePasse.jsx';
+import RecupererCleAcces from './pages/RecupererCleAcces.jsx';
+
+// =====================================================
+// COMMUN
+// =====================================================
+
 import NotificationCentre from './component/Shared/NotificationCentre.jsx';
+import Footer from './pages/Footer.jsx';
+
+// =====================================================
+// ADMINISTRATION
+// =====================================================
+
 import ModifierStatut from './features/admin/pages/ModifierStatut';
 import HomeAdmin from './features/admin/pages/HomeAdmin.jsx';
 import PageSecretariat from './features/admin/pages/PageSecretariat.jsx';
-import MesClasses from './features/professeur/pages/classes/MesClasses.jsx';
-import MessagerieProf from './features/professeur/pages/MessagerieProf.jsx';
-import AjouterPersonneSuperAdmin from './pages/AjouterPersonneSuperAdmin.jsx';
-
-// 🟢 INTEGRATION SÉCURISÉE : Page de récupération des clés d'accès oubliées
-import RecupererCleAcces from './pages/RecupererCleAcces.jsx';
-
-// 🟢 ALIGNEMENT DE PRODUCTION : Registre d'appel électronique dynamique
-import RegistreAppelEleves from './features/professeur/pages/assiduite/RegistreAppelEleves.jsx';
-
-import CahierTextes from './features/professeur/pages/classes/CahierTextes.jsx';
-import MonPointage from './features/professeur/pages/assiduite/MonPointage.jsx';
-import ConfigurationTerminal from './features/admin/pages/ConfigurationTerminal.jsx';
-import SuperAdminSaas from './pages/SuperAdminSaaS.jsx';
-import HomeSuperAdmin from './pages/homeSuperAdmin.jsx'; 
-import HistoriqueMessage from './features/admin/pages/messages/HistoriqueMessage.jsx';
-import DashboardPP from './features/professeur/pages/espacePP/DashboardPP.jsx';
-import GestionTrimestres from './features/admin/pages/GestionTrimestres.jsx';
-
-// --- IMPORTS DES COMPOSANTS ET PAGES DE PRODUCTION ---
 import DashboardAdmin from './features/admin/pages/DashboardAdmin';
 import AjouterEleve from './features/admin/pages/AjouterEleve';
+import BaseDonneCentraleAdmin from './features/admin/pages/BaseDonneCentraleAdmin';
 import AjouterPersonnel from './features/admin/pages/AjouterPersonnel';
-import ListeDesClasse from './features/admin/pages/listeDesClasse'; 
+import ListeDesClasse from './features/admin/pages/listeDesClasse';
+import GestionTrimestres from './features/admin/pages/GestionTrimestres.jsx';
+import ConfigurationTerminal from './features/admin/pages/ConfigurationTerminal.jsx';
+import EmploiDuTempsAdmin from './features/admin/pages/EmploiDuTempsAdmin.jsx';
 
-// 🟢 RECTIFICATION CHEMIN ÉVALUATIONS : Pointage direct dans le répertoire existant evaluations/
+// =====================================================
+// PROFESSEUR
+// =====================================================
+
+import MessagerieProf from './features/professeur/pages/MessagerieProf.jsx';
+import RegistreAppelEleves from './features/professeur/pages/assiduite/RegistreAppelEleves.jsx';
+import CahierTextes from './features/professeur/pages/classes/CahierTextes.jsx';
+import MonPointage from './features/professeur/pages/assiduite/MonPointage.jsx';
+import DashboardPP from './features/professeur/pages/espacePP/DashboardPP.jsx';
 import SaisieNotes from './features/professeur/pages/evaluations/SaisieNotes.jsx';
 import DashboardProf from './features/professeur/pages/DashboardProf';
+
+// =====================================================
+// ÉDUCATEUR
+// =====================================================
+
+import DashboardEducateur from './features/educateur/pages/DashboardEducateur.jsx';
 import ListePromotion from './features/educateur/pages/ListePromotion';
 
-// 🟢 ALIGNEMENT ROUTAGE : Suivi de la vie scolaire de l'éducateur et des apprenants
-import DashboardEducateur from './features/educateur/pages/DashboardEducateur.jsx';
+// =====================================================
+// ÉLÈVE
+// =====================================================
+
 import DashboardEleve from './features/eleve/pages/DashboardEleve';
-import EmploiDuTempsAdmin from './features/admin/pages/EmploiDuTempsAdmin.jsx';
-import './App.css';
 
-// --- COMPOSANT DE SECOURS DE LA PLATEFORME ---
-const PageNonAutorisee = () => (
-  <div className="p-8 text-center font-sans max-w-md mx-auto bg-white border border-red-100 shadow-md rounded-xl mt-12 text-left text-gray-700 animate-fadeIn">
-    <span className="text-2xl">❌</span>
-    <h1 className="text-sm font-black text-red-500 mb-2 uppercase mt-3">Accès temporairement restreint</h1>
-    <p className="text-xs text-gray-400 font-medium">Vos privilèges actuels ne couvrent pas la consultation de cette division.</p>
-  </div>
-);
+// =====================================================
+// SUPER ADMIN
+// =====================================================
 
-function App() {
+import SuperAdminSaaS from './pages/SuperAdminSaaS.jsx';
+import HomeSuperAdmin from './pages/HomeSuperAdmin.jsx';
+import AjouterPersonneSuperAdmin from './pages/AjouterPersonneSuperAdmin.jsx';
+import HistoriqueMessage from './features/admin/pages/messages/HistoriqueMessage.jsx';
+
+// =====================================================
+// PUBLICITÉS
+// =====================================================
+
+import GestionPublicites from './components/GestionPublicites';
+
+
+const App = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* 🔓 ROUTES PUBLIQUES */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/recuperation-cle" element={<RecupererCleAcces />} />
-        <Route path="/unauthorized" element={<PageNonAutorisee />} />
+    <AuthProvider>
 
-        {/* 🏛️ ROUTAGE DES PÔLES ADMINISTRATIFS ET SÉCURITÉ SCELLÉS (SUPERADMIN) */}
-        <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
-          <Route path="/superadmin/configure-terminal" element={<ConfigurationTerminal />} />
-          <Route path="/superadmin/dashboard" element={<SuperAdminSaas />} />
-          <Route path="/superadmin/home" element={<HomeSuperAdmin />} />
-        </Route>
+      <BrowserRouter>
 
-        {/* 🎓 ESPACE ACCÈS ÉLÈVES & ÉTUDIANTS PROTEGÉ (DÉCENTRALISÉ) */}
-        <Route element={<ProtectedRoute allowedRoles={['eleve']} />}>
-          <Route path="/eleve/dashboard" element={<DashboardEleve />} />
-          <Route path="/eleve/bulletins" element={<DashboardEleve />} />
-          <Route path="/eleve/messagerie" element={<DashboardEleve />} />
-        </Route>
+        {/* =================================================
+            ÉCRAN DE VEILLE GLOBAL
+            Il affiche children normalement.
+            Il affiche le verrou uniquement après inactivité.
+        ================================================= */}
 
-        {/* 🔐 ESPACE ÉDUCATEUR ET PROMOTIONS EXCLUSIVES */}
-        <Route element={<ProtectedRoute allowedRoles={['educateur']} />}>
-          <Route path="/educateur/promotion" element={<ListePromotion />} />
-          <Route path="/educateur/promotion/:niveau" element={<ListePromotion />} />
-          <Route path="/educateur/dashboard" element={<DashboardEducateur />} />
-        </Route>
+        <EcranEveilSecurite>
 
-        {/* 👨‍🏫 ESPACE ACCÈS ENSEIGNANTS & PROFESSEURS */}
-        <Route element={<ProtectedRoute allowedRoles={['professeur', 'prof_principal']} />}>
-          <Route path="/prof/dashboardProf" element={<DashboardProf />} /> 
-          <Route path="/prof/saisie-notes/:classIdUrl?" element={<SaisieNotes />} />
-          <Route path="/prof/faire-appel/:classIdUrl?" element={<RegistreAppelEleves />} />
-          <Route path="/prof/mes-classes" element={<MesClasses />} />
-          <Route path="/prof/messagerie" element={<MessagerieProf />} /> 
-          <Route path="/prof/mon-pointage" element={<MonPointage />} /> 
-          <Route path="/prof/cahier-textes" element={<CahierTextes />} /> 
-          <Route path="/prof/dashboard-pp" element={<DashboardPP />} /> 
-        </Route>
+          <div className="App flex flex-col min-h-screen">
 
-        {/* 🔐 ESPACE DIRECTION / ADMINISTRATEUR */}
-        <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
-          <Route path="/admin/messages-history" element={<HistoriqueMessage />} />
-          <Route path="/admin/configure-terminal" element={<ConfigurationTerminal />} />
-          <Route path="/admin/secretariat" element={<PageSecretariat />} />
-          <Route path="/admin/home" element={<HomeAdmin />} />
-          <Route path="/admin/dashboard" element={<DashboardAdmin />} />
-          <Route path="/admin/AjouterEleve" element={<AjouterEleve />} />
-          <Route path="/admin/recrutement-personnel" element={<AjouterPersonnel />} />
-          <Route path="/admin/registre-classes" element={<ListeDesClasse />} />
-          <Route path="/admin/emploi-temps" element={<EmploiDuTempsAdmin />} />
-          <Route path="/admin/gestion-trimestres" element={<GestionTrimestres />} />
-          <Route path="/superadmin/ajouter-personnel" element={<AjouterPersonneSuperAdmin />} />
-        </Route>
+            <main className="flex-grow">
 
-        {/* 🔐 ESPACE COMMUN PROTEGÉ POUR LES PARAMÈTRES COMPTES */}
-        <Route element={<ProtectedRoute allowedRoles={['admin', 'educateur', 'professeur', 'prof_principal', 'eleve', 'super_admin']} />}>
-          <Route path="/mon-compte/securite" element={<ChangerMotDePasse />} />
-          <Route path="/notifications" element={<NotificationCentre />} />
-          <Route path="/admin/modifier-statut" element={<ModifierStatut />} />
-        </Route>
+              <Routes>
 
-        {/* 🔄 REDIRECTION AUTOMATIQUE SI CHEMIN INCORRECT */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+                {/* =================================================
+                    ROUTES PUBLIQUES
+                ================================================= */}
+
+                <Route
+                  path="/"
+                  element={
+                    <Navigate
+                      to="/login"
+                      replace
+                    />
+                  }
+                />
+
+                <Route
+                  path="/login"
+                  element={<Login />}
+                />
+
+                <Route
+                  path="/recuperer-cle"
+                  element={<RecupererCleAcces />}
+                />
+
+
+                {/* =================================================
+                    ROUTES COMMUNES SÉCURISÉES
+                ================================================= */}
+
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={[
+                        'admin',
+                        'super_admin',
+                        'professeur',
+                        'educateur',
+                        'eleve',
+                      ]}
+                    />
+                  }
+                >
+
+                  <Route
+                    path="/modifier-mot-de-passe"
+                    element={<ChangerMotDePasse />}
+                  />
+
+                  <Route
+                    path="/notifications"
+                    element={<NotificationCentre />}
+                  />
+
+                </Route>
+
+
+                {/* =================================================
+                    ESPACE ADMIN
+                ================================================= */}
+
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={['admin']}
+                    />
+                  }
+                >
+
+                  <Route
+                    path="/admin/home"
+                    element={<HomeAdmin />}
+                  />
+
+                  <Route
+                    path="/admin/secretariat"
+                    element={<PageSecretariat />}
+                  />
+
+                  <Route
+                    path="/admin/dashboard"
+                    element={<DashboardAdmin />}
+                  />
+
+                  <Route
+                    path="/admin/ajouter-eleve"
+                    element={<AjouterEleve />}
+                  />
+
+                  <Route
+                    path="/admin/base-centralise"
+                    element={<BaseDonneCentraleAdmin />}
+                  />
+
+                  <Route
+                    path="/admin/ajouter-personnel"
+                    element={<AjouterPersonnel />}
+                  />
+
+                  <Route
+                    path="/admin/classes"
+                    element={<ListeDesClasse />}
+                  />
+
+                  <Route
+                    path="/admin/trimestres"
+                    element={<GestionTrimestres />}
+                  />
+
+                  <Route
+                    path="/admin/statuts"
+                    element={<ModifierStatut />}
+                  />
+
+                  <Route
+                    path="/admin/terminal"
+                    element={<ConfigurationTerminal />}
+                  />
+
+                  <Route
+                    path="/admin/emploi-du-temps"
+                    element={<EmploiDuTempsAdmin />}
+                  />
+
+                </Route>
+
+
+                {/* =================================================
+                    ESPACE PROFESSEUR
+                ================================================= */}
+
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={['professeur']}
+                    />
+                  }
+                >
+
+                  <Route
+                    path="/professeur/dashboard"
+                    element={<DashboardProf />}
+                  />
+
+                  <Route
+                    path="/professeur/notes"
+                    element={<SaisieNotes />}
+                  />
+
+                  <Route
+                    path="/professeur/appel"
+                    element={<RegistreAppelEleves />}
+                  />
+
+                  <Route
+                    path="/professeur/cahier-textes"
+                    element={<CahierTextes />}
+                  />
+
+                  <Route
+                    path="/professeur/pointage"
+                    element={<MonPointage />}
+                  />
+
+                  <Route
+                    path="/professeur/messagerie"
+                    element={<MessagerieProf />}
+                  />
+
+                  <Route
+                    path="/professeur/principal"
+                    element={<DashboardPP />}
+                  />
+
+                  <Route
+                    path="/professeur/emploi-du-temps"
+                    element={<EmploiDuTempsAdmin />}
+                  />
+
+                </Route>
+
+
+                {/* =================================================
+                    ESPACE ÉDUCATEUR
+                ================================================= */}
+
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={['educateur']}
+                    />
+                  }
+                >
+
+                  <Route
+                    path="/educateur/dashboard"
+                    element={<DashboardEducateur />}
+                  />
+
+                  <Route
+                    path="/educateur/promotions"
+                    element={<ListePromotion />}
+                  />
+
+                </Route>
+
+
+                {/* =================================================
+                    ESPACE ÉLÈVE
+                ================================================= */}
+
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={['eleve']}
+                    />
+                  }
+                >
+
+                  <Route
+                    path="/eleve/dashboard"
+                    element={<DashboardEleve />}
+                  />
+
+                </Route>
+
+
+                {/* =================================================
+                    ESPACE SUPER ADMIN
+                ================================================= */}
+
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={['super_admin']}
+                    />
+                  }
+                >
+
+                  <Route
+                    path="/superadmin/home"
+                    element={<HomeSuperAdmin />}
+                  />
+
+                  <Route
+                    path="/superadmin/saas"
+                    element={<SuperAdminSaaS />}
+                  />
+
+                  <Route
+                    path="/superadmin/ajouter"
+                    element={<AjouterPersonneSuperAdmin />}
+                  />
+
+                  <Route
+                    path="/superadmin/logs"
+                    element={<HistoriqueMessage />}
+                  />
+
+                  <Route
+                    path="/superadmin/publicites"
+                    element={<GestionPublicites />}
+                  />
+
+                </Route>
+
+
+                {/* =================================================
+                    ROUTE INCONNUE
+                ================================================= */}
+
+                <Route
+                  path="*"
+                  element={
+                    <Navigate
+                      to="/login"
+                      replace
+                    />
+                  }
+                />
+
+              </Routes>
+
+            </main>
+
+            <Footer />
+
+          </div>
+
+        </EcranEveilSecurite>
+
+      </BrowserRouter>
+
+    </AuthProvider>
   );
-}
+};
 
 export default App;

@@ -57,7 +57,7 @@ const GestionTrimestres = () => {
       
       {/* BOUTON RETOUR */}
       <div className="mb-4">
-        <Link to="/admin/dashboard" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition">
+        <Link to="/admin/home" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition">
           ⬅️ Tableau de Bord Admin
         </Link>
       </div>

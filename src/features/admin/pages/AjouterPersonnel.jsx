@@ -233,7 +233,15 @@ const AjouterPersonnel = () => {
           </div>
           <div>
             <label className="block text-gray-400 uppercase mb-1">Prénoms *</label>
-            <input type="text" name="prenom" value={formData.prenom} onChange={handleChange} placeholder="Ex: Eric Luciano" className="w-full bg-gray-50 border p-2.5 rounded-lg outline-none" required />
+            <input
+  type="text"
+  name="prenom"
+  value={formData.prenom}
+  onChange={handleChange}
+  placeholder="Ex: Eric Luciano"
+  className="w-full bg-gray-50 border p-2.5 rounded-lg outline-none"
+  required
+/>
           </div>
           <div>
             <label className="block text-gray-400 uppercase mb-1">Genre / Sexe *</label>

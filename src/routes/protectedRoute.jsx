@@ -1,89 +1,67 @@
-import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+// src/routes/ProtectedRoute.jsx
 
+import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = ({allowedRoles=[]})=>{
-const rolesAutorisesNettoyes = allowedRoles.map(r => r.trim().toLowerCase());
+const ProtectedRoute = ({ allowedRoles = [] }) => {
+  const { user, loading } = useAuth();
 
-const {user,loading}=useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-xs text-gray-500 font-bold uppercase tracking-widest">
+        Synchronisation des verrous de sécurité...
+      </div>
+    );
+  }
 
+  const storedUserRaw = sessionStorage.getItem('sgs_user');
+  let sessionUser = null;
 
+  try {
+    sessionUser = storedUserRaw
+      ? JSON.parse(storedUserRaw)
+      : null;
+  } catch {
+    sessionUser = null;
+  }
 
-if(loading){
+  const storedRole = sessionStorage.getItem('sgs_user_role');
 
-return (
+  const profilCourant = user || sessionUser;
 
-<div className="flex h-screen items-center justify-center">
+  const roleActif =
+    profilCourant?.role ||
+    storedRole ||
+    '';
 
-<p className="font-bold text-gray-500">
-Vérification sécurité...
-</p>
+  if (!profilCourant || !roleActif) {
+    return <Navigate to="/login" replace />;
+  }
 
-</div>
+  const roleFormate = String(roleActif)
+    .trim()
+    .toLowerCase();
 
-);
+  const listeRolesAttendus = Array.isArray(allowedRoles)
+    ? allowedRoles.map((role) =>
+        String(role).trim().toLowerCase()
+      )
+    : [];
 
-}
+  const estAutorise =
+    listeRolesAttendus.includes(roleFormate);
 
+  if (!estAutorise) {
+    console.warn(
+      `Accès refusé : ${roleFormate}`,
+      listeRolesAttendus
+    );
 
+    return <Navigate to="/login" replace />;
+  }
 
-if(!user){
-
-return <Navigate to="/login" replace />;
-
-}
-
-
-
-// 👑 ADMIN TOUJOURS AUTORISE
-if(user.role==="admin"){
-
-return <Outlet/>;
-
-}
-
-
-
-// 🚫 BLOQUE LES COMPTES NON ACTIFS
-
-const statut =
-(user.statut || "actif")
-.toLowerCase();
-
-
-
-if(statut !== "actif"){
-
-return (
-
-<Navigate
-to="/unauthorized"
-replace
-/>
-
-);
-
-}
-
-
-
-// Vérification rôle
-
-if(!allowedRoles.includes(user.role)){
-
-return <Navigate
-to="/unauthorized"
-replace
-/>;
-
-}
-
-
-
-return <Outlet/>;
-
-
+  return <Outlet />;
 };
-
 
 export default ProtectedRoute;

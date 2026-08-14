@@ -1,3 +1,4 @@
+// src/pages/AjouterPersonneSuperAdmin.jsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -5,7 +6,7 @@ const AjouterPersonneSuperAdmin = () => {
   // --- ÉTATS DU FORMULAIRE DE L'AGENCE INFORMATIQUE ---
   const [nom, setNom] = useState('');
   const [prenoms, setPrenoms] = useState('');
-  const [poste, setPoste] = useState('CHEF D\'AGENCE');
+  const [poste, setPoste] = useState("CHEF D'AGENCE");
   const [matriculeTemp, setMatriculeTemp] = useState('');
   
   const [pays, setPays] = useState('');
@@ -41,7 +42,7 @@ const AjouterPersonneSuperAdmin = () => {
     // Injection instantanée dans l'aperçu graphique
     setBadgePret(donneesBadge);
     
-    // 🟢 DÉCLENCHEMENT DE L'IMPRESSION SYSTÈME LOCALE SANS AUCUN IMPORTS EXPIRES
+    // 🟢 DÉCLENCHEMENT DE L'IMPRESSION SYSTÈME LOCALE
     setTimeout(() => {
       window.print();
     }, 300);
@@ -172,8 +173,9 @@ const AjouterPersonneSuperAdmin = () => {
           {badgePret ? (
             <div id="zone-badge-agence-saas" className="w-[340px] border-2 border-slate-900 rounded-2xl p-6 bg-white text-center font-sans shadow-md relative overflow-hidden animate-fadeIn print:shadow-none">
               
-              <div className="border-b border-gray-200 pb-3 mb-4">
-                                <p className="text-[8px] font-medium text-gray-400 italic lowercase first-letter:uppercase leading-tight">{badgePret.devise}</p>
+                            <div className="border-b border-gray-200 pb-3 mb-4">
+                <p className="text-[10px] font-black uppercase text-gray-800 tracking-wide leading-tight">{badgePret.pays}</p>
+                <p className="text-[8px] font-medium text-gray-400 italic lowercase first-letter:uppercase leading-tight mt-0.5">{badgePret.devise}</p>
                 <p className="text-[9px] font-bold text-gray-700 mt-1 uppercase max-w-[280px] mx-auto leading-tight">{badgePret.ministere}</p>
                 <p className="text-xs font-black text-purple-700 mt-2 tracking-wide uppercase">{badgePret.etablissement}</p>
               </div>

@@ -3,6 +3,8 @@ import { db } from '../services/api';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import React from 'react';
+import { Link } from 'react-router-dom'; // 🟢 SÉCURISATION CRITIQUE DES LIENS
 
 const SuperAdminSaaS = () => {
   const navigate = useNavigate();
@@ -355,7 +357,13 @@ const SuperAdminSaaS = () => {
             </table>
           </div>
         </div>
-
+        <Link
+  to="/superadmin/publicites"
+  className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition"
+>
+  📢
+  <span>Publicités</span>
+</Link>
       </div>
     </div>
   );

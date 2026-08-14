@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; 
 import { db, enrollStudentOnFirebase } from '../../../services/api';
-import { collection, query, where, onSnapshot } from 'firebase/firestore'; 
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc
+} from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
 import { genererFicheAvecQRCodePDF } from '../../../utils/genererPDF.js';
+import FormulaireClasse from './FormulaireClasse.jsx';
 
 const AjouterEleve = () => {
   const navigate = useNavigate();
@@ -78,38 +86,40 @@ const AjouterEleve = () => {
     return () => unsubscribe();
   }, [currentSchool]);
 
-  // 🟢 3. ALGORITHME DE FILTRAGE CHIRURGICAL DOUBLE FLUX (PREMIER & SECOND CYCLE IVOIRIEN)
-  const classesFiltrees = classes.filter(c => {
-    if (!formData.niveauPromotion) return false;
+  // 🟢 3. FILTRAGE DES CLASSES PAR PROMOTION
+// La valeur du formulaire et celle de Firestore peuvent être écrites
+// différemment : "2nd C", "2nd_C", "2nd-c", etc.
+// On les transforme en une même clé technique.
 
-    const selectionFormulaire = formData.niveauPromotion.trim().toLowerCase(); // Ex: "tle_d" ou "6eme"
-    const promoClasse = (c.promotion || '').trim().toLowerCase(); // Ex: "tle" ou "6eme"
-    const serieClasse = (c.serie || '').trim().toLowerCase(); // Ex: "d" ou "generale"
+// 🟢 FILTRAGE COMPATIBLE AVEC TOUTES LES SÉRIES IVOIRIENNES (C, D, A1, A2...)
+const normaliserPromotion = (value = '') => {
+  const str = value.toString().toLowerCase().trim();
+  
+  // Convertit les formats formulaire ou Firestore vers des clés génériques simplifiées
+  if (str === '2nd' || str.startsWith('2nd') || str.startsWith('2nde')) return '2nd';
+  if (str === '1ere' || str.startsWith('1ere') || str.startsWith('1er')) return '1ere';
+  
+  // Capture "terminal", "terminale", "tle", ainsi que vos formats Firestore comme "t_a1", "t_a2"
+  if (str === 'terminal' || str === 'terminale' || str.startsWith('tle') || str.startsWith('t_') || str === 't') {
+    return 'terminal';
+  }
+  
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[-\s]+/g, '_')
+    .replace(/_+/g, '_');
+};
 
-    // Cas A : Premier Cycle (6eme, 5eme, 4eme, 3eme) -> Pas de série
-    if (!selectionFormulaire.includes('_')) {
-      return promoClasse === selectionFormulaire;
-    }
+const classesFiltrees = classes.filter((c) => {
+  if (!formData.niveauPromotion) return false;
 
-    // Cas B : Second Cycle (Séries A, C, D) -> Découpage technique de la sélection (ex: "tle_d" -> "tle" + "d")
-    const [promoForm, serieForm] = selectionFormulaire.split('_');
-    return promoClasse === promoForm && serieClasse === serieForm;
-  });
+  const promotionSelectionnee = normaliserPromotion(formData.niveauPromotion); // Ex: 'terminal' (formulaire)
+  const promotionClasseFirestore = normaliserPromotion(c.promotion);            // Ex: 'terminal' (car c.promotion vaut 'T_A1')
 
-  // Capture des entrées claviers
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Traitement de l'image de profil
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPhotoFile(file);
-      setPhotoPreview(URL.createObjectURL(file));
-    }
-  };
+  // Vérification de correspondance stricte après unification du cycle
+  return promotionClasseFirestore === promotionSelectionnee;
+});
 
   // 4. Soumission et écriture Cloud en Temps Réel
   const handleSubmit = async (e) => {
@@ -197,7 +207,45 @@ const AjouterEleve = () => {
       setLoading(false);
     }
   };
+  const handleChange = (e) => {
+  const { name, value } = e.target;
 
+  setFormData((prev) => ({
+    ...prev,
+    [name]: value
+  }));
+};
+
+// 📸 Gestion de la photo
+const handlePhotoChange = (e) => {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  // Vérification simple
+  if (!file.type.startsWith('image/')) {
+    setMessage({
+      type: 'error',
+      text: 'Veuillez sélectionner une image valide.'
+    });
+    return;
+  }
+
+  setPhotoFile(file);
+
+  // Libère éventuellement l'ancienne URL
+  if (photoPreview) {
+    URL.revokeObjectURL(photoPreview);
+  }
+
+  setPhotoPreview(URL.createObjectURL(file));
+};
+ useEffect(() => {
+  setFormData((prev) => ({
+    ...prev,
+    classeId: ''
+  }));
+}, [formData.niveauPromotion]);
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md my-6 font-sans relative animate-fadeIn">
        {/* 🟢 FICHE D'IDENTIFICATION & EN-TÊTE BADGE ÉLÈVE DYNAMIQUE INTERNATIONALE */}
@@ -225,7 +273,6 @@ const AjouterEleve = () => {
           {message.text}
         </div>
       )}
-
       <form onSubmit={handleSubmit} className="space-y-8">
 
         {/* ================= 1. INFORMATIONS PERSONNELLES ================= */}
@@ -317,36 +364,30 @@ const AjouterEleve = () => {
           </div>
         </div>
 
-        {/* ================= 2. INFORMATIONS ACADÉMIQUES ================= */}
+                {/* ================= 2. INFORMATIONS ACADÉMIQUES ================= */}
         <div className="border-t pt-6">
-          <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wide mb-4 border-b pb-1">2. Affectation Pédagogique (12 Promotions Ivoiriennes)</h3>
+          <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wide mb-4 border-b pb-1">2. Affectation Pédagogique (Promotions Unifiées Ivoiriennes)</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Niveau de la Promotion *</label>
               <select name="niveauPromotion" value={formData.niveauPromotion || ''} onChange={handleChange} className="w-full px-3 py-2.5 border text-sm rounded-md focus:ring-2 focus:ring-orange-500 bg-white font-medium outline-none" required>
-                <option value="">-- Sélectionner la promotion --</option>
-                <optgroup label="Premier Cycle">
-                  <option value="6eme">6ème</option>
-                  <option value="5eme">5ème</option>
-                  <option value="4eme">4ème</option>
-                  <option value="3eme">3ème</option>
-                </optgroup>
-                <optgroup label="Second Cycle — Secondes">
-                  <option value="2nd_a">2nd A</option>
-                  <option value="2nd_c">2nd C</option>
-                </optgroup>
-                <optgroup label="Second Cycle — Premières">
-                  <option value="1ere_a">1ere A</option>
-                  <option value="1ere_c">1ere C</option>
-                  <option value="1ere_d">1ere D</option>
-                </optgroup>
-                <optgroup label="Second Cycle — Terminales">
-                  <option value="tle_a">Terminale A</option>
-                  <option value="tle_c">Terminale C</option>
-                  <option value="tle_d">Terminale D</option>
-                </optgroup>
-              </select>
+  <option value="">-- Sélectionner la promotion --</option>
+  
+  <optgroup label="Premier Cycle">
+    <option value="6eme">6ème</option>
+    <option value="5eme">5ème</option>
+    <option value="4eme">4ème</option>
+    <option value="3eme">3ème</option>
+  </optgroup>
+
+  <optgroup label="Second Cycle">
+    <option value="2nd">2nd</option>
+    <option value="1ere">1ère</option>
+    <option value="terminal">Terminale</option>
+  </optgroup>
+</select>
+
             </div>
 
             {/* Division de classe dynamique */}

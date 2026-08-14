@@ -40,7 +40,24 @@ const HomeAdmin = () => {
 
       {/* 🗂️ GRILLE DES GRANDS PÔLES DE REDIRECTION MULTI-RÔLES SAAS */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
+         
+          {/* 🟢 CARTE 0 AJOUTÉE : REDIRECTION VERS LE DASHBOARD DE PILOTAGE GLOBAL */}
+        <div className="bg-purple-900 text-purple-100 p-6 rounded-2xl shadow-md border border-purple-950 flex flex-col justify-between">
+          <div>
+            <div className="h-10 w-10 bg-purple-950 text-orange-400 rounded-xl flex items-center justify-center text-lg font-bold">📈</div>
+            <h3 className="text-base font-black mt-4 uppercase tracking-tight">RH & GESTION DE CRISE</h3>
+            <p className="text-xs text-purple-200 mt-1 leading-relaxed font-medium">
+              Base de donnee centralisée de toute l'etablisement.
+            </p>
+          </div>
+          <Link 
+            to="/admin/base-centralise" 
+            className="w-full text-center bg-orange-500 hover:bg-orange-600 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-md transition mt-6 block cursor-pointer"
+          >
+            📈 Liste de tout l'effectifs 
+          </Link>
+        </div>
+
         {/* 🟢 CARTE 1 AJOUTÉE : REDIRECTION VERS LE DASHBOARD DE PILOTAGE GLOBAL */}
         <div className="bg-purple-900 text-purple-100 p-6 rounded-2xl shadow-md border border-purple-950 flex flex-col justify-between">
           <div>
@@ -77,8 +94,11 @@ const HomeAdmin = () => {
             <h3 className="text-base font-black text-gray-800 mt-4 uppercase tracking-tight">Inscriptions & Badges</h3>
             <p className="text-xs text-gray-400 mt-1 leading-relaxed font-medium">Enregistrer de nouveaux élèves, renseigner le genre, le mail parental et générer leur reçu d'accès QR Code obligatoire.</p>
           </div>
-          <Link to="/admin/AjouterEleve" className="w-full text-center bg-emerald-600 hover:bg-emerald-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
+          <Link to="/admin/ajouter-eleve" className="w-full text-center bg-emerald-600 hover:bg-emerald-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
             👤 Inscrire un Élève
+          </Link>
+          <Link to="/admin/ajouter-personnel" className="w-full text-center bg-emerald-600 hover:bg-emerald-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer">
+            👤 Ajouter les personnels
           </Link>
         </div>
         {/* Carte 5 : GESTION TECHNIQUE DES EMPLOIS DU TEMPS */}
@@ -91,7 +111,7 @@ const HomeAdmin = () => {
             </p>
           </div>
           <Link 
-            to="/admin/emploi-temps" 
+            to="/admin/emploi-du-temps" 
             className="w-full text-center bg-purple-600 hover:bg-purple-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-xs transition mt-6 block cursor-pointer"
           >
             📅 Planifier les Cours
@@ -142,14 +162,13 @@ const HomeAdmin = () => {
             </p>
           </div>
                    <Link 
-            to="/admin/configure-terminal" 
+            to="/admin/terminal" 
             className="w-full text-center bg-purple-600 hover:bg-purple-700 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl transition shadow-xs mt-6 block cursor-pointer"
           >
             📟 Configurer ce Poste Fixe
           </Link>
         </div>
         <div>
-          <NotificationCentre/>
           <ReceptionAdmin/>
         </div>
       </div>
@@ -158,4 +177,3 @@ const HomeAdmin = () => {
 };
 
 export default HomeAdmin;
-

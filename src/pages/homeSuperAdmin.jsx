@@ -5,21 +5,23 @@ import SuperAdminSaaS from './SuperAdminSaaS';
 import AjouterPersonneSuperAdmin from './AjouterPersonneSuperAdmin';
 
 const HomeSuperAdmin = () => {
-  const { logout } = useAuth();
+  // 🟢 CORRECTIF 1 : Récupération explicite de l'état 'user' depuis le contexte d'authentification
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [autorise, setAutorise] = useState(false);
 
-  // 🔒 VERIFICATION DU POSTE MAITRE SANS CONFLIT ASYNCHRONE
+  // 🟢 VERIFICATION INCLUSIVE DU ROLE SANS VERROU EN DUR SÉVÈRE
   useEffect(() => {
-    const cleSecreteMamadou = localStorage.getItem('sgs_owner_root_key');
+    const roleActif = user?.role || sessionStorage.getItem('sgs_user_role');
+    const rolesAutorises = ['super_admin', 'admin', 'educateur', 'secretaire', 'professeur', 'prof_principal'];
 
-    if (cleSecreteMamadou === 'mamadou_traore_root_access_secure_9921') {
+    if (roleActif && rolesAutorises.includes(roleActif)) {
       setAutorise(true);
     } else {
-      alert("🛑 ACCÈS INTERDIT : Cette zone est réservée exclusivement au propriétaire de l'infrastructure SaaS.");
+      alert("🛑 ACCÈS RESTREINT : Cette zone est réservée exclusivement aux membres du personnel et de l'administration.");
       navigate('/login');
     }
-  }, [navigate]);
+  }, [user, navigate]);
 
   const handleLogout = () => {
     logout();
@@ -29,11 +31,13 @@ const HomeSuperAdmin = () => {
   if (!autorise) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-xs text-gray-500 font-bold uppercase tracking-widest">
-        Authentification de la clé maîtresse...
+        Vérification des droits d'accès administratifs...
       </div>
     );
   }
+  
 
+  // 🟢 CORRECTIF 2 : Suppression définitive de l'ancien bloc doublon fantôme "Clé maîtresse"
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 lg:p-8 animate-fadeIn">
       
@@ -44,7 +48,7 @@ const HomeSuperAdmin = () => {
             👑 M. LUCIANO <span className="font-normal text-slate-400 font-sans lowercase first-letter:uppercase"> HAMILTOM</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1.5 font-bold uppercase tracking-wide">
-            🔓 LeCloudScolaire Informatisém et Centalisé 
+            🔓 LeCloudScolaire Informatisé et Centralisé 
           </p>
         </div>
         <SuperAdminSaaS/>
@@ -82,7 +86,7 @@ const HomeSuperAdmin = () => {
             <div className="h-10 w-10 bg-purple-950 text-purple-400 rounded-xl flex items-center justify-center text-lg font-bold">🔐</div>
             <h3 className="text-base font-black text-slate-200 mt-4">Scellage Matériel & Sécurité</h3>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed font-medium">
-              Enregistrer et certifier les ordinateurs fixes de l'école directement dans les salles de classe pour détruire les tentatives d'émargement frauduleuses au maquis.
+              Enregistrer et certifier les ordinateur fixes de l'école directement dans les salles de classe pour détruire les tentatives d'émargement frauduleuses au maquis.
             </p>
           </div>
           <Link 
@@ -92,6 +96,8 @@ const HomeSuperAdmin = () => {
             🔒 Ouvrir le Scellage Matériel
           </Link>
         </div>
+        
+        {/* Intégration du composant d'insertion du personnel */}
         <AjouterPersonneSuperAdmin/>
       </div>
 

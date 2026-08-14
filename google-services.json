@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "360989143638",
+    "firebase_url": "https://midnight-9d901-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "midnight-9d901",
+    "storage_bucket": "midnight-9d901.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:360989143638:android:737249c340719924e1c1f7",
+        "android_client_info": {
+          "package_name": "com.that.midnight"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCqlQdtTul974ws_6lwWRcSHo4uLZJnGZ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

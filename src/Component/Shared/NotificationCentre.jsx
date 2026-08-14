@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/api';
 import { collection, query, onSnapshot, doc, addDoc } from 'firebase/firestore';
+import HistoriqueMessage from '../../features/admin/pages/messages/HistoriqueMessage';
 
 const NotificationCentre = () => {
   const { user, schoolId, schoolName } = useAuth();
@@ -176,12 +177,12 @@ const NotificationCentre = () => {
       </div>
 
       {/* TITRAGE BANDEAU */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl border shadow-md mb-6">
+      <div className="bg-slate-900  p-5 rounded-2xl border shadow-md mb-6">
         <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-950/40 px-3 py-1 rounded-full">
           📡 Routeur de Flux NoSQL Universel Débloqué
         </span>
-        <h2 className="text-xl font-black mt-2 text-white">Centre National des Correspondances Scolaires</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Utilisateur connecté : <span className="text-white font-bold uppercase">{user?.nom || "UTILISATEUR"} ({idUtilisateurConnecte})</span></p>
+        <h2 className="text-xl font-black mt-2 ">Centre National des Correspondances Scolaires</h2>
+        <p className="text-xs text-slate-400 mt-0.5">Utilisateur connecté : <span className=" font-bold uppercase">{user?.nom || "UTILISATEUR"} ({idUtilisateurConnecte})</span></p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -314,6 +315,7 @@ const NotificationCentre = () => {
 
         </div>
       </div>
+      <HistoriqueMessage/>
     </div>
   );
 };

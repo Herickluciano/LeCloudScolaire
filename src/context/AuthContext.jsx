@@ -1,10 +1,6 @@
-"use no memo";
-
 import { createContext, useContext, useState, useEffect } from 'react';
-import { verifyUserOnCloud } from '../services/api';
-import { db } from '../services/api';
+import api, { db } from '../services/api';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -17,18 +13,24 @@ export const AuthProvider = ({ children }) => {
   const [schoolId, setSchoolId] = useState(sessionStorage.getItem('sgs_school_id') || '');
   const [loading, setLoading] = useState(true);
 
-  // 🔄 ÉCOUTEUR ET SYNC EN TEMPS RÉEL (Insensible aux conflits de Casse)
+  // 🔄 ÉCOUTEUR LIVE AVEC EXTRACTEUR D'INDEX SECURISÉ
   useEffect(() => {
     const refreshUserStatus = async () => {
       const matriculeCible = user?.matricule || user?.id || (sessionStorage.getItem('sgs_user') ? JSON.parse(sessionStorage.getItem('sgs_user'))?.matricule : null);
       
-      if (!matriculeCible || matriculeCible === 'ROOT_LUHAMCODE_2024') {
+      if (!matriculeCible || matriculeCible === 'ROOT_LUHAMCODE_2024' || user?.id === 'SUPERADMIN_MASTER') {
+        setLoading(false);
+        return;
+      }
+
+      const firestoreInstance = db || api?.db;
+      if (!firestoreInstance) {
         setLoading(false);
         return;
       }
 
       try {
-        const userRef = doc(db, "users", matriculeCible.trim());
+        const userRef = doc(firestoreInstance, "users", matriculeCible.trim());
         const snap = await getDoc(userRef);
 
         if (snap.exists()) {
@@ -36,16 +38,19 @@ export const AuthProvider = ({ children }) => {
           let classeAssigneeOfficielle = cloudData.classeId || '';
           let roleDetermine = cloudData.role || 'professeur';
 
-          const qClasseCheck = query(
-            collection(db, "classes"),
-            where("profPrincipalId", "==", matriculeCible.trim())
-          );
-          const classSnapshot = await getDocs(qClasseCheck);
-          
-          if (!classSnapshot.empty) {
-            roleDetermine = 'prof_principal'; 
-            const classeDoc = classSnapshot.docs[0].data();
-            classeAssigneeOfficielle = classeDoc.idBrute || classeDoc.id || '5eme_1'; 
+          if (roleDetermine === 'professeur' || roleDetermine === 'prof_principal') {
+            const qClasseCheck = query(
+              collection(firestoreInstance, "classes"),
+              where("profPrincipalId", "==", matriculeCible.trim())
+            );
+            const classSnapshot = await getDocs(qClasseCheck);
+            
+            // 🟢 CORRECTIF : Ciblage direct du premier index pour tuer le plantage de boucle
+            if (!classSnapshot.empty && classSnapshot.docs.length > 0) {
+              roleDetermine = 'prof_principal'; 
+              const classeDoc = classSnapshot.docs[0].data();
+              classeAssigneeOfficielle = classeDoc.idBrute || classeDoc.id || ''; 
+            }
           }
 
           const updatedUser = {
@@ -56,88 +61,66 @@ export const AuthProvider = ({ children }) => {
             prenoms: cloudData.prenoms || cloudData.prenom || '',
             role: roleDetermine, 
             statut: (cloudData.statut || "actif").trim().toLowerCase(),
-            schoolId: cloudData.schoolId || 'lycee_Moderne_Gagnoa',
-            matiereEnseignee: cloudData.matiereEnseignee || 'Français',
+            schoolId: cloudData.schoolId || 'lycee_saint_bernard',
+            matiereEnseignee: cloudData.matiereEnseignee || '',
             classeId: classeAssigneeOfficielle, 
             grade: cloudData.grade || user?.grade || 'A3',
-            experience: cloudData.anneesExperience || cloudData.experience || "20", 
+            experience: cloudData.anneesExperience || cloudData.experience || "0", 
             absences: cloudData.absences || 0,
             retards: cloudData.retards || 0
           };
 
           setUser(updatedUser);
           sessionStorage.setItem("sgs_user", JSON.stringify(updatedUser));
+          
+          if (cloudData.schoolId) {
+            setSchoolId(cloudData.schoolId);
+            sessionStorage.setItem("sgs_school_id", cloudData.schoolId);
+          }
         }
       } catch (err) {
-        console.error("Erreur sync Auth :", err);
+        console.error("Erreur de rafraîchissement atténuée :", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     refreshUserStatus();
   }, [user?.matricule, user?.id]);
 
-  // 🔑 CONNEXION INITIALE CLIENTS DÉBLOQUÉE
-  const login = async (matricule, password) => {
+  const login = async (matriculeInput, passwordInput) => {
     setLoading(true);
     try {
-      const result = await verifyUserOnCloud(matricule, password);
+      const authService = api?.verifyUserOnCloud || verifyUserOnCloud;
+      const res = await authService(matriculeInput, passwordInput);
 
-      if (result?.success) {
-        // Extraction et sécurisation de la clé d'établissement d'origine
-        const originalSchoolId = result.user.schoolId ? result.user.schoolId.trim() : 'lycee_Moderne_Gagnoa';
+      if (res && res.success && res.user) {
+        const u = res.user;
+        setUser(u);
+        setSchoolId(u.schoolId || 'lycee_saint_bernard');
+        setSchoolName(u.schoolName || 'Lycée Saint Bernard');
         
-        // Label d'affichage cosmétique propre pour l'interface
-        const cleanDisplayName = originalSchoolId.replace(/_/g, " ").toUpperCase();
-
-        const profil = {
-          id: result.user.matricule, 
-          matricule: result.user.matricule,
-          nom: result.user.nom || result.user.name || '',
-          prenoms: result.user.prenoms || result.user.prenom || '',
-          role: result.user.role || 'professeur',
-          statut: (result.user.statut || "actif").trim().toLowerCase(),
-          classeId: result.user.classeId || '5eme_1',
-          schoolId: originalSchoolId, // 🟢 FIXE IMMUTABLE : Conserve la vraie clé Firestore (ex: lycee_Moderne_Gagnoa)
-          matiereEnseignee: result.user.matiereEnseignee || 'Français', 
-          grade: result.user.grade || 'A3',
-          experience: result.user.anneesExperience || "20",
-          absences: result.user.absences || 0,
-          retards: result.user.retards || 0
-        };
-
-        setUser(profil);
-        setSchoolId(originalSchoolId);
-        setSchoolName(cleanDisplayName);
-
-        // Remplissage étanche du stockage persistant
-        sessionStorage.setItem("sgs_user", JSON.stringify(profil));
-        sessionStorage.setItem("sgs_school_id", originalSchoolId);
-        sessionStorage.setItem("sgs_school_name", cleanDisplayName);
-
-        setLoading(false);
-        return { success: true, role: profil.role };
+        sessionStorage.setItem("sgs_user", JSON.stringify(u));
+        sessionStorage.setItem("sgs_school_id", u.schoolId || "lycee_saint_bernard");
+        sessionStorage.setItem("sgs_school_name", u.schoolName || "Lycée Saint Bernard");
+        sessionStorage.setItem("sgs_user_role", u.role || "professeur");
+        
+        return { success: true, role: u.role };
       }
-
+      return { success: false, msg: res?.msg || "Identifiant ou mot de passe incorrect." };
+    } catch (err) {
+      return { success: false, msg: "Erreur technique de liaison avec le Cloud." };
+    } finally {
       setLoading(false);
-      return { success: false, msg: result?.msg || "Identifiants incorrects" };
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
-      return { success: false, msg: "Erreur de communication cloud." };
     }
   };
 
   const logout = () => {
-    setUser(null);
-    setSchoolId("");
-    setSchoolName("");
-    sessionStorage.clear();
-    localStorage.clear();
+    setUser(null); setSchoolId(''); setSchoolName(''); sessionStorage.clear();
   };
 
   return (
-    <AuthContext.Provider value={{ user, schoolName, schoolId, loading, login, logout, setUser, setSchoolId, setSchoolName }}>
+    <AuthContext.Provider value={{ user, setUser, schoolId, setSchoolId, schoolName, setSchoolName, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -145,6 +128,7 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth doit être utilisé dans AuthProvider");
+  if (!context) throw new Error("useAuth doit être encapsulé au sein d'un AuthProvider.");
   return context;
 };
+export default AuthProvider;

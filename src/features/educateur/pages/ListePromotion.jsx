@@ -1,199 +1,216 @@
-import { useState, useEffect } from 'react';
+// src/features/educateur/pages/ListePromotion.jsx
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; 
+import { db } from '../../../services/api';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
-import { enrollStudentOnFirebase, db } from '../../../services/api';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { useParams, Link } from 'react-router-dom'; 
-import DashboardEducateur from './DashboardEducateur';
 
 const ListePromotion = () => {
-  const { user, schoolId, schoolName } = useAuth();
-  const { niveau } = useParams();
+  const { user, schoolId } = useAuth();
+  const navigate = useNavigate(); // 🟢 AJOUTÉ POUR PERMETTRE LA REDIRECTION
   
-  // Détection du niveau assigné à l'éducateur connecté (ex: '6eme')
-  const promotionLevel = niveau || user?.assigned_promotion || '6eme';
-  const currentSchool = schoolId || 'lycee_Moderne_Gagnoa';
+  const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_saint_bernard').trim().toLowerCase();
 
-  // --- ÉTATS DES DONNÉES CLOUD ---
-  const [classesEcole, setClassesEcole] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [absentsDuJour, setAbsentsDuJour] = useState([]);
+  // --- ÉTATS NUAGIQUES DU HUB PARTAGÉ ---
+  const [eleves, setEleves] = useState([]);
+  const [dictionnaireClasses, setDictionnaireClasses] = useState({}); 
   const [loading, setLoading] = useState(true);
-  
-  // --- ÉTATS DES FILTRES ---
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('liste'); // 'liste' ou 'absences'
-  const [periodeHeure, setPeriodeHeure] = useState('H1 (07h-08h)');
-  const [jourSemaine, setJourSemaine] = useState('Lundi');
 
-  // --- ÉTATS DE LA MODAL D'INSCRIPTION ---
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formNom, setFormNom] = useState('');
-  const [formPrenoms, setFormPrenoms] = useState('');
-  const [formMatricule, setFormMatricule] = useState('');
-  const [formGenre, setFormGenre] = useState('Masculin');
-  const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
+  // --- ÉTATS FILTRES ---
+  const [termeRecherche, setTermeRecherche] = useState('');
+  const [classeFiltre, setClasseFiltre] = useState('all');
 
-  const dateAujourdhui = new Date().toLocaleDateString('fr-FR');
-
-  // 🔄 ÉCOUTE EN TEMPS RÉEL (Firebase onSnapshot)
+  // 🔄 ÉCOUTEUR 1 : Chargement et dictionnaire intelligent des classes
   useEffect(() => {
-    setLoading(true);
+    if (!currentSchool) return;
 
-    // A. Écouter uniquement les classes de CETTE école et de CETTE promotion/niveau
-    const qClasses = query(
-      collection(db, "classes"),
-      where("schoolId", "==", currentSchool),
-      where("promotion", "==", promotionLevel)
+    const qClasses = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
+    const unsubscribeClasses = onSnapshot(qClasses, (snapshot) => {
+      const pucesClasses = {};
+      snapshot.forEach((docSnap) => {
+        const cData = docSnap.data();
+        const rawId = docSnap.id.toLowerCase();
+        
+        pucesClasses[rawId] = cData.nom || cData.idBrute || docSnap.id;
+        
+        const segmentId = docSnap.id.replace(`${currentSchool}_`, '').toLowerCase();
+        pucesClasses[segmentId] = cData.nom || cData.idBrute || docSnap.id;
+
+        if (cData.idBrute) {
+          pucesClasses[cData.idBrute.toLowerCase()] = cData.nom || cData.idBrute;
+        }
+      });
+      setDictionnaireClasses(pucesClasses);
+    });
+
+    return () => unsubscribeClasses();
+  }, [currentSchool]);
+
+  // 🔄 ÉCOUTEUR 2 : Synchronisation des élèves
+  useEffect(() => {
+    if (!currentSchool) return;
+
+    const qEleves = query(
+      collection(db, "users"), 
+      where("schoolId", "==", currentSchool), 
+      where("role", "==", "eleve")
     );
 
-    const unsubClasses = onSnapshot(qClasses, (snapshot) => {
+    const unsubscribeEleves = onSnapshot(qEleves, (snapshot) => {
       const list = [];
       snapshot.forEach((docSnap) => {
         list.push({ id: docSnap.id, ...docSnap.data() });
       });
-      setClassesEcole(list);
-      if (list.length > 0) {
-        setSelectedClassId(list[0].id);
-      }
-    });
-
-    // B. Écouter les élèves affectés à cette promotion de l'école
-    const qStudents = query(
-      collection(db, "users"),
-      where("schoolId", "==", currentSchool),
-      where("role", "==", "eleve")
-    );
-
-    const unsubStudents = onSnapshot(qStudents, (snapshot) => {
-      const list = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.promotion === promotionLevel) {
-          list.push({ id: docSnap.id, ...data });
-        }
-      });
-      setStudents(list);
+      setEleves(list);
+      setLoading(false);
+    }, (err) => {
+      console.error(err);
       setLoading(false);
     });
 
-    return () => {
-      unsubClasses();
-      unsubStudents();
-    };
-  }, [promotionLevel, currentSchool]);
+    return () => unsubscribeEleves();
+  }, [currentSchool]);
 
-  // 🔄 C. Écouter les absences pour l'onglet Pointage
-  useEffect(() => {
-    if (!selectedClassId) return;
-    const qAbsences = query(
-      collection(db, "registre_appels"),
-      where("schoolId", "==", currentSchool),
-      where("classeId", "==", selectedClassId.replace(`${currentSchool}_`, '')),
-      where("jour", "==", jourSemaine),
-      where("heure", "==", periodeHeure),
-      where("date", "==", dateAujourdhui)
-    );
-    const unsubAbsences = onSnapshot(qAbsences, (snapshot) => {
-      const activeAbsences = [];
-      snapshot.forEach(docSnap => activeAbsences.push({ id: docSnap.id, ...docSnap.data() }));
-      setAbsentsDuJour(activeAbsences);
-    });
-    return () => unsubAbsences();
-  }, [selectedClassId, jourSemaine, periodeHeure, currentSchool, dateAujourdhui]);
-
-  // 🟢 / 🛑 COMMUTATEUR LOGIQUE ABSENCES (Double Option)
-  const handleTogglePresence = async (student) => {
-    const enregistrementExistant = absentsDuJour.find(a => a.eleveId === student.id);
-    const studentRef = doc(db, "users", student.id);
-    const cumulActuel = student.absences || 0;
-    const cleanClassId = selectedClassId.replace(`${currentSchool}_`, '');
-
-    try {
-      if (!enregistrementExistant) {
-        await updateDoc(studentRef, { absences: cumulActuel + 1 });
-        await addDoc(collection(db, "registre_appels"), {
-          eleveId: student.id,
-          eleveName: `${student.nom} ${student.prenoms || student.prenom}`,
-          classeId: cleanClassId,
-          schoolId: currentSchool,
-          matiere: "Régulation Éducateur",
-          profName: user?.name || "Éducateur",
-          jour: jourSemaine,
-          heure: periodeHeure,
-          date: dateAujourdhui,
-          createdAt: new Date().toISOString()
-        });
-      } else {
-        const nouveauCumul = cumulActuel > 0 ? cumulActuel - 1 : 0;
-        await updateDoc(studentRef, { absences: nouveauCumul });
-        await deleteDoc(doc(db, "registre_appels", enregistrementExistant.id));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // 📥 SOUMISSION DU FORMULAIRE D'INSCRIPTION CLOUD ÉDUCATEUR
-  const handleEnrollStudent = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    setFormSuccess('');
-
-    const cleanMatricule = formMatricule.trim().toUpperCase();
-    const cleanNom = formNom.trim().toUpperCase();
-    const cleanPrenoms = formPrenoms.trim();
-
-    if (!cleanMatricule || !cleanNom || !cleanPrenoms || !selectedClassId) {
-      setFormError('Veuillez remplir tous les champs obligatoires.');
-      return;
-    }
-
-    const cleanClassId = selectedClassId.replace(`${currentSchool}_`, '');
-
-    const studentData = {
-      matricule: cleanMatricule,
-      nom: cleanNom,
-      prenoms: cleanPrenoms,
-      role: 'eleve',
-      genre: formGenre,
-      classeId: cleanClassId,
-      promotion: promotionLevel,
-      absences: 0,
-      notes: {},
-      statut: 'actif',
-      schoolId: currentSchool
-    };
-
-    const response = await enrollStudentOnFirebase(cleanMatricule, studentData, currentSchool);
-
-    if (response.success) {
-      setFormSuccess(`Élève inscrit avec succès ! Mot de passe initial généré : ${cleanMatricule}@${cleanNom}!`);
-      setFormNom('');
-      setFormPrenoms('');
-      setFormMatricule('');
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setFormSuccess('');
-      }, 2000);
-    } else {
-      setFormError(response.msg || "Erreur lors de l'enregistrement de l'élève.");
-    }
-  };
-
-  // 🔍 FILTRAGE SYNCHRONE POUR L'AFFICHAGE
-  const filteredStudents = students.filter(student => {
-    const matchesClass = student.classeId === selectedClassId.replace(`${currentSchool}_`, '');
-    const matchesSearch = student.nom.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (student.prenoms || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          student.matricule.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesClass && matchesSearch;
+  // --- TRAITEMENT ET FILTRAGE ---
+  const elevesFiltres = eleves.filter((e) => {
+    const nomComplet = `${e.nom || ''} ${e.prenoms || e.prenom || ''} ${e.matricule || e.id || ''}`.toLowerCase();
+    const matcheTexte = nomComplet.includes(termeRecherche.toLowerCase().trim());
+    
+    const idClasseEleve = String(e.classeId || '').toLowerCase().trim();
+    const matcheClasse = classeFiltre === 'all' || idClasseEleve === classeFiltre;
+    
+    return matcheTexte && matcheClasse;
   });
 
+  if (loading) {
+    return <div className="p-8 text-center text-xs font-black text-purple-600 animate-pulse uppercase">Chargement du registre...</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 font-sans">
-    <DashboardEducateur/>
+    <div className="space-y-4 text-left">
+      
+      {/* BARRE DE FILTRAGE ET RECHERCHE RAPIDE */}
+      <div className="bg-white p-4 rounded-2xl border shadow-2xs flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <select 
+            value={classeFiltre} 
+            onChange={(e) => setClasseFiltre(e.target.value)}
+            className="bg-gray-50 border rounded-xl px-3 py-2 outline-none text-xs font-black text-purple-700 cursor-pointer bg-white"
+          >
+            <option value="all">🔍 Toutes les classes</option>
+            {Object.entries(dictionnaireClasses)
+              .filter(([key]) => !key.includes(currentSchool)) 
+              .map(([id, nom]) => (
+                <option key={id} value={id}>🔹 {String(nom).toUpperCase()}</option>
+            ))}
+          </select>
+
+          {/* 🟢 BOUTON DE REDIRECTION VERS LE DASHBOARD ÉDUCATEUR (SÉCURISÉ PAR RÔLE) */}
+          {user?.role === 'educateur' && (
+            <button
+              type="button"
+              onClick={() => navigate('/educateur/dashboard')}
+              className="bg-slate-900 hover:bg-slate-800 text-orange-400 font-black text-xs uppercase px-4 py-2 rounded-xl transition shadow-sm border-0 cursor-pointer flex items-center gap-1.5"
+            >
+              📊 Ouvrir le Tableau Éducateur
+            </button>
+          )}
+        </div>
+
+        <input 
+          type="text" 
+          placeholder="Rechercher un élève..." 
+          value={termeRecherche} 
+          onChange={(e) => setTermeRecherche(e.target.value)} 
+          className="w-full sm:max-w-md bg-gray-50 border p-2.5 rounded-xl outline-none text-xs font-bold text-gray-800 focus:ring-2 focus:ring-orange-500 bg-white" 
+        />
+      </div>
+
+      {/* ================= LE TABLEAU DES PROMOTIONS COMPLET ================= */}
+      <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-fadeIn">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-bold text-gray-700 border-collapse">
+            <thead>
+              <tr className="bg-gray-50 text-gray-400 uppercase border-b border-gray-100 text-[10px] tracking-wider">
+                <th className="p-4">Élève</th>
+                <th className="p-4">Matricule</th>
+                <th className="p-4">Classe</th>
+                <th className="p-4">Email</th>
+                <th className="p-4 text-center">Statut</th>
+                <th className="p-4 text-right print:hidden">Actions Propres</th>
+              </tr>
+            </thead>
+            <tbody>
+              {elevesFiltres.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-12 text-center text-gray-400 italic font-medium">Aucun élève dans cette section.</td>
+                </tr>
+              ) : (
+                elevesFiltres.map((e) => {
+                  const estActif = e.statut === 'actif';
+                  const cléClasseSaisie = String(e.classeId || '').toLowerCase().trim();
+                  const nomClasseAffiche = dictionnaireClasses[cléClasseSaisie] || e.promotion || e.classeNom || "Non assignée";
+
+                  return (
+                    <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50/40 transition">
+                      <td className="p-4 flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-slate-900 text-orange-400 flex items-center justify-center font-black uppercase text-[11px]">
+                          {e.nom ? e.nom.substring(0, 2) : "🎓"}
+                        </div>
+                        <div>
+                          <p className="text-gray-900 font-black uppercase leading-tight">{e.nom}</p>
+                          <p className="text-gray-400 font-bold uppercase text-[10px] mt-0.5">{e.prenoms || e.prenom || ''}</p>
+                        </div>
+                      </td>
+
+                      <td className="p-4 font-mono font-black text-gray-900 text-[11px] tracking-wide">
+                        {e.matricule || e.id || "—"}
+                      </td>
+
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-purple-50 text-purple-700 font-black rounded-lg text-[10px] border border-purple-100 uppercase tracking-wide">
+                          🔹 {nomClasseAffiche}
+                        </span>
+                      </td>
+
+                      <td className="p-4 font-medium text-gray-500 font-sans lowercase">
+                        {e.email || "—"}
+                      </td>
+
+                      <td className="p-4 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${estActif ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                          {e.statut || 'actif'}
+                        </span>
+                      </td>
+
+                      <td className="p-4 text-right space-x-2 whitespace-nowrap print:hidden">
+                        <button 
+                          type="button" 
+                          onClick={() => alert(`Visualisation du bulletin de : ${e.nom}`)}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase cursor-pointer transition"
+                        >
+                          📜 Bulletin
+                        </button>
+                        
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <button 
+                            type="button"
+                            onClick={() => alert(`Archivage : ${e.matricule}`)}
+                            className="text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg font-black text-[10px] uppercase cursor-pointer transition"
+                          >
+                            ⚠️ Archiver
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 };

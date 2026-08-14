@@ -1,266 +1,374 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  doc, 
-  getDoc, 
-  setDoc, 
+// src/services/api.js
+
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAnalytics, isSupported } from "firebase/analytics";
+
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
   updateDoc,
-  collection, 
-  query, 
-  where, 
-  getDocs 
+  collection,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
 
-// Configuration de production de l'infrastructure multi-écoles (SaaS)
+import { getStorage } from "firebase/storage";
+
+// ============================================================
+// FIREBASE CONFIG
+// ============================================================
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBlbV_ExAmPlE_KeY_LuHaMcOdE_2026", 
-  authDomain: "://firebaseapp.com",
-  projectId: "midnight-9d901",
-  storageBucket: "midnight-9d901.firebasestorage.app",
-  messagingSenderId: "360989143638",
-  appId: "1:360989143638:web:737249c340719924e1c1f7"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app); 
+// ============================================================
+// INITIALISATION UNIQUE
+// ============================================================
 
-/**
- * 🔑 FONCTION 1 : Authentification Réelle Cloud Adaptative (Single Login)
- * Intègre la barrière d'interdiction en temps réel pour scolarité impayée ou exclusion.
- */
+const app = getApps().length > 0
+  ? getApp()
+  : initializeApp(firebaseConfig);
+
+// ============================================================
+// FIRESTORE / STORAGE
+// ============================================================
+
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+
+let analytics = null;
+
+if (typeof window !== "undefined") {
+  isSupported()
+    .then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch(() => {
+      analytics = null;
+    });
+}
+
+// ============================================================
+// UTILITAIRES
+// ============================================================
+
+export const nettoyerTexte = (value) =>
+  String(value ?? "").trim();
+
+export const normaliserTexte = (value) =>
+  nettoyerTexte(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+// ============================================================
+// CONNEXION UTILISATEUR
+// ============================================================
+
 export const verifyUserOnCloud = async (matricule, password) => {
-  const key = matricule.trim().toUpperCase();
-  const inputPassword = password.trim();
-
   try {
-    const userRef = doc(db, "users", key);
-    const userSnap = await getDoc(userRef);
+    const identifiantSaisi = nettoyerTexte(matricule);
+    const motDePasseSaisi = nettoyerTexte(password);
 
-    if (!userSnap.exists()) return { success: false, msg: "Identifiant inconnu." };
+    if (!identifiantSaisi || !motDePasseSaisi) {
+      return {
+        success: false,
+        msg: "Identifiant ou mot de passe manquant.",
+      };
+    }
+
+    const usersRef = collection(db, "users");
+    let userSnap = null;
+
+    // Recherche directe
+    const directRef = doc(db, "users", identifiantSaisi);
+    const directSnap = await getDoc(directRef);
+
+    if (directSnap.exists()) {
+      userSnap = directSnap;
+    }
+
+    // Recherche majuscule
+    if (!userSnap) {
+      const upperId = identifiantSaisi.toUpperCase();
+      const upperRef = doc(db, "users", upperId);
+      const upperSnap = await getDoc(upperRef);
+
+      if (upperSnap.exists()) {
+        userSnap = upperSnap;
+      }
+    }
+
+    // Recherche par matricule
+    if (!userSnap) {
+      const q = query(usersRef, where("matricule", "==", identifiantSaisi));
+      const result = await getDocs(q);
+
+      if (!result.empty) {
+        userSnap = result.docs[0];
+      }
+    }
+
+    // Recherche matricule majuscule
+    if (!userSnap) {
+      const q = query(usersRef, where("matricule", "==", identifiantSaisi.toUpperCase()));
+      const result = await getDocs(q);
+
+      if (!result.empty) {
+        userSnap = result.docs[0];
+      }
+    }
+
+    if (!userSnap) {
+      return {
+        success: false,
+        msg: "Identifiant incorrect ou compte inexistant.",
+      };
+    }
 
     const userData = userSnap.data();
 
-    // 🚨 BARRIÈRE DE SÉCURITÉ AUTOMATIQUE : Vérification instantanée du statut du compte
-    if (userData.statut && userData.statut !== 'actif') {
-      let motif = "Votre compte a été temporairement suspendu par l'administration.";
-      if (userData.statut === 'suspendu_scolarite') motif = "Accès refusé : Scolarité impayée. Veuillez régulariser votre situation financière au secrétariat.";
-      if (userData.statut === 'exclu') motif = "Accès interdit : Compte suspendu définitivement pour motif disciplinaire.";
-      if (userData.statut === 'transfere') motif = "Compte inactif : Votre dossier a été transféré dans un autre établissement.";
-      
-      return { success: false, msg: motif }; 
+    // Compte inactif
+    if (userData.statut && normaliserTexte(userData.statut) === "inactif") {
+      return {
+        success: false,
+        msg: "Ce compte est actuellement inactif.",
+      };
     }
 
-    // 🎓 RÈGLE IVOIRIENNE POUR L'ÉLÈVE ACTIF
-    if (userData.role === 'eleve') {
-      if (userData.password) {
-        if (inputPassword === userData.password) return { success: true, user: userData };
-      } else {
-        const expectedPassword = `${key}@${userData.nom.toUpperCase()}!`;
-        if (inputPassword === expectedPassword) return { success: true, user: userData };
-      }
-    } else {
-      // Pour le personnel actif (Admin, Éducateur, Enseignant)
-      if (inputPassword === userData.password || inputPassword === 'password123') {
-        return { success: true, user: userData };
-      }
+    // Vérification mot de passe
+    const passwordCandidates = [
+      userData.password,
+      userData.motDePasse,
+      userData.cleAcces,
+    ].filter(Boolean);
+
+    const passwordCorrecte = passwordCandidates.includes(motDePasseSaisi);
+
+    if (!passwordCorrecte) {
+      return {
+        success: false,
+        msg: "Mot de passe erroné.",
+      };
     }
 
-    return { success: false, msg: "Mot de passe erroné." };
+    return {
+      success: true,
+      user: {
+        ...userData,
+        id: userSnap.id,
+        matricule: userData.matricule || userSnap.id,
+        role: userData.role || "professeur",
+        schoolId: userData.schoolId || "lycee_saint_bernard",
+        schoolName: userData.schoolName || userData.etablissementActuel || "Lycée Saint Bernard",
+        statut: userData.statut || "actif",
+      },
+    };
+
   } catch (error) {
-    console.error("Erreur de liaison réseau avec l'infrastructure :", error);
-    return { success: false, msg: "Erreur de liaison avec le serveur Cloud." };
+    console.error("❌ Erreur verifyUserOnCloud :", error);
+    return {
+      success: false,
+      msg: "Erreur réseau avec l'infrastructure Cloud.",
+    };
   }
 };
 
-/**
- * 🏛️ FONCTION 2 : Création de Classe SaaS Isolée avec injection de clé relationnelle
- */
+// ============================================================
+// CRÉATION CLASSE
+// ============================================================
+
 export const createClassOnFirebase = async (classId, classData, schoolId) => {
   try {
-    const currentSchool = schoolId || "lycee_classique_abidjan";
-    const uniqueClassKey = `${currentSchool.trim().toLowerCase()}_${classId.trim().toLowerCase()}`;
+    const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
+    const uniqueClassKey = `${currentSchool.toLowerCase()}_${nettoyerTexte(classId).toLowerCase()}`;
     const classRef = doc(db, "classes", uniqueClassKey);
-    
-    await setDoc(classRef, {
+
+    const dataToSave = {
       ...classData,
       id: uniqueClassKey,
       idBrute: classId,
-      schoolId: currentSchool 
-    });
-    return { success: true };
+      schoolId: currentSchool,
+      nom: classData.nom || classData.name || classId,
+      createdAt: classData.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+
+    await setDoc(classRef, dataToSave);
+
+    return {
+      success: true,
+      id: uniqueClassKey,
+      data: dataToSave,
+    };
+
   } catch (error) {
-    console.error("Erreur de création de classe SaaS :", error);
-    return { success: false, msg: error.message };
+    console.error("Erreur création classe :", error);
+    return {
+      success: false,
+      msg: error.message,
+    };
   }
 };
 
-/**
- * 🧑‍💼 FONCTION 3 : Inscription Élève SaaS Tolérante à la Casse et Format des Séries (Ex: tle_d_1)
- */
+// ============================================================
+// INSCRIPTION ÉLÈVE
+// ============================================================
+
 export const enrollStudentOnFirebase = async (studentMatricule, studentData, schoolId) => {
   try {
-    const currentSchool = (schoolId || "lycee_classique_abidjan").trim().toLowerCase();
-    const cleanClassId = studentData.classeId.trim().toLowerCase();
-    
-    // 🟢 RECTIFICATION ALIGNEMENT : Construit l'ID universel de la classe en minuscules sans rupture
-    const uniqueClassKey = `${currentSchool}_${cleanClassId}`;
-    
-    const classRef = doc(db, "classes", uniqueClassKey);
-    const classSnap = await getDoc(classRef);
+    const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
+    const cleanMatricule = nettoyerTexte(studentMatricule);
+    const cleanClassId = nettoyerTexte(studentData.classeId || studentData.classId || "").toLowerCase();
 
-    if (classSnap.exists()) {
-      const classInfo = classSnap.data();
-      
-      // Limite réglementaire
-      if ((classInfo.elevesCount || 0) >= 50) {
-        return { success: false, msg: "L'inscription a échoué : la limite réglementaire de 50 élèves est atteinte !" };
+    if (!cleanMatricule) {
+      throw new Error("Le matricule est obligatoire.");
+    }
+
+    if (cleanClassId) {
+      const uniqueClassKey = `${currentSchool.toLowerCase()}_${cleanClassId}`;
+      const classRef = doc(db, "classes", uniqueClassKey);
+      const classSnap = await getDoc(classRef);
+
+      if (classSnap.exists()) {
+        const classInfo = classSnap.data();
+        const nombreEleves = Number(classInfo.elevesCount || 0);
+
+        if (nombreEleves >= 50) {
+          return {
+            success: false,
+            msg: "Limite de 50 élèves atteinte.",
+          };
+        }
+
+        const finalData = {
+          ...studentData,
+          id: cleanMatricule,
+          matricule: cleanMatricule,
+          classeId: uniqueClassKey,
+          classeNom: classInfo.nom || cleanClassId,
+          classe: classInfo.nom || cleanClassId,
+          promotion: classInfo.promotion || studentData.promotion || "",
+          role: "eleve",
+          statut: "actif",
+          schoolId: currentSchool,
+          updatedAt: new Date()
+        };
+
+        await setDoc(doc(db, "users", cleanMatricule), finalData);
+        await updateDoc(classRef, { elevesCount: nombreEleves + 1 });
+
+        return { success: true, msg: "Élève inscrit avec succès." };
       }
-
-      const cleanMatricule = studentMatricule.toUpperCase().trim();
-      
-      // Enregistrement du profil de l'élève
-      await setDoc(doc(db, "users", cleanMatricule), {
-        ...studentData,
-        classeId: cleanClassId,
-        statut: 'actif', 
-        schoolId: currentSchool 
-      });
-
-      // Incrémentation dynamique du compteur live de places de la classe
-      await updateDoc(classRef, {
-        elevesCount: (classInfo.elevesCount || 0) + 1
-      });
-
-      return { success: true };
     }
     
-    // Fallback de secours : si la structure de clé n'est pas encore harmonisée dans votre Firestore
-    const cleanMatriculeFallback = studentMatricule.toUpperCase().trim();
-    await setDoc(doc(db, "users", cleanMatriculeFallback), {
+    await setDoc(doc(db, "users", cleanMatricule), {
       ...studentData,
-      statut: 'actif',
-      schoolId: currentSchool
-    });
-    return { success: true };
-
-  } catch (error) {
-    console.error("Erreur d'inscription élève Firebase :", error);
-    return { success: false, msg: "Erreur de transmission." };
-  }
-};
-
-/**
- * ⏱️ FONCTION 4 : ÉMÄRGEMENT CENTRAL DES ENSEIGNANTS DEBLOQUÉ (ZÉRO GPS, ZÉRO MATÉRIEL FIXE)
- * Élimine définitivement le message rouge de refus sur l'appareil personnel.
- */
-export const pointerPresenceProfesseur = async (matriculeProf, donneesPointage, schoolId) => {
-  try {
-    const ecolePropre = (schoolId || "lycee_Moderne_Gagnoa").trim();
-    const profPropre = matriculeProf.trim().toUpperCase();
-
-    // 🟢 SÉCURITÉ LIBÉRÉE : Enregistrement d'office sans vérifier l'empreinte matérielle de l'ordinateur
-    const pointageRef = doc(collection(db, "pointages_professeurs"));
-    
-    await setDoc(pointageRef, {
-      ...donneesPointage,
-      professeurId: profPropre,
-      schoolId: ecolePropre,
-      statutVacation: "certifiee_cloud",
-      verificationPoste: "Autorisé d'office (Bypass Démo)", 
-      terminalAutorise: true, 
-      createdAt: new Date().toISOString()
+      id: cleanMatricule,
+      matricule: cleanMatricule,
+      role: "eleve",
+      statut: "actif",
+      schoolId: currentSchool,
+      updatedAt: new Date()
     });
 
-    return { success: true, msg: "Pointage certifié sur le réseau cloud." };
+    return { success: true, msg: "Élève inscrit (sans classe)." };
 
   } catch (error) {
-    console.error("Erreur d'émargement central :", error);
-    return { success: false, msg: "Erreur réseau lors de la distribution du pointage." };
-  }
-};
-
-/**
- * 📝 FONCTION 5 : Enregistrement des Notes du Carnet de classe (Table NOTES)
- */
-export const addStudentNotesOnFirebase = async (eleveMatricule, matiere, trimestre, interrogations, devoirSurveille, devoirCommun) => {
-  try {
-    const noteId = `note_${eleveMatricule}_${matiere}_T${trimestre}`;
-    const noteRef = doc(db, "notes", noteId);
-    
-    await setDoc(noteRef, {
-      eleveMatricule,
-      matiere,
-      trimestre,
-      interrogations,
-      devoirSurveille,
-      devoirCommun
-    });
-    
-    return { success: true, noteId };
-  } catch (error) {
-    console.error("Erreur d'ajout de notes Firebase :", error);
+    console.error("Erreur inscription élève :", error);
     return { success: false, msg: error.message };
   }
 };
 
-/**
- * 📝 FONCTION 6 : Récupération des Professeurs (Isolée par École)
- */
+// ============================================================
+// RÉCUPÉRATION DES PROFESSEURS
+// ============================================================
+
 export const getAllProfesseursFromFirebase = async (schoolId) => {
   try {
-    const currentSchool = schoolId || "lycee_classique_abidjan";
+    const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
+    const usersRef = collection(db, "users");
+    
     const q = query(
-      collection(db, "users"), 
-      where("role", "in", ["professeur", "prof_principal"]),
-      where("schoolId", "==", currentSchool)
+      usersRef, 
+      where("schoolId", "==", currentSchool),
+      where("role", "in", ["professeur", "prof_principal"])
     );
-    const querySnapshot = await getDocs(q);
-    const profs = [];
-    querySnapshot.forEach((doc) => {
-      profs.push({ id: doc.id, ...doc.data() });
+    
+    const snapshot = await getDocs(q);
+    const liste = [];
+    
+    snapshot.forEach((docSnap) => {
+      liste.push({ id: docSnap.id, ...docSnap.data() });
     });
-    return profs;
+    
+    return { success: true, data: liste };
   } catch (error) {
-    console.error("Erreur de chargement des enseignants :", error);
-    return [];
+    console.error("Erreur getAllProfesseursFromFirebase :", error);
+    return { success: false, msg: error.message, data: [] };
   }
 };
 
-/**
- * 👑 FONCTION 7 : Récupération des Éducateurs (Isolée par École)
- */
+// ============================================================
+// RÉCUPÉRATION DES ÉDUCATEURS
+// ============================================================
+
 export const getAllEducateursFromFirebase = async (schoolId) => {
   try {
-    const currentSchool = schoolId || "lycee_classique_abidjan";
+    const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
+    const usersRef = collection(db, "users");
+    
     const q = query(
-      collection(db, "users"), 
-      where("role", "==", "educateur"),
-      where("schoolId", "==", currentSchool)
+      usersRef, 
+      where("schoolId", "==", currentSchool),
+      where("role", "==", "educateur")
     );
-    const querySnapshot = await getDocs(q);
-    const educs = [];
-    querySnapshot.forEach((doc) => {
-      educs.push({ id: doc.id, ...doc.data() });
+    
+    const snapshot = await getDocs(q);
+    const liste = [];
+    
+    snapshot.forEach((docSnap) => {
+      liste.push({ id: docSnap.id, ...docSnap.data() });
     });
-    return educs;
+    
+        return { success: true, data: liste };
   } catch (error) {
-    console.error("Erreur de chargement des éducateurs :", error);
-    return [];
+    console.error("Erreur getAllEducateursFromFirebase :", error);
+    return { success: false, msg: error.message, data: [] };
   }
 };
 
-/**
- * 🔒 FONCTION 8 : Modification du Mot de Passe en Temps Réel 
- */
-export const updatePasswordOnFirebase = async (uid, newPassword) => {
-  try {
-    const userRef = doc(db, "users", uid);
-    await updateDoc(userRef, {
-      password: newPassword.trim()
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("Erreur de modification du mot de passe Cloud :", error);
-    return { success: false, msg: "Impossible de mettre à jour le mot de passe réseau." };
-  }
+// ============================================================
+// MODULE D'EXPORTATION PAR DÉFAUT GLOBAL
+// ============================================================
+
+const api = {
+  db,
+  storage,
+  analytics,
+  nettoyerTexte,
+  normaliserTexte,
+  verifyUserOnCloud,
+  createClassOnFirebase,
+  enrollStudentOnFirebase,
+  getAllProfesseursFromFirebase,
+  getAllEducateursFromFirebase,
 };
+
+export default api;

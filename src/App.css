@@ -1,6 +1,11 @@
 * {
   color: black!important;
 }
+.barre-bi-couleur {
+  width: 100%;
+  height: 20px;
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
 
 .hero {
   position: relative;
