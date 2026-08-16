@@ -14,6 +14,7 @@ import ReceptionAdmin from './messages/ReceptionAdmin';
 
 // IMPORTATION DU REGISTRE DE PROMOTION
 import ListePromotion from '../../educateur/pages/ListePromotion'; 
+import ModifierStatut from './ModifierStatut';
 
 const DashboardAdmin = () => {
   const { user, schoolId, schoolName } = useAuth();
@@ -177,7 +178,7 @@ const DashboardAdmin = () => {
               <p className="text-2xl font-black text-red-700 mt-1">{totalBadgesSuspendus} <span className="text-xs font-bold text-gray-400">Fiches suspendues</span></p>
             </div>
           </div>
-
+           <ModifierStatut/>
                    {/* BARRE DE FILTRAGE AVEC VOTRE NOUVEAU BOUTON ALIGNÉ */}
           <div className="bg-white p-4 rounded-2xl border shadow-2xs flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex bg-gray-100 p-1 rounded-xl border text-xs font-bold uppercase w-full sm:w-auto gap-1">

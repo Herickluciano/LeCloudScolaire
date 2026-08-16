@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../../../services/api';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import ReceptionAdmin from './ReceptionAdmin';
+import HistoriqueMessage from './HistoriqueMessage';
 
 const EnvoieAdmin = ({ currentSchool }) => {
   const [envois, setEnvois] = useState([]);
@@ -57,6 +59,8 @@ const EnvoieAdmin = ({ currentSchool }) => {
           </div>
         ))
       )}
+      <ReceptionAdmin/>
+      <HistoriqueMessage/>
     </div>
   );
 };

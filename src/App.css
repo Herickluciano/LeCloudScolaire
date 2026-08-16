@@ -1,5 +1,31 @@
+/* =========================================================================
+   SCELLAGE VISUEL : SUPPRESSION RADICALE ET PROPRE DE TOUTES LES BORDURES
+   ========================================================================= */
+
+/* 1. Neutralisation de toutes les bordures et outlines natifs du site */
+
 * {
-  color: black!important;
+  border: none !important;
+  outline: none !important;
+  border-width: 0px !important;
+}
+
+/* 2. Suppression des ombres qui imitent des bordures (Tailwind CSS, modales, cartes) */
+div, section, article, table, tr, td, th, input, select, textarea, button, form {
+  box-shadow: none !important;
+}
+
+/* 3. Sécurisation de votre typographie (Sans écraser vos couleurs dynamiques) */
+body {
+  font-family: "Open Sans", sans-serif;
+  background-color: #f5f7fb; /* Conserve le fond gris clair pour faire ressortir vos fiches blanches */
+}
+
+open-sans {
+  font-family: "Open Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-variation-settings:
+    "wdth" 100;
 }
 .barre-bi-couleur {
   width: 100%;
@@ -172,3 +198,76 @@
     border-right-color: var(--border);
   }
 }
+
+/* footer */
+ .logoedulink {
+    position: relative;
+    width: 60px!important;
+    left: 24px;
+  }
+  .luhamcode {
+    position: relative;
+    width: 80px!important;
+    left: -154px;
+    top: -32px;
+  }
+  .logologin {
+    position: relative;
+    width: 200px!important;
+  
+  }
+  .parti-footer {
+    position: absolute;
+    display: flex;
+    right: 24px!important;
+  }
+  .footer-tex {
+    position:relative;
+    font-size: 11px;
+    font-style: italic;
+    text-align: justify;
+    top: -70px;
+    left: -404px;
+  }
+  .menu-footer {
+    position: relative;
+    font-size: 10px;
+    font-style: italic;
+    text-align: justify;
+    top: 20px;
+  }
+  li ,a {
+    text-decoration: none;
+    list-style-type:  none; 
+    display: inline;
+    margin: 5px;
+    
+  }
+   .bas-footer {
+    position: relative;
+    font-size: 10px;
+    font-style: italic;
+    text-align: justify;
+    top: 83px;
+  }
+   .form-partie {
+   display: inline-flexbox;
+  text-align: center;
+    font-family: "Open Sans", sans-serif;
+  }
+   .text-edulink {
+   font-size: 16px;
+   font-family: "Open Sans", sans-serif;
+  }
+   .btn {
+   font-size: small;
+   font-family: "Open Sans", sans-serif;
+  }
+   .oublie {
+   font-size: small;
+   font-family: "Open Sans", sans-serif;
+  }
+   .bloc {
+  position: relative;
+  top: -20px;
+  }

@@ -52,7 +52,7 @@ import ListeDesClasse from './features/admin/pages/listeDesClasse';
 import GestionTrimestres from './features/admin/pages/GestionTrimestres.jsx';
 import ConfigurationTerminal from './features/admin/pages/ConfigurationTerminal.jsx';
 import EmploiDuTempsAdmin from './features/admin/pages/EmploiDuTempsAdmin.jsx';
-
+import GestionPubSaas from './pages/GestionPubSaas';
 // =====================================================
 // PROFESSEUR
 // =====================================================
@@ -92,10 +92,12 @@ import HistoriqueMessage from './features/admin/pages/messages/HistoriqueMessage
 // =====================================================
 
 import GestionPublicites from './components/GestionPublicites';
+import FormulaireClasse from './features/admin/pages/FormulaireClasse.jsx';
 
 
 const App = () => {
   return (
+    
     <AuthProvider>
 
       <BrowserRouter>
@@ -113,6 +115,7 @@ const App = () => {
             <main className="flex-grow">
 
               <Routes>
+
 
                 {/* =================================================
                     ROUTES PUBLIQUES
@@ -138,7 +141,10 @@ const App = () => {
                   element={<RecupererCleAcces />}
                 />
 
-
+                 <Route
+                  path="/components/pub-notification"
+                  element={<GestionPublicites />}
+                />
                 {/* =================================================
                     ROUTES COMMUNES SÉCURISÉES
                 ================================================= */}
@@ -181,7 +187,7 @@ const App = () => {
                     />
                   }
                 >
-
+                 <Route path="/superadmin/publicites" element={<GestionPubSaas />} />
                   <Route
                     path="/admin/home"
                     element={<HomeAdmin />}
@@ -213,12 +219,18 @@ const App = () => {
                   />
 
                   <Route
-                    path="/admin/classes"
+                    path="/admin/list-classe"
                     element={<ListeDesClasse />}
                   />
 
+                   <Route
+                    path="/admin/ajouter-classe"
+                    element={<FormulaireClasse />}
+                  />
+
+
                   <Route
-                    path="/admin/trimestres"
+                    path="/admin/gestion-trimestres"
                     element={<GestionTrimestres />}
                   />
 
@@ -374,9 +386,13 @@ const App = () => {
 
                   <Route
                     path="/superadmin/publicites"
-                    element={<GestionPublicites />}
+                    element={<ChangerMotDePasse />}
                   />
-
+                 
+                  <Route
+                    path="/superadmin/configure-terminal"
+                    element={<ConfigurationTerminal />}
+                  />
                 </Route>
 
 

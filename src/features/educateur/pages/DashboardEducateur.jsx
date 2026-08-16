@@ -1,113 +1,46 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { db } from '../../../services/api';
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  doc,
-  updateDoc,
-  addDoc,
-  getDocs,
-  writeBatch
-} from 'firebase/firestore';
+// src/features/educateur/pages/DashboardEducateur.jsx
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { db } from '../../../services/api';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
 
-// ============================================================
-// RÉCEPTION DES INSTRUCTIONS ADMIN
-// ============================================================
-const ReceptionInstructionsAdmin = ({ currentSchool, idEducateurLogge }) => {
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!currentSchool || !idEducateurLogge) {
-      setLoading(false);
-      return;
-    }
-
-    const q = query(
-      collection(db, 'notifications'),
-      where('schoolId', '==', currentSchool)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list = [];
-        snapshot.forEach((snap) => {
-          const d = snap.data();
-          const destinataire = d.destinataireId || d.educateurId || '';
-
-          if (
-            destinataire === idEducateurLogge ||
-            d.audience === 'all' ||
-            d.audience === 'educateur'
-          ) {
-            list.push({
-              id: snap.id,
-              ...d
-            });
-          }
-        });
-
-        list.sort(
-          (a, b) =>
-            new Date(b.createdAt || b.date || 0) -
-            new Date(a.createdAt || a.date || 0)
-        );
-
-        setMessages(list);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Erreur notifications éducateur:', error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [currentSchool, idEducateurLogge]);
-
-  if (loading) {
-    return (
-      <div className="p-4 text-center text-xs font-bold text-gray-400 animate-pulse">
-        Chargement des directives...
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {messages.length === 0 ? (
-        <p className="text-xs text-center text-gray-400 py-8 border border-dashed rounded-xl">
-          📥 Aucun ordre reçu.
-        </p>
-      ) : (
-        messages.map((m) => (
-          <div key={m.id} className="bg-white p-4 rounded-xl border text-xs space-y-2">
-            <div className="flex justify-between border-b pb-1">
-              <span className="text-red-600 font-black">🏛️ DIRECTION CENTRALE</span>
-              <span>{m.date || 'Récemment'}</span>
-            </div>
-            <p className="text-gray-800 font-bold">{m.message || m.corps}</p>
-          </div>
-        ))
-      )}
-    </div>
-  );
-};
-
-// ============================================================
-// DASHBOARD ÉDUCATEUR
-// ============================================================
+// IMPORTATION DES SOUS-COMPOSANTS
+import ListePromotion from './ListePromotion';
+import ReceptionInstructionsAdmin from '../../admin/pages/messages/ReceptionAdmin'; 
 const DashboardEducateur = () => {
-  const { user, schoolId, schoolName, logout } = useAuth();
+  // ==========================================================
+  // 1. CONTEXTES ET UTILITAIRES GLOBAUX (TOUJOURS EN PREMIER)
+  // ==========================================================
+  const { user, schoolId, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // Variable de secours globale pour l'en-tête et les onglets
+  const schoolName = sessionStorage.getItem('sgs_school_name') || "Établissement Edulink";
 
   // ==========================================================
-  // IDENTITÉ ÉDUCATEUR
+  // 2. ÉTATS DE TRACABILITÉ ET RECONNAISSANCE UNIQUE
+  // ==========================================================
+  const [activeTab, setActiveTab] = useState('dashboard_global');
+  const [classeEducateur, setClasseEducateur] = useState(null); 
+  const [loadingClasse, setLoadingClasse] = useState(true);
+  const [loadingEleves, setLoadingEleves] = useState(true);
+
+  // Registres d'élèves, pointages et fiches d'appels d'origine
+  const [elevesPromo, setElevesPromo] = useState([]);
+  const [pointagesRaw, setPointagesRaw] = useState([]);
+  const [fichesAppels, setFichesAppels] = useState([]);
+
+  // États additionnels d'origine pour les conseils et circulaires
+  const [eleveSelectionneConseil, setEleveSelectionneConseil] = useState(null);
+  const [avisConduiteConseil, setAvisConduiteConseil] = useState('');
+  const [sujetCirculaire, setSujetCirculaire] = useState('');
+  const [corpsCirculaire, setCorpsCirculaire] = useState('');
+  const [sending, setSending] = useState(false);
+  const [msgStatus, setMsgStatus] = useState({ type: '', text: '' });
+
+  // ==========================================================
+  // 3. IDENTIFICATION ET MEMOÏSATION (DÉCLARÉES AVANT TOUT USAGE)
   // ==========================================================
   const idEducateur = useMemo(() => {
     return (
@@ -128,29 +61,16 @@ const DashboardEducateur = () => {
     ).trim();
   }, [schoolId, user]);
 
-    
-    // ==========================================================
-  // ÉTATS GLOBAUX (Placés obligatoirement en premier)
   // ==========================================================
-  const [activeTab, setActiveTab] = useState('dashboard_global');
-  const [classeEducateur, setClasseEducateur] = useState(null); // 🏢 Déclaré ici !
-  const [elevesPromo, setElevesPromo] = useState([]);
-  const [pointagesRaw, setPointagesRaw] = useState([]);
-  const [fichesAppels, setFichesAppels] = useState([]);
-  const [loadingClasse, setLoadingClasse] = useState(true);
-  const [loadingEleves, setLoadingEleves] = useState(true);
-
-  const [eleveSelectionneConseil, setEleveSelectionneConseil] = useState(null);
-  const [avisConduiteConseil, setAvisConduiteConseil] = useState('');
-
-  const [sujetCirculaire, setSujetCirculaire] = useState('');
-  const [corpsCirculaire, setCorpsCirculaire] = useState('');
-  const [sending, setSending] = useState(false);
-  const [msgStatus, setMsgStatus] = useState({ type: '', text: '' });
-
+  // 4. ÉTATS MAÎTRES POUR LA SÉLECTION POP-UP DU DÉLÉGUÉ
+  // ==========================================================
+  const [isModalDelegueOpen, setIsModalDelegueOpen] = useState(false);
+  const [rechercheEleveDelegue, setRechercheEleveDelegue] = useState('');
+  const [rechercheClasseDelegue, setRechercheClasseDelegue] = useState('');
+  const [listeElevesPourDelegue, setListeElevesPourDelegue] = useState([]);
 
   // ==========================================================
-  // 🟢 CALCUL DE LA PROMOTION (Placé APRÈS les useState)
+  // 5. 🟢 CALCUL DE LA PROMOTION REGLEMENTAIRE MENA
   // ==========================================================
   const assignedPromotion = useMemo(() => {
     const brute = 
@@ -172,9 +92,69 @@ const DashboardEducateur = () => {
     if (format.endsWith('eme')) return format.replace('eme', 'ème');
 
     return premierTerme.toUpperCase();
-  }, [user, classeEducateur]); // 🌟 classeEducateur est maintenant bien initialisé !
+  }, [user, classeEducateur]);
 
+  // ==========================================================
+  // 6. ACTION DE SCÈLLAGE ATOMIQUE EN LIVE SUR FIRESTORE
+  // ==========================================================
+  // 🟢 ENFIN DÉFINIE ET ALIGNÉE ICI : Plus aucun crash au clic à la ligne 602
+  const handleValiderChoixDelegue = async (idEleve, nomCompletEleve) => {
+    const classeIdCible = classeEducateur?.id || `${currentSchool}_${classeEducateur?.idBrute?.toLowerCase()}`;
 
+    if (!classeIdCible) {
+      alert("⚠️ Erreur : Impossible de localiser la structure de votre classe.");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "classes", classeIdCible.trim()), {
+        delegueId: idEleve, 
+        delegueName: nomCompletEleve, 
+        updatedAt: new Date().toISOString()
+      });
+      
+      alert(`✨ Sceau cloud validé ! Le délégué officiel de la promotion est désormais : ${nomCompletEleve}`);
+      setIsModalDelegueOpen(false);
+      setRechercheEleveDelegue('');
+      setRechercheClasseDelegue('');
+    } catch (err) {
+      console.error("Erreur lors de la désignation du délégué :", err);
+      alert("Erreur réseau lors du scellage du délégué.");
+    }
+  };
+
+  // ==========================================================
+  // 7. ÉCOUTEURS DYNAMIQUES FIRESTORE POUR LE POP-UP DÉLÉGUÉ
+  // ==========================================================
+  useEffect(() => {
+    if (!currentSchool) return;
+    
+    const codePromotionCible = classeEducateur?.promotion || sessionStorage.getItem('sgs_user_promotion') || '';
+    if (!codePromotionCible) return;
+
+    const q = query(
+      collection(db, "users"), 
+      where("schoolId", "==", currentSchool.toLowerCase()),
+      where("role", "==", "eleve"),
+      where("promotion", "==", codePromotionCible)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setListeElevesPourDelegue(list);
+    }, (err) => {
+      console.error("Erreur de récupération des élèves pour délégué :", err);
+    });
+
+    return () => unsubscribe();
+  }, [currentSchool, classeEducateur?.promotion]);
+
+  // ==========================================================
+  // ⛔ FIN DE LA SECTION DÉCLARATIVE DES HOOKS ET DES ÉTATS UNIFIÉS
+  // ==========================================================
   // ==========================================================
   // 1. RECHERCHE EN TEMPS RÉEL DE LA CLASSE ASSIGNÉE
   // ==========================================================
@@ -202,7 +182,6 @@ const DashboardEducateur = () => {
         });
 
         let classeTrouvee = null;
-
         if (assignedPromotion) {
           const normalise = (value) => (value || '').toLowerCase().replace(/[\s_-]/g, '');
           const cible = normalise(assignedPromotion);
@@ -229,7 +208,6 @@ const DashboardEducateur = () => {
         setLoadingClasse(false);
       }
     );
-
     return () => unsubscribe();
   }, [idEducateur, currentSchool, assignedPromotion]);
 
@@ -524,14 +502,112 @@ const DashboardEducateur = () => {
         </div>
       </div>
 
-          {/* MENU DES NAVIGATIONS ONGLET */}
-          <div className="flex flex-wrap gap-1 bg-gray-50 p-1 rounded-xl mt-5">
-            <button type="button" onClick={() => setActiveTab('dashboard_global')} className={`px-3 py-2 rounded-lg text-xs font-black ${activeTab === 'dashboard_global' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>📊 Vue Globale</button>
-            <button type="button" onClick={() => setActiveTab('pointages_rh')} className={`px-3 py-2 rounded-lg text-xs font-black ${activeTab === 'pointages_rh' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>🕒 Suivi Heures</button>
-            <button type="button" onClick={() => setActiveTab('assiduite_classes')} className={`px-3 py-2 rounded-lg text-xs font-black ${activeTab === 'assiduite_classes' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>📝 Main-Courante</button>
-            <button type="button" onClick={() => setActiveTab('excellence_promo')} className={`px-3 py-2 rounded-lg text-xs font-black ${activeTab === 'excellence_promo' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>🏆 Excellence</button>
-            <button type="button" onClick={() => setActiveTab('messages_sos')} className={`px-3 py-2 rounded-lg text-xs font-black ${activeTab === 'messages_sos' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>📬 Circulaires & SOS</button>
+                   {/* MENU DES NAVIGATIONS ONGLET AVEC POP-UP DÉLÉGUÉ INTÉGRÉ */}
+          <div className="flex flex-wrap gap-1 bg-gray-50 p-1 rounded-xl mt-5 items-center justify-between">
+            <div className="flex flex-wrap gap-1">
+              <button type="button" onClick={() => setActiveTab('dashboard_global')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'dashboard_global' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>📊 Vue Globale</button>
+              <button type="button" onClick={() => setActiveTab('pointages_rh')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'pointages_rh' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>🕒 Suivi Heures</button>
+              <button type="button" onClick={() => setActiveTab('assiduite_classes')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'assiduite_classes' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>📝 Main-Courante</button>
+              <button type="button" onClick={() => setActiveTab('excellence_promo')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'excellence_promo' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>🏆 Excellence</button>
+              <button type="button" onClick={() => setActiveTab('messages_sos')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'messages_sos' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>📬 Circulaires & SOS</button>
+            </div>
+
+            {/* 🟢 ACTION MAÎTRESSE : Bouton d'ouverture du Pop-up pour l'Éducateur */}
+            <button
+              type="button"
+              onClick={() => setIsModalDelegueOpen(true)}
+              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-black uppercase tracking-wider transition shadow-sm border-0 cursor-pointer"
+            >
+              👑 Assigner Délégué
+            </button>
           </div>
+
+                    {/* ================= 🪪 POP-UP MODAL : SÉLECTION DU DÉLÉGUÉ FILTRÉ ================= */}
+          {isModalDelegueOpen && (
+            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-[99999] flex items-center justify-center p-4 animate-fadeIn">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 space-y-4 text-left">
+                
+                <div className="border-b pb-2 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase">Délégué de Promotion ({classeEducateur?.promotion || 'En cours'})</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Accès restreint à vos apprenants rattachés</p>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => { setIsModalDelegueOpen(false); setRechercheEleveDelegue(''); setRechercheClasseDelegue(''); }} 
+                    className="text-gray-400 hover:text-gray-600 border-0 bg-transparent text-sm font-black cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 🔍 DOUBLE ZONE DE RECHERCHE : ÉLÈVE + CLASSE */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-gray-400 text-[9px] uppercase font-black mb-1">Nom ou Prénom</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: DOUBA..."
+                      value={rechercheEleveDelegue}
+                      onChange={(e) => setRechercheEleveDelegue(e.target.value)}
+                      className="w-full bg-gray-50 border p-2 rounded-xl outline-none text-xs font-bold text-gray-800 focus:ring-1 focus:ring-purple-500 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 text-[9px] uppercase font-black mb-1">Filtrer par Classe</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 1ere_A_1..."
+                      value={rechercheClasseDelegue}
+                      onChange={(e) => setRechercheClasseDelegue(e.target.value)}
+                      className="w-full bg-gray-50 border p-2 rounded-xl outline-none text-xs font-bold text-gray-800 focus:ring-1 focus:ring-purple-500 bg-white font-mono lowercase"
+                    />
+                  </div>
+                </div>
+
+                {/* Liste déroulante des élèves filtrés */}
+                <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                  <button
+                    type="button"
+                    onClick={() => handleValiderChoixDelegue(null, "Non désigné")}
+                    className="w-full text-left p-2.5 rounded-xl border border-dashed border-red-200 text-red-600 hover:bg-red-50 text-xs font-black uppercase transition cursor-pointer flex justify-between items-center"
+                  >
+                    <span>❌ Destituer le délégué actuel</span>
+                    <span className="text-[9px] bg-red-100 px-2 py-0.5 rounded font-mono">Reset</span>
+                  </button>
+
+                  {/* MOTEUR DE DOUBLE COMPILATION CROISÉE */}
+                  {listeElevesPourDelegue
+                    .filter(el => {
+                      const civil = `${el.nom || ''} ${el.prenoms || el.prenom || ''}`.toLowerCase();
+                      const division = String(el.classeId || '').toLowerCase();
+                      
+                      const matcheNom = civil.includes(rechercheEleveDelegue.toLowerCase().trim());
+                      const matcheClasse = division.includes(rechercheClasseDelegue.toLowerCase().trim());
+                      
+                      return matcheNom && matcheClasse;
+                    })
+                    .map(el => (
+                      <button
+                        key={el.id}
+                        type="button"
+                        onClick={() => handleValiderChoixDelegue(el.id, `${el.nom} ${el.prenoms || el.prenom || ''}`.toUpperCase())}
+                        className="w-full text-left p-2.5 bg-gray-50 hover:bg-purple-50 hover:text-purple-700 rounded-xl transition text-xs font-bold flex justify-between items-center cursor-pointer border border-transparent hover:border-purple-200"
+                      >
+                        <span className="uppercase font-black truncate max-w-[200px]">{el.nom} {el.prenoms || el.prenom || ''}</span>
+                        <span className="text-[8px] font-mono bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded uppercase font-black">{el.classeId || 'N/A'}</span>
+                      </button>
+                    ))
+                  }
+                </div>
+
+                <div className="text-[10px] text-gray-400 font-medium text-center italic border-t pt-2">
+                  Seuls les apprenants de la promotion {classeEducateur?.promotion || ''} sont listés ici.
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* COMPTEURS SYNTHÈSES DE L'ONGLET PRINCIPAL */}

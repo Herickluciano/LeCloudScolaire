@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import logoEdulink from '../assets/logoedulink.png';
 
 const Login = () => {
   // Récupération des mutations de session du contexte central
@@ -112,17 +113,20 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 font-sans animate-fadeIn">
+      <div className="barre-bi-couleur"></div>
       <form onSubmit={handleSubmit} className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-        
-        <div className="text-center mb-6">
+        <div className="flex items-center gap-2">
+              {logoEdulink && <img src={logoEdulink} alt="Logo" className="logologin h-6 w-auto" />}
+            </div>
+       <div className="text-center mb-6">
           <div className="flex justify-center space-x-1 mb-3">
             <span className="w-10 h-1.5 bg-orange-500 rounded-full"></span>
             <span className="w-10 h-1.5 bg-gray-200 rounded-full"></span>
             <span className="w-10 h-1.5 bg-green-500 rounded-full"></span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Portail Scolaire Numérique</h2>
+          <h2 className="text-edulink text-2xl font-bold text-gray-800 tracking-tight">Le Lien Éducatif — Système SaaS International Intégré de Gestion Scolaire</h2>
           <p className="text-xs text-gray-400 mt-1 font-semibold uppercase tracking-wider">
-            Système SaaS Ivoirien & International
+            Portail Scolaire Numérique
           </p>
         </div>
 
@@ -132,38 +136,40 @@ const Login = () => {
           </div>
         )}
 
-        <div className="space-y-4 mb-6">
+        <div className="form-partie space-y-4 mb-6">
           <div>
-            <label className="block text-gray-600 text-xs font-bold uppercase mb-1">Identifiant / Matricule</label>
+            <label className="block text-gray-600 text-xs font-bold uppercase mb-1">Identifiant</label><br />
             <input
               type="text"
-              placeholder="Ex: EDUC_N'GUESSAN_243..."
+              required
+              placeholder="Ex: EDUC_votreNom_243..."
               value={matricule}
               onChange={(e) => setMatricule(e.target.value)}
               disabled={isSubmitting}
               className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition font-bold"
             />
           </div>
-
+            <br/>
           <div>
-            <label className="block text-gray-600 text-xs font-bold uppercase mb-1">Mot de passe</label>
-            <div className="relative flex items-center">
+             <div className="relative flex items-center">
+            <label className="bloc block text-gray-600 text-xs font-bold uppercase mb-1">Mot de passe</label><br />
               <input
                 type={showPassword ? "text" : "password"} 
-                placeholder="••••••••"
+                required
+                placeholder="*****************"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={handleKeyDownPassword} 
                 disabled={isSubmitting}
-                className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition"
+                className="bloc w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 text-gray-400 hover:text-gray-600 focus:outline-none text-base cursor-pointer"
-              >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
+             <button 
+  type="button" 
+  onClick={() => setShowPassword(!showPassword)} 
+  className="bloc hover:bg-blue-800 text-white cursor-pointer" 
+>
+  {showPassword ? "👁️" : "👁️‍🗨️"} 
+</button>
             </div>
           </div>
         </div>
@@ -171,7 +177,7 @@ const Login = () => {
         <button 
           type="submit" 
           disabled={isSubmitting}
-          className="w-full bg-orange-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-md hover:shadow-lg flex justify-center items-center cursor-pointer mb-4"
+          className="btn btn-primary "
         >
           {isSubmitting ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
@@ -183,7 +189,7 @@ const Login = () => {
         <div className="text-right">
           <Link 
             to="/recuperer-cle" 
-            className="text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider"
+            className="oublie text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider"
           >
             Mot de passe oublié ?
           </Link>

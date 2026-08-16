@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+// src/context/AuthContext.jsx
+import { createContext, useContext, useState, useEffect, useMemo } from 'react'; // 🟢 useMemo est maintenant déclaré !
+
 import api, { db } from '../services/api';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -13,12 +16,17 @@ export const AuthProvider = ({ children }) => {
   const [schoolId, setSchoolId] = useState(sessionStorage.getItem('sgs_school_id') || '');
   const [loading, setLoading] = useState(true);
 
-  // 🔄 ÉCOUTEUR LIVE AVEC EXTRACTEUR D'INDEX SECURISÉ
+  // 🟢 Extraction et mémorisation de l'ID brute hors du state user pour briser la boucle infinie
+  const matriculeFige = useMemo(() => {
+    if (user?.matricule || user?.id) return (user.matricule || user.id).trim();
+    const saved = sessionStorage.getItem('sgs_user');
+    return saved ? (JSON.parse(saved)?.matricule || JSON.parse(saved)?.id || null) : null;
+  }, [user?.matricule, user?.id]);
+
+  // 🔄 ÉCOUTEUR ET RAFRAÎCHISSEMENT SÉCURISÉ SANS BOUCLE INFINIE
   useEffect(() => {
     const refreshUserStatus = async () => {
-      const matriculeCible = user?.matricule || user?.id || (sessionStorage.getItem('sgs_user') ? JSON.parse(sessionStorage.getItem('sgs_user'))?.matricule : null);
-      
-      if (!matriculeCible || matriculeCible === 'ROOT_LUHAMCODE_2024' || user?.id === 'SUPERADMIN_MASTER') {
+      if (!matriculeFige || matriculeFige === 'ROOT_LUHAMCODE_2024' || matriculeFige === 'SUPERADMIN_MASTER') {
         setLoading(false);
         return;
       }
@@ -30,7 +38,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const userRef = doc(firestoreInstance, "users", matriculeCible.trim());
+        const userRef = doc(firestoreInstance, "users", matriculeFige);
         const snap = await getDoc(userRef);
 
         if (snap.exists()) {
@@ -38,14 +46,14 @@ export const AuthProvider = ({ children }) => {
           let classeAssigneeOfficielle = cloudData.classeId || '';
           let roleDetermine = cloudData.role || 'professeur';
 
+          // Vérification croisée pour l'attribution automatique du statut PP
           if (roleDetermine === 'professeur' || roleDetermine === 'prof_principal') {
             const qClasseCheck = query(
               collection(firestoreInstance, "classes"),
-              where("profPrincipalId", "==", matriculeCible.trim())
+              where("profPrincipalId", "==", matriculeFige)
             );
             const classSnapshot = await getDocs(qClasseCheck);
             
-            // 🟢 CORRECTIF : Ciblage direct du premier index pour tuer le plantage de boucle
             if (!classSnapshot.empty && classSnapshot.docs.length > 0) {
               roleDetermine = 'prof_principal'; 
               const classeDoc = classSnapshot.docs[0].data();
@@ -53,10 +61,10 @@ export const AuthProvider = ({ children }) => {
             }
           }
 
+          // Construction du profil rafraîchi
           const updatedUser = {
-            ...user,
-            id: matriculeCible.trim(),
-            matricule: matriculeCible.trim(),
+            id: matriculeFige,
+            matricule: matriculeFige,
             nom: cloudData.nom || cloudData.name || '',
             prenoms: cloudData.prenoms || cloudData.prenom || '',
             role: roleDetermine, 
@@ -64,14 +72,19 @@ export const AuthProvider = ({ children }) => {
             schoolId: cloudData.schoolId || 'lycee_saint_bernard',
             matiereEnseignee: cloudData.matiereEnseignee || '',
             classeId: classeAssigneeOfficielle, 
-            grade: cloudData.grade || user?.grade || 'A3',
+            promotion: cloudData.promotion || cloudData.assigned_promotion || '', // 🟢 GREFFAGE SÉCURISÉ ÉDUCATEUR
+            grade: cloudData.grade || cloudData.grade || 'A3',
             experience: cloudData.anneesExperience || cloudData.experience || "0", 
             absences: cloudData.absences || 0,
             retards: cloudData.retards || 0
           };
 
-          setUser(updatedUser);
-          sessionStorage.setItem("sgs_user", JSON.stringify(updatedUser));
+          // On ne déclenche la mise à jour que si les données critiques ont changé
+          const savedStr = sessionStorage.getItem("sgs_user");
+          if (!savedStr || savedStr !== JSON.stringify(updatedUser)) {
+            setUser(updatedUser);
+            sessionStorage.setItem("sgs_user", JSON.stringify(updatedUser));
+          }
           
           if (cloudData.schoolId) {
             setSchoolId(cloudData.schoolId);
@@ -86,7 +99,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     refreshUserStatus();
-  }, [user?.matricule, user?.id]);
+  }, [matriculeFige]); // 🟢 CORRECTIF : Dépendance sur la clé figée uniquement pour tuer la boucle infinie
 
   const login = async (matriculeInput, passwordInput) => {
     setLoading(true);
@@ -116,7 +129,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    setUser(null); setSchoolId(''); setSchoolName(''); sessionStorage.clear();
+    setUser(null); 
+    setSchoolId(''); 
+    setSchoolName(''); 
+    sessionStorage.clear();
   };
 
   return (
@@ -131,4 +147,5 @@ export const useAuth = () => {
   if (!context) throw new Error("useAuth doit être encapsulé au sein d'un AuthProvider.");
   return context;
 };
+
 export default AuthProvider;

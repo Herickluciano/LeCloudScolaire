@@ -169,7 +169,14 @@ const SuperAdminSaaS = () => {
           🚪 Quitter le Noyau
         </button>
       </div>
-
+        <Link
+  to="/components/pub-notification"
+  className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition"
+>
+  📢
+  <span>Pub dans page eveille</span>
+</Link>
+          <Link to="/superadmin/publicites"  className="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-bold text-xs uppercase tracking-wider px-3.5 py-2 rounded-lg transition">📢 Pub dans page notification</Link>
       {/* STATISTIQUES FINANCIÈRES CENTRALISÉES */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 text-left">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-2xs">
@@ -357,13 +364,6 @@ const SuperAdminSaaS = () => {
             </table>
           </div>
         </div>
-        <Link
-  to="/superadmin/publicites"
-  className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition"
->
-  📢
-  <span>Publicités</span>
-</Link>
       </div>
     </div>
   );

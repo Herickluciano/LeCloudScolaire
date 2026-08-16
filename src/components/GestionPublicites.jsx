@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Link } from "react";
 import {
   collection,
   onSnapshot,
@@ -7,24 +7,18 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
-} from 'firebase/firestore';
+} from "firebase/firestore";
 
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from 'firebase/storage';
-
-import { db, storage } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { db } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 const formInitial = {
-  titre: '',
-  description: '',
-  lienUrl: '',
-  dateDebut: '',
-  dateFin: '',
+  titre: "",
+  description: "",
+  lienUrl: "",
+  imageUrl: "",
+  dateDebut: "",
+  dateFin: "",
   actif: true,
   ordre: 0,
 };
@@ -34,27 +28,27 @@ const GestionPublicites = () => {
 
   const [publicites, setPublicites] = useState([]);
   const [form, setForm] = useState(formInitial);
-  const [image, setImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
   const [publiciteEnCours, setPubliciteEnCours] = useState(null);
 
   const [chargement, setChargement] = useState(false);
   const [chargementListe, setChargementListe] = useState(true);
-  const [message, setMessage] = useState('');
-  const [erreur, setErreur] = useState('');
+  const [message, setMessage] = useState("");
+  const [erreur, setErreur] = useState("");
 
   const schoolId =
     user?.schoolId ||
-    sessionStorage.getItem('sgs_school_id') ||
+    sessionStorage.getItem("sgs_school_id") ||
     null;
 
-  /* =========================================================
-     CHARGEMENT TEMPS REEL
-  ========================================================= */
+  /*
+   * =========================================================
+   * CHARGEMENT TEMPS REEL
+   * =========================================================
+   */
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, 'publicites'),
+      collection(db, "publicites"),
       (snapshot) => {
         const liste = snapshot.docs
           .map((item) => ({
@@ -72,10 +66,15 @@ const GestionPublicites = () => {
         setChargementListe(false);
       },
       (error) => {
-        console.error(error);
-        setErreur(
-          'Impossible de charger les publicités.'
+        console.error(
+          "Erreur chargement publicités :",
+          error
         );
+
+        setErreur(
+          "Impossible de charger les publicités."
+        );
+
         setChargementListe(false);
       }
     );
@@ -83,62 +82,49 @@ const GestionPublicites = () => {
     return () => unsubscribe();
   }, []);
 
-  /* =========================================================
-     FORMULAIRE
-  ========================================================= */
+  /*
+   * =========================================================
+   * FORMULAIRE
+   * =========================================================
+   */
 
   const modifierChamp = (nom, valeur) => {
     setForm((ancien) => ({
       ...ancien,
       [nom]: valeur,
     }));
+
+    setErreur("");
+    setMessage("");
   };
 
-  const handleImageChange = (e) => {
-    const fichier = e.target.files?.[0];
-
-    if (!fichier) return;
-
-    if (!fichier.type.startsWith('image/')) {
-      setErreur('Veuillez sélectionner une image.');
-      return;
-    }
-
-    if (fichier.size > 5 * 1024 * 1024) {
-      setErreur(
-        'L’image ne doit pas dépasser 5 Mo.'
-      );
-      return;
-    }
-
-    setErreur('');
-    setImage(fichier);
-    setImagePreview(URL.createObjectURL(fichier));
-  };
-
-  /* =========================================================
-     RESET
-  ========================================================= */
+  /*
+   * =========================================================
+   * RESET
+   * =========================================================
+   */
 
   const resetForm = () => {
     setForm(formInitial);
-    setImage(null);
-    setImagePreview('');
     setPubliciteEnCours(null);
-    setErreur('');
+    setErreur("");
+    setMessage("");
   };
 
-  /* =========================================================
-     EDITION
-  ========================================================= */
+  /*
+   * =========================================================
+   * EDITION
+   * =========================================================
+   */
 
   const modifierPublicite = (pub) => {
     setPubliciteEnCours(pub);
 
     setForm({
-      titre: pub.titre || '',
-      description: pub.description || '',
-      lienUrl: pub.lienUrl || '',
+      titre: pub.titre || "",
+      description: pub.description || "",
+      lienUrl: pub.lienUrl || "",
+      imageUrl: pub.imageUrl || "",
       dateDebut: convertirTimestampEnInput(
         pub.dateDebut
       ),
@@ -149,34 +135,35 @@ const GestionPublicites = () => {
       ordre: Number(pub.ordre || 0),
     });
 
-    setImage(null);
-    setImagePreview(pub.imageUrl || '');
-    setErreur('');
+    setErreur("");
+    setMessage("");
 
     window.scrollTo({
       top: 0,
-      behavior: 'smooth',
+      behavior: "smooth",
     });
   };
 
-  /* =========================================================
-     ENREGISTREMENT
-  ========================================================= */
+  /*
+   * =========================================================
+   * ENREGISTREMENT
+   * =========================================================
+   */
 
   const enregistrerPublicite = async (e) => {
     e.preventDefault();
 
-    setErreur('');
-    setMessage('');
+    setErreur("");
+    setMessage("");
 
     if (!form.titre.trim()) {
-      setErreur('Le titre est obligatoire.');
+      setErreur("Le titre est obligatoire.");
       return;
     }
 
     if (!form.dateDebut || !form.dateFin) {
       setErreur(
-        'Les dates de début et de fin sont obligatoires.'
+        "Les dates de début et de fin sont obligatoires."
       );
       return;
     }
@@ -189,74 +176,59 @@ const GestionPublicites = () => {
       `${form.dateFin}T23:59:59`
     );
 
+    if (Number.isNaN(debut.getTime())) {
+      setErreur("La date de début est invalide.");
+      return;
+    }
+
+    if (Number.isNaN(fin.getTime())) {
+      setErreur("La date de fin est invalide.");
+      return;
+    }
+
     if (fin <= debut) {
       setErreur(
-        'La date de fin doit être après la date de début.'
+        "La date de fin doit être après la date de début."
       );
       return;
+    }
+
+    /*
+     * Vérification URL image
+     */
+    if (form.imageUrl.trim()) {
+      try {
+        new URL(form.imageUrl.trim());
+      } catch {
+        setErreur(
+          "L'URL de l'image n'est pas valide."
+        );
+        return;
+      }
+    }
+
+    /*
+     * Vérification lien externe
+     */
+    if (form.lienUrl.trim()) {
+      try {
+        new URL(form.lienUrl.trim());
+      } catch {
+        setErreur(
+          "Le lien externe n'est pas valide."
+        );
+        return;
+      }
     }
 
     setChargement(true);
 
     try {
-      let imageUrl =
-        publiciteEnCours?.imageUrl || '';
-
-      let storagePath =
-        publiciteEnCours?.storagePath || '';
-
-      /* ============================================
-         UPLOAD IMAGE
-      ============================================ */
-
-      if (image) {
-        const extension =
-          image.name.split('.').pop() || 'jpg';
-
-        const nomFichier =
-          `publicites/${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2)}.${extension}`;
-
-        const storageRef = ref(
-          storage,
-          nomFichier
-        );
-
-        await uploadBytes(storageRef, image);
-
-        imageUrl =
-          await getDownloadURL(storageRef);
-
-        storagePath = nomFichier;
-
-        /* Supprimer ancienne image */
-        if (
-          publiciteEnCours?.storagePath &&
-          publiciteEnCours.storagePath !== nomFichier
-        ) {
-          try {
-            await deleteObject(
-              ref(
-                storage,
-                publiciteEnCours.storagePath
-              )
-            );
-          } catch (error) {
-            console.warn(
-              'Ancienne image introuvable :',
-              error
-            );
-          }
-        }
-      }
-
       const donnees = {
         titre: form.titre.trim(),
         description: form.description.trim(),
         lienUrl: form.lienUrl.trim(),
-        imageUrl,
-        storagePath,
+        imageUrl: form.imageUrl.trim(),
         dateDebut: debut,
         dateFin: fin,
         actif: Boolean(form.actif),
@@ -265,32 +237,36 @@ const GestionPublicites = () => {
         updatedAt: serverTimestamp(),
       };
 
-      /* ============================================
-         MODIFICATION
-      ============================================ */
+      /*
+       * =====================================================
+       * MODIFICATION
+       * =====================================================
+       */
 
       if (publiciteEnCours) {
         await updateDoc(
           doc(
             db,
-            'publicites',
+            "publicites",
             publiciteEnCours.id
           ),
           donnees
         );
 
         setMessage(
-          'Publicité modifiée avec succès.'
+          "Publicité modifiée avec succès."
         );
       }
 
-      /* ============================================
-         CREATION
-      ============================================ */
+      /*
+       * =====================================================
+       * CREATION
+       * =====================================================
+       */
 
       else {
         await addDoc(
-          collection(db, 'publicites'),
+          collection(db, "publicites"),
           {
             ...donnees,
             createdAt: serverTimestamp(),
@@ -298,91 +274,122 @@ const GestionPublicites = () => {
         );
 
         setMessage(
-          'Publicité créée avec succès.'
+          "Publicité créée avec succès."
         );
       }
 
       resetForm();
     } catch (error) {
       console.error(
-        'Erreur publicité :',
+        "Erreur publicité :",
         error
       );
 
       setErreur(
-        'Impossible d’enregistrer la publicité.'
+        "Impossible d’enregistrer la publicité."
       );
     } finally {
       setChargement(false);
     }
   };
 
-  /* =========================================================
-     ACTIVATION / DESACTIVATION
-  ========================================================= */
+  /*
+   * =========================================================
+   * ACTIVATION / DESACTIVATION
+   * =========================================================
+   */
 
   const changerEtat = async (pub) => {
+    setErreur("");
+    setMessage("");
+
     try {
       await updateDoc(
-        doc(db, 'publicites', pub.id),
+        doc(db, "publicites", pub.id),
         {
           actif: !pub.actif,
           updatedAt: serverTimestamp(),
         }
       );
+
+      setMessage(
+        pub.actif
+          ? "Publicité désactivée."
+          : "Publicité activée."
+      );
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erreur changement état :",
+        error
+      );
 
       setErreur(
-        'Impossible de modifier l’état de la publicité.'
+        "Impossible de modifier l’état de la publicité."
       );
     }
   };
 
-  /* =========================================================
-     SUPPRESSION
-  ========================================================= */
+  /*
+   * =========================================================
+   * SUPPRESSION
+   * =========================================================
+   */
 
   const supprimerPublicite = async (pub) => {
     const confirmation = window.confirm(
       `Supprimer la publicité "${pub.titre}" ?`
     );
 
-    if (!confirmation) return;
+    if (!confirmation) {
+      return;
+    }
+
+    setErreur("");
+    setMessage("");
 
     try {
-      if (pub.storagePath) {
-        try {
-          await deleteObject(
-            ref(storage, pub.storagePath)
-          );
-        } catch (error) {
-          console.warn(
-            'Image Storage déjà supprimée.',
-            error
-          );
-        }
+      await deleteDoc(
+        doc(db, "publicites", pub.id)
+      );
+
+      if (
+        publiciteEnCours?.id === pub.id
+      ) {
+        resetForm();
       }
 
-      await deleteDoc(
-        doc(db, 'publicites', pub.id)
-      );
-
       setMessage(
-        'Publicité supprimée.'
+        "Publicité supprimée."
       );
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erreur suppression :",
+        error
+      );
 
       setErreur(
-        'Impossible de supprimer la publicité.'
+        "Impossible de supprimer la publicité."
       );
     }
   };
 
+  /*
+   * =========================================================
+   * APERCU URL IMAGE
+   * =========================================================
+   */
+
+  const imageValide =
+    form.imageUrl.trim() !== "";
+
+  /*
+   * =========================================================
+   * RENDU
+   * =========================================================
+   */
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-900 p-4 md:p-8">
-
       <div className="max-w-7xl mx-auto">
 
         {/* =================================================
@@ -390,7 +397,6 @@ const GestionPublicites = () => {
         ================================================= */}
 
         <div className="mb-8">
-
           <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.25em]">
             Administration
           </p>
@@ -400,10 +406,9 @@ const GestionPublicites = () => {
           </h1>
 
           <p className="text-sm text-slate-400 mt-2">
-            Programmez les publicités affichées sur
+            Programme les publicités affichées sur
             l’écran de veille.
           </p>
-
         </div>
 
         {/* =================================================
@@ -429,12 +434,11 @@ const GestionPublicites = () => {
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl mb-8">
 
           <div className="flex items-center justify-between gap-4 mb-6">
-
             <div>
               <h2 className="text-xl font-black">
                 {publiciteEnCours
-                  ? 'Modifier la publicité'
-                  : 'Nouvelle publicité'}
+                  ? "Modifier la publicité"
+                  : "Nouvelle publicité"}
               </h2>
 
               <p className="text-xs text-slate-500 mt-1">
@@ -452,7 +456,6 @@ const GestionPublicites = () => {
                 Annuler
               </button>
             )}
-
           </div>
 
           <form
@@ -471,7 +474,7 @@ const GestionPublicites = () => {
                 value={form.titre}
                 onChange={(e) =>
                   modifierChamp(
-                    'titre',
+                    "titre",
                     e.target.value
                   )
                 }
@@ -491,7 +494,7 @@ const GestionPublicites = () => {
                 value={form.description}
                 onChange={(e) =>
                   modifierChamp(
-                    'description',
+                    "description",
                     e.target.value
                   )
                 }
@@ -501,39 +504,51 @@ const GestionPublicites = () => {
               />
             </div>
 
-            {/* IMAGE */}
+            {/* URL IMAGE */}
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-xs font-black uppercase text-slate-600 mb-2">
-                Image publicitaire
+                URL de l'image
               </label>
 
               <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="w-full text-xs"
+                type="url"
+                value={form.imageUrl}
+                onChange={(e) =>
+                  modifierChamp(
+                    "imageUrl",
+                    e.target.value
+                  )
+                }
+                placeholder="https://exemple.com/image.jpg"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-slate-900"
               />
 
               <p className="text-[10px] text-slate-400 mt-2">
-                JPG, PNG ou WEBP — maximum 5 Mo.
+                Colle ici l'adresse directe de ton
+                image. Aucun stockage Firebase Storage
+                n'est utilisé.
               </p>
             </div>
 
             {/* APERCU */}
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-xs font-black uppercase text-slate-600 mb-2">
                 Aperçu
               </label>
 
-              <div className="h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
+              <div className="h-48 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
 
-                {imagePreview ? (
+                {imageValide ? (
                   <img
-                    src={imagePreview}
-                    alt="Aperçu"
+                    src={form.imageUrl}
+                    alt="Aperçu de la publicité"
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display =
+                        "none";
+                    }}
                   />
                 ) : (
                   <span className="text-xs text-slate-400 font-bold">
@@ -556,7 +571,7 @@ const GestionPublicites = () => {
                 value={form.dateDebut}
                 onChange={(e) =>
                   modifierChamp(
-                    'dateDebut',
+                    "dateDebut",
                     e.target.value
                   )
                 }
@@ -576,7 +591,7 @@ const GestionPublicites = () => {
                 value={form.dateFin}
                 onChange={(e) =>
                   modifierChamp(
-                    'dateFin',
+                    "dateFin",
                     e.target.value
                   )
                 }
@@ -596,7 +611,7 @@ const GestionPublicites = () => {
                 value={form.lienUrl}
                 onChange={(e) =>
                   modifierChamp(
-                    'lienUrl',
+                    "lienUrl",
                     e.target.value
                   )
                 }
@@ -617,7 +632,7 @@ const GestionPublicites = () => {
                 value={form.ordre}
                 onChange={(e) =>
                   modifierChamp(
-                    'ordre',
+                    "ordre",
                     e.target.value
                   )
                 }
@@ -628,7 +643,6 @@ const GestionPublicites = () => {
             {/* ACTIF */}
 
             <div className="md:col-span-2">
-
               <label className="flex items-center gap-3 cursor-pointer">
 
                 <input
@@ -636,7 +650,7 @@ const GestionPublicites = () => {
                   checked={form.actif}
                   onChange={(e) =>
                     modifierChamp(
-                      'actif',
+                      "actif",
                       e.target.checked
                     )
                   }
@@ -648,25 +662,22 @@ const GestionPublicites = () => {
                 </span>
 
               </label>
-
             </div>
 
             {/* BOUTON */}
 
             <div className="md:col-span-2">
-
               <button
                 type="submit"
                 disabled={chargement}
                 className="w-full md:w-auto px-8 py-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-black uppercase disabled:opacity-50"
               >
                 {chargement
-                  ? 'Enregistrement...'
+                  ? "Enregistrement..."
                   : publiciteEnCours
-                  ? 'Enregistrer les modifications'
-                  : 'Créer la publicité'}
+                  ? "Enregistrer les modifications"
+                  : "Créer la publicité"}
               </button>
-
             </div>
 
           </form>
@@ -679,7 +690,6 @@ const GestionPublicites = () => {
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl">
 
           <div className="flex justify-between items-center mb-6">
-
             <div>
               <h2 className="text-xl font-black">
                 Publicités programmées
@@ -689,7 +699,6 @@ const GestionPublicites = () => {
                 {publicites.length} publicité(s)
               </p>
             </div>
-
           </div>
 
           {chargementListe ? (
@@ -710,7 +719,6 @@ const GestionPublicites = () => {
             <div className="space-y-4">
 
               {publicites.map((pub) => {
-
                 const debut =
                   convertirTimestampEnInput(
                     pub.dateDebut
@@ -721,8 +729,7 @@ const GestionPublicites = () => {
                     pub.dateFin
                   );
 
-                const aujourdHui =
-                  new Date();
+                const aujourdHui = new Date();
 
                 const dateDebut =
                   convertirDate(pub.dateDebut);
@@ -781,6 +788,13 @@ const GestionPublicites = () => {
                           </span>
                         )}
 
+                        {pub.actif &&
+                          !enCours && (
+                            <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-[9px] font-black uppercase">
+                              Hors période
+                            </span>
+                          )}
+
                       </div>
 
                       {pub.description && (
@@ -826,13 +840,13 @@ const GestionPublicites = () => {
                           }
                           className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase ${
                             pub.actif
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-emerald-100 text-emerald-700'
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-emerald-100 text-emerald-700"
                           }`}
                         >
                           {pub.actif
-                            ? 'Désactiver'
-                            : 'Activer'}
+                            ? "Désactiver"
+                            : "Activer"}
                         </button>
 
                         <button
@@ -846,7 +860,6 @@ const GestionPublicites = () => {
                         </button>
 
                       </div>
-
                     </div>
 
                   </div>
@@ -857,15 +870,16 @@ const GestionPublicites = () => {
           )}
 
         </div>
-
       </div>
     </div>
   );
 };
 
-/* =========================================================
-   UTILITAIRES DATES
-========================================================= */
+/*
+ * =========================================================
+ * UTILITAIRES DATES
+ * =========================================================
+ */
 
 const convertirDate = (valeur) => {
   if (!valeur) {
@@ -880,22 +894,25 @@ const convertirDate = (valeur) => {
 };
 
 const convertirTimestampEnInput = (valeur) => {
-  if (!valeur) return '';
+  if (!valeur) {
+    return "";
+  }
 
   const date = convertirDate(valeur);
 
   if (Number.isNaN(date.getTime())) {
-    return '';
+    return "";
   }
 
   const annee = date.getFullYear();
+
   const mois = String(
     date.getMonth() + 1
-  ).padStart(2, '0');
+  ).padStart(2, "0");
 
   const jour = String(
     date.getDate()
-  ).padStart(2, '0');
+  ).padStart(2, "0");
 
   return `${annee}-${mois}-${jour}`;
 };

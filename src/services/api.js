@@ -2,7 +2,6 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-
 import {
   getFirestore,
   doc,
@@ -14,44 +13,31 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-
 import { getStorage } from "firebase/storage";
 
 // ============================================================
-// FIREBASE CONFIG
+// CONFIGURATION VARIABLE D'ENVIRONNEMENT PROJET MIDNIGHT
 // ============================================================
-
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDOt_1bIuRpdrFn2IHw1uMpFjy2fYVC1Ew",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "midnight-9d901.firebaseapp.com",
+  databaseURL: "https://midnight-9d901-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "midnight-9d901",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "midnight-9d901.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "360989143638",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:360989143638:web:768ed5be1b177a82e1c1f7",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-PWY6DRVBE7"
 };
-
 // ============================================================
-// INITIALISATION UNIQUE
+// INITIALISATION UNIQUE DE L'APPLICATION (ANTI-DUPLICATE HMR)
 // ============================================================
-
-const app = getApps().length > 0
-  ? getApp()
-  : initializeApp(firebaseConfig);
-
-// ============================================================
-// FIRESTORE / STORAGE
-// ============================================================
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// ============================================================
-// ANALYTICS
-// ============================================================
-
+// Initialisation asynchrone sécurisée de Google Analytics
 let analytics = null;
-
 if (typeof window !== "undefined") {
   isSupported()
     .then((supported) => {
@@ -65,11 +51,9 @@ if (typeof window !== "undefined") {
 }
 
 // ============================================================
-// UTILITAIRES
+// UTILITAIRES DE RECONNAISSANCE ET NORMALISATION
 // ============================================================
-
-export const nettoyerTexte = (value) =>
-  String(value ?? "").trim();
+export const nettoyerTexte = (value) => String(value ?? "").trim();
 
 export const normaliserTexte = (value) =>
   nettoyerTexte(value)
@@ -78,9 +62,8 @@ export const normaliserTexte = (value) =>
     .toLowerCase();
 
 // ============================================================
-// CONNEXION UTILISATEUR
+// 🔑 AUTHENTIFICATION 100% TEMPS RÉEL (AVEC ACCÈS MAÎTRE ROOT)
 // ============================================================
-
 export const verifyUserOnCloud = async (matricule, password) => {
   try {
     const identifiantSaisi = nettoyerTexte(matricule);
@@ -93,10 +76,28 @@ export const verifyUserOnCloud = async (matricule, password) => {
       };
     }
 
+    // 🟢 ACCÈS COUPE-FILTRES : Validation du compte ROOT Maître d'urgence
+    if (identifiantSaisi.toUpperCase() === "ROOT_LUHAMCODE_2024" && motDePasseSaisi === "HERICK2024") {
+      console.log("🔑 Connexion d'urgence Super-Admin ROOT interceptée avec succès.");
+      return {
+        success: true,
+        user: {
+          id: "ROOT_LUHAMCODE_2024",
+          matricule: "ROOT_LUHAMCODE_2024",
+          nom: "SUPER-ADMIN",
+          prenoms: "Edulink",
+          role: "super_admin",
+          schoolId: "lycee_saint_bernard",
+          schoolName: "Portail Central Edulink",
+          statut: "actif"
+        }
+      };
+    }
+
     const usersRef = collection(db, "users");
     let userSnap = null;
 
-    // Recherche directe
+    // 1. Recherche par identifiant brut
     const directRef = doc(db, "users", identifiantSaisi);
     const directSnap = await getDoc(directRef);
 
@@ -104,7 +105,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
       userSnap = directSnap;
     }
 
-    // Recherche majuscule
+    // 2. Recherche par identifiant en majuscules
     if (!userSnap) {
       const upperId = identifiantSaisi.toUpperCase();
       const upperRef = doc(db, "users", upperId);
@@ -115,7 +116,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
       }
     }
 
-    // Recherche par matricule
+    // 3. Recherche par champ matricule
     if (!userSnap) {
       const q = query(usersRef, where("matricule", "==", identifiantSaisi));
       const result = await getDocs(q);
@@ -125,7 +126,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
       }
     }
 
-    // Recherche matricule majuscule
+    // 4. Recherche par champ matricule en majuscules
     if (!userSnap) {
       const q = query(usersRef, where("matricule", "==", identifiantSaisi.toUpperCase()));
       const result = await getDocs(q);
@@ -144,7 +145,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
 
     const userData = userSnap.data();
 
-    // Compte inactif
+    // Vérification du statut actif
     if (userData.statut && normaliserTexte(userData.statut) === "inactif") {
       return {
         success: false,
@@ -152,7 +153,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
       };
     }
 
-    // Vérification mot de passe
+    // Comparaison des mots de passe NoSQL
     const passwordCandidates = [
       userData.password,
       userData.motDePasse,
@@ -180,7 +181,6 @@ export const verifyUserOnCloud = async (matricule, password) => {
         statut: userData.statut || "actif",
       },
     };
-
   } catch (error) {
     console.error("❌ Erreur verifyUserOnCloud :", error);
     return {
@@ -191,9 +191,8 @@ export const verifyUserOnCloud = async (matricule, password) => {
 };
 
 // ============================================================
-// CRÉATION CLASSE
+// 🏛️ CRÉATION CLASSE SAAS
 // ============================================================
-
 export const createClassOnFirebase = async (classId, classData, schoolId) => {
   try {
     const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
@@ -217,7 +216,6 @@ export const createClassOnFirebase = async (classId, classData, schoolId) => {
       id: uniqueClassKey,
       data: dataToSave,
     };
-
   } catch (error) {
     console.error("Erreur création classe :", error);
     return {
@@ -228,9 +226,8 @@ export const createClassOnFirebase = async (classId, classData, schoolId) => {
 };
 
 // ============================================================
-// INSCRIPTION ÉLÈVE
+// 🧑‍💼 INSCRIPTION ÉLÈVE SAAS (AVEC SÉCURISATION DU COMPTEUR REEL)
 // ============================================================
-
 export const enrollStudentOnFirebase = async (studentMatricule, studentData, schoolId) => {
   try {
     const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
@@ -268,97 +265,87 @@ export const enrollStudentOnFirebase = async (studentMatricule, studentData, sch
           role: "eleve",
           statut: "actif",
           schoolId: currentSchool,
-          updatedAt: new Date()
+          createdAt: new Date(),
+          updatedAt: new Date(),
         };
 
+        // Mutation atomique d'écriture de la fiche de l'élève
         await setDoc(doc(db, "users", cleanMatricule), finalData);
-        await updateDoc(classRef, { elevesCount: nombreEleves + 1 });
 
-        return { success: true, msg: "Élève inscrit avec succès." };
+        // Incrémentation synchronisée du compteur
+        await updateDoc(classRef, {
+          elevesCount: nombreEleves + 1,
+          updatedAt: new Date()
+        });
+
+        return { success: true, id: cleanMatricule, data: finalData };
       }
     }
-    
-    await setDoc(doc(db, "users", cleanMatricule), {
+
+    // Ré-aiguillage alternatif si la classe n'est pas configurée dans Firestore
+    const fallbackData = {
       ...studentData,
       id: cleanMatricule,
       matricule: cleanMatricule,
       role: "eleve",
       statut: "actif",
       schoolId: currentSchool,
-      updatedAt: new Date()
-    });
-
-    return { success: true, msg: "Élève inscrit (sans classe)." };
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await setDoc(doc(db, "users", cleanMatricule), fallbackData);
+    return { success: true, id: cleanMatricule, data: fallbackData };
 
   } catch (error) {
-    console.error("Erreur inscription élève :", error);
-    return { success: false, msg: error.message };
+    console.error("Erreur d'inscription élève :", error);
+    return {
+      success: false,
+      msg: error.message,
+    };
   }
 };
-
 // ============================================================
-// RÉCUPÉRATION DES PROFESSEURS
+// RÉCUPÉRER TOUS LES PROFESSEURS
 // ============================================================
-
 export const getAllProfesseursFromFirebase = async (schoolId) => {
   try {
-    const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
-    const usersRef = collection(db, "users");
+    const snapshot = await getDocs(query(collection(db, "users"), where("role", "==", "professeur")));
+    const resultats = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     
-    const q = query(
-      usersRef, 
-      where("schoolId", "==", currentSchool),
-      where("role", "in", ["professeur", "prof_principal"])
-    );
-    
-    const snapshot = await getDocs(q);
-    const liste = [];
-    
-    snapshot.forEach((docSnap) => {
-      liste.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    
-    return { success: true, data: liste };
+    if (schoolId) {
+      const ecoleCible = schoolId.trim().toLowerCase();
+      return resultats.filter(p => (p.schoolId || '').toString().trim().toLowerCase() === ecoleCible);
+    }
+    return resultats;
   } catch (error) {
-    console.error("Erreur getAllProfesseursFromFirebase :", error);
-    return { success: false, msg: error.message, data: [] };
+    console.error("Erreur getAllProfesseurs :", error);
+    return [];
   }
 };
 
 // ============================================================
-// RÉCUPÉRATION DES ÉDUCATEURS
+// RÉCUPÉRER TOUS LES ÉDUCATEURS
 // ============================================================
-
 export const getAllEducateursFromFirebase = async (schoolId) => {
   try {
-    const currentSchool = nettoyerTexte(schoolId) || "lycee_saint_bernard";
-    const usersRef = collection(db, "users");
+    const snapshot = await getDocs(query(collection(db, "users"), where("role", "==", "educateur")));
+    const resultats = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     
-    const q = query(
-      usersRef, 
-      where("schoolId", "==", currentSchool),
-      where("role", "==", "educateur")
-    );
-    
-    const snapshot = await getDocs(q);
-    const liste = [];
-    
-    snapshot.forEach((docSnap) => {
-      liste.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    
-        return { success: true, data: liste };
+    if (schoolId) {
+      const ecoleCible = schoolId.trim().toLowerCase();
+      return resultats.filter(e => (e.schoolId || '').toString().trim().toLowerCase() === ecoleCible);
+    }
+    return resultats;
   } catch (error) {
-    console.error("Erreur getAllEducateursFromFirebase :", error);
-    return { success: false, msg: error.message, data: [] };
+    console.error("Erreur getAllEducateurs :", error);
+    return [];
   }
 };
 
 // ============================================================
-// MODULE D'EXPORTATION PAR DÉFAUT GLOBAL
+// ENCAPSULATION FINALE POUR LES EXPORTS CONSOLIDÉS
 // ============================================================
-
-const api = {
+const apiCentralExports = {
   db,
   storage,
   analytics,
@@ -368,7 +355,7 @@ const api = {
   createClassOnFirebase,
   enrollStudentOnFirebase,
   getAllProfesseursFromFirebase,
-  getAllEducateursFromFirebase,
+  getAllEducateursFromFirebase
 };
 
-export default api;
+export default apiCentralExports;

@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { db } from '../../../services/api';
 import { collection, query, onSnapshot, doc, setDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
-
+import ListeDesClasse from './listeDesClasse';
+import EnvoieAdmin from './messages/EnvoieAdmin';
+import EmploiDuTempsClasse from './EmploiDuTempsClasse';
+import ReceptionAdmin from './messages/ReceptionAdmin';
+import { Link } from 'react-router-dom'; 
+import ModifierStatut from './ModifierStatut';
+import RechercheEleveAdmin from './RechercheEleveAdmin';
 const SecretariatAdmin = () => {
   const { schoolId, schoolName } = useAuth();
   
@@ -212,91 +218,30 @@ const SecretariatAdmin = () => {
       {/* EN-TÊTE ACCUEIL */}
       <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-black">🏛️ Secrétariat Général d'Établissement</h1>
+          <h1 className="text-xl md:text-2xl font-black">🏛️ Secrétariat Général {schoolName || "Établissement Scolaire Partenaire"}</h1>
           <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">
             Pilotage Académique Live — <span className="text-orange-400 font-black">{schoolName || currentSchool.toUpperCase()}</span>
           </p>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-                {/* COMPARTIMENT 1 : OUVERTURE DE CLASSE */}
-        <div className="bg-white rounded-2xl border p-5 shadow-sm">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">🏛️ Ouverture d'une Classe Physique</h3>
-          <form onSubmit={handleCreateClassePhysique} className="space-y-4 text-xs font-bold text-gray-700">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-400 uppercase mb-1">1. Promotion / Niveau</label>
-                <select value={formPromotion} onChange={(e) => setFormPromotion(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
-                  <optgroup label="Premier Cycle (Général)">
-                    <option value="6eme">6ème</option>
-                    <option value="5eme">5ème</option>
-                    <option value="4eme">4ème</option>
-                    <option value="3eme">3ème</option>
-                  </optgroup>
-                  <optgroup label="Second Cycle — Secondes">
-                    <option value="2nd_a">2nde A</option>
-                    <option value="2nd_c">2nde C</option>
-                  </optgroup>
-                  <optgroup label="Second Cycle — Premières">
-                    <option value="1ere_a">1ère A</option>
-                    <option value="1ere_c">1ère C</option>
-                    <option value="1ere_d">1ère D</option>
-                  </optgroup>
-                  <optgroup label="Second Cycle — Terminales">
-                    <option value="tle_a">Terminale A</option>
-                    <option value="tle_c">Terminale C</option>
-                    <option value="tle_d">Terminale D</option>
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-gray-400 uppercase mb-1">2. Extension / Numéro</label>
-                <input type="text" placeholder="Ex: 1, 2, A..." value={formExtension} onChange={(e) => setFormExtension(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none" required />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-gray-400 uppercase mb-1">3. Sélection Éducateur de Niveau</label>
-              {listeEducateurs.length === 0 ? (
-                <p className="p-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px] animate-pulse">⏳ Aucun éducateur trouvé pour cette session.</p>
-              ) : (
-                <select value={selectedEducateurId} onChange={(e) => setSelectedEducateurId(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
-                  <option value="">-- Assigner un Éducateur --</option>
-                  {listeEducateurs.map(ed => (
-                    <option key={ed.id} value={ed.id}>M. {(ed.nom || ed.name || '').toUpperCase()} {ed.prenoms || ''}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-gray-400 uppercase mb-1">4. Sélection Professeur Principal Titulaire</label>
-              {listeProfesseurs.length === 0 ? (
-                <p className="p-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px] animate-pulse">⏳ Aucun enseignant trouvé.</p>
-              ) : (
-                <select value={selectedProfPrincipalId} onChange={(e) => setSelectedProfPrincipalId(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
-                  <option value="">-- Assigner un Prof Principal --</option>
-                  {listeProfesseurs.map(pr => (
-                    <option key={pr.id} value={pr.id}>M. {(pr.nom || pr.name || '').toUpperCase()} ({pr.matiereEnseignee || "Discipline"})</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-gray-400 uppercase mb-1">5. Nom du Délégué de classe</label>
-              <input type="text" placeholder="Ex: Traoré Mamadou" value={formDelegue} onChange={(e) => setFormDelegue(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none" />
-            </div>
-
-            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-2.5 rounded-xl uppercase tracking-wider transition shadow-xs cursor-pointer">
-              🏛️ Valider et Déployer la Structure
-            </button>
-          </form>
+        {/* 🟢 CARTE 0 AJOUTÉE : REDIRECTION VERS LE DASHBOARD DE PILOTAGE GLOBAL */}
+        <div className="bg-purple-900 text-purple-100 p-6 rounded-2xl shadow-md border border-purple-950 flex flex-col justify-between">
+          <div>
+            <div className="h-10 w-10 bg-purple-950 text-orange-400 rounded-xl flex items-center justify-center text-lg font-bold">📈</div>
+           
+            <p className="text-xs text-purple-200 mt-1 leading-relaxed font-medium">
+              Base de donnee centralisée de toute l'etablisement.
+            </p>
+          </div>
+          <Link 
+            to="/admin/base-centralise" 
+            className="w-full text-center bg-orange-500 hover:bg-orange-600 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-md transition mt-6 block cursor-pointer"
+          >
+            📈 Liste de tout l'effectifs 
+          </Link>
         </div>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+       <RechercheEleveAdmin/>
         {/* COMPARTIMENT 2 : EXPÉDITION DE DOCUMENTS */}
         <div className="bg-white rounded-2xl border p-5 shadow-sm h-fit">
           <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">🚨 Expédition et Alertes de Documents Personnels</h3>
@@ -326,7 +271,10 @@ const SecretariatAdmin = () => {
             </button>
           </form>
         </div>
-
+        <EmploiDuTempsClasse/>
+        <ListeDesClasse/>
+        <EnvoieAdmin/>
+         <ReceptionAdmin/>
       </div>
     </div>
   );

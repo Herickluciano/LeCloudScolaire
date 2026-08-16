@@ -1,5 +1,5 @@
-import React from 'react';
-import EmploiDuTempsAdmin from '../../../components/dashboard/admin/EmploiDuTempsAdmin.jsx';
+import React from "react";
+import EmploiDuTempsAdmin from "./EmploiDuTempsAdmin.jsx"; // 🟢 Seule et unique déclaration propre
 
 const EmploiDuTempsClasse = () => {
   return (

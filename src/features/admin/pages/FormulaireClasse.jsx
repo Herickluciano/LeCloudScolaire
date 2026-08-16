@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { db } from '../../../services/api'; 
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Link } from 'react-router-dom'; 
 
 const FormulaireClasse = ({ onClose, currentSchool }) => {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     nomClasse: '',
     niveauPromotion: '',
-    capaciteMaximale: '35',
+    capaciteMaximale: '100',
     professeurPrincipal: ''
   });
 
@@ -37,7 +38,7 @@ const FormulaireClasse = ({ onClose, currentSchool }) => {
         schoolId: idEcole,
         name: formData.nomClasse.toUpperCase(),
         promotion: formData.niveauPromotion, // Clé unifiée : 6eme, 5eme, 2nd, terminal, etc.
-        capacite: parseInt(formData.capaciteMaximale) || 35,
+        capacite: parseInt(formData.capaciteMaximale) || 100,
         professeurPrincipalId: formData.professeurPrincipal || "NON_ASSIGNE",
         createdAt: serverTimestamp()
       });
@@ -62,19 +63,7 @@ const FormulaireClasse = ({ onClose, currentSchool }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 text-xs font-bold uppercase text-slate-700">
-        <div>
-          <label className="block mb-1 text-gray-600">Nom de la classe (Ex: 1, 2, A, B) *</label>
-          <input 
-            type="text" 
-            name="nomClasse" 
-            value={formData.nomClasse} 
-            onChange={handleChange} 
-            placeholder="Ex: 1" 
-            className="w-full px-3 py-2.5 border text-sm rounded-md font-medium outline-none bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-600" 
-            required 
-          />
-        </div>
-
+        
         <div>
           <label className="block mb-1 text-gray-600">Niveau de la Promotion *</label>
           <select 
@@ -94,7 +83,18 @@ const FormulaireClasse = ({ onClose, currentSchool }) => {
             <option value="terminal">Terminal</option>
           </select>
         </div>
-
+         <div>
+          <label className="block mb-1 text-gray-600">Nom de la classe (Ex: 1, 2, A, B) *</label>
+          <input 
+            type="text" 
+            name="nomClasse" 
+            value={formData.nomClasse} 
+            onChange={handleChange} 
+            placeholder="Ex: 1" 
+            className="w-full px-3 py-2.5 border text-sm rounded-md font-medium outline-none bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-600" 
+            required 
+          />
+        </div>
         <div>
           <label className="block mb-1 text-gray-600">Capacité maximale</label>
           <input 
