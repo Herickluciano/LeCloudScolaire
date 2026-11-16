@@ -1,0 +1,12 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 🔓 DÉBLOCAGE TOTAL DE TOUTE L'APPLICATION (Zéro restriction de date ou de rôle)
+    // Autorise la lecture pour l'initialisation et l'écriture pour toutes les mises à jour (Trimestres, Terminaux...)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

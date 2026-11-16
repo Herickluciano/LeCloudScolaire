@@ -20,14 +20,15 @@ import { getStorage } from "firebase/storage";
 // ============================================================
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDOt_1bIuRpdrFn2IHw1uMpFjy2fYVC1Ew",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "midnight-9d901.firebaseapp.com",
-  databaseURL: "https://midnight-9d901-default-rtdb.europe-west1.firebasedatabase.app",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "://firebaseapp.com",
+  databaseURL: "https://firebasedatabase.app",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "midnight-9d901",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "midnight-9d901.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "360989143638",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:360989143638:web:768ed5be1b177a82e1c1f7",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-PWY6DRVBE7"
 };
+
 // ============================================================
 // INITIALISATION UNIQUE DE L'APPLICATION (ANTI-DUPLICATE HMR)
 // ============================================================
@@ -88,7 +89,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
           prenoms: "Edulink",
           role: "super_admin",
           schoolId: "lycee_saint_bernard",
-          schoolName: "Portail Central Edulink",
+          schoolName: "Portail Central Edulink _ Le lien scolaire",
           statut: "actif"
         }
       };
@@ -122,6 +123,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
       const result = await getDocs(q);
 
       if (!result.empty) {
+        // 🟢 FIX : Récupération du premier document de la liste
         userSnap = result.docs[0];
       }
     }
@@ -132,6 +134,7 @@ export const verifyUserOnCloud = async (matricule, password) => {
       const result = await getDocs(q);
 
       if (!result.empty) {
+        // 🟢 FIX : Récupération du premier document de la liste
         userSnap = result.docs[0];
       }
     }
@@ -247,10 +250,10 @@ export const enrollStudentOnFirebase = async (studentMatricule, studentData, sch
         const classInfo = classSnap.data();
         const nombreEleves = Number(classInfo.elevesCount || 0);
 
-        if (nombreEleves >= 50) {
+        if (nombreEleves >= 100) {
           return {
             success: false,
-            msg: "Limite de 50 élèves atteinte.",
+            msg: "Limite de 100 élèves atteinte.",
           };
         }
 
@@ -304,13 +307,18 @@ export const enrollStudentOnFirebase = async (studentMatricule, studentData, sch
     };
   }
 };
+
 // ============================================================
-// RÉCUPÉRER TOUS LES PROFESSEURS
+// 📚 RÉCUPÉRER TOUS LES ENSEIGNANTS (STANDARD & PRINCIPAUX)
 // ============================================================
 export const getAllProfesseursFromFirebase = async (schoolId) => {
   try {
-    const snapshot = await getDocs(query(collection(db, "users"), where("role", "==", "professeur")));
-    const resultats = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 🟢 AMÉLIORATION : On récupère tous les utilisateurs pour filtrer les deux rôles enseignants
+    const snapshot = await getDocs(collection(db, "users"));
+    
+    const resultats = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.role === "professeur" || p.role === "prof_principal");
     
     if (schoolId) {
       const ecoleCible = schoolId.trim().toLowerCase();
@@ -324,7 +332,7 @@ export const getAllProfesseursFromFirebase = async (schoolId) => {
 };
 
 // ============================================================
-// RÉCUPÉRER TOUS LES ÉDUCATEURS
+// 📋 RÉCUPÉRER TOUS LES ÉDUCATEURS
 // ============================================================
 export const getAllEducateursFromFirebase = async (schoolId) => {
   try {
@@ -343,7 +351,7 @@ export const getAllEducateursFromFirebase = async (schoolId) => {
 };
 
 // ============================================================
-// ENCAPSULATION FINALE POUR LES EXPORTS CONSOLIDÉS
+// 📦 ENCAPSULATION FINALE POUR LES EXPORTS CONSOLIDÉS
 // ============================================================
 const apiCentralExports = {
   db,

@@ -1,57 +1,110 @@
-import React, { useEffect, useMemo, useState } from 'react';
+// src/features/admin/pages/GestionStatut.jsx
+
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import { db } from '../../../services/api';
+
 import {
   collection,
   query,
   onSnapshot,
   doc,
   updateDoc,
+  getDoc,
 } from 'firebase/firestore';
+
 import { useAuth } from '../../../context/AuthContext';
 
-const GestionStatut = () => {
-  const { schoolId, schoolName } = useAuth();
+// IMPORTANT : on utilise la vraie fonction qui génère le PDF + QR
+import {
+  genererFicheAvecQRCodePDF,
+} from '../../../utils/bulletinUtils.js';
 
-  const currentSchool = (
+import {
+  imprimerBulletinTrimestriel,
+} from '../../../utils/bulletinUtils';
+
+import Header from '../../../pages/Header.jsx';
+
+const GestionStatut = () => {
+  const {
+    schoolId,
+    schoolName,
+  } = useAuth();
+
+  /* =========================================================
+     ÉTABLISSEMENT COURANT
+  ========================================================= */
+
+  const currentSchool = String(
     schoolId ||
-    sessionStorage.getItem('sgs_school_id') ||
-    'lycee_moderne_gagnoa'
+      sessionStorage.getItem(
+        'sgs_school_id'
+      ) ||
+      ''
   )
     .trim()
     .toLowerCase();
 
-  // ============================================================
-  // ÉTATS
-  // ============================================================
-
-  const [eleves, setEleves] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const [filtrePromotion, setFiltrePromotion] = useState('all');
-
-  const [listePromotionsExistantes, setListePromotionsUniques] =
+  const [eleves, setEleves] =
     useState([]);
 
-  const [envoiEnCours, setEnvoiEnCours] = useState(null);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [message, setMessage] = useState({
-    type: '',
-    text: '',
-  });
+  const [
+    filtrePromotion,
+    setFiltrePromotion,
+  ] = useState('all');
 
-  // ============================================================
-  // NORMALISATION DES PROMOTIONS
-  // ============================================================
+  const [
+    listePromotionsExistantes,
+    setListePromotionsUniques,
+  ] = useState([]);
 
-  const nettoyerPromotionIvoirienne = (promoBrute = '') => {
-    const str = promoBrute
-      .toString()
+  const [
+    envoiEnCours,
+    setEnvoiEnCours,
+  ] = useState(null);
+
+  const [
+    badgeEnCours,
+    setBadgeEnCours,
+  ] = useState(null);
+
+  const [message, setMessage] =
+    useState({
+      type: '',
+      text: '',
+    });
+
+  /* =========================================================
+     TRIMESTRE
+  ========================================================= */
+
+  const trimestreFiltre =
+    sessionStorage.getItem(
+      'sgs_trimestre'
+    ) || '1';
+
+  /* =========================================================
+     NETTOYAGE PROMOTION
+  ========================================================= */
+
+  const nettoyerPromotionIvoirienne = (
+    promoBrute = ''
+  ) => {
+    const str = String(
+      promoBrute
+    )
       .toLowerCase()
       .trim();
 
-    if (!str) {
-      return '';
-    }
+    if (!str) return '';
 
     if (
       str.startsWith('t_') ||
@@ -106,14 +159,19 @@ const GestionStatut = () => {
       return '6eme';
     }
 
-    return str.split('_')[0];
+    return str
+      .split('_')[0]
+      .toUpperCase();
   };
 
-  // ============================================================
-  // MESSAGE TEMPORAIRE
-  // ============================================================
+  /* =========================================================
+     MESSAGE
+  ========================================================= */
 
-  const afficherMessage = (type, text) => {
+  const afficherMessage = (
+    type,
+    text
+  ) => {
     setMessage({
       type,
       text,
@@ -124,762 +182,1299 @@ const GestionStatut = () => {
         type: '',
         text: '',
       });
-    }, 5000);
+    }, 6000);
   };
 
-  // ============================================================
-  // ÉCOUTEUR FIRESTORE TEMPS RÉEL
-  // ============================================================
+  /* =========================================================
+     CHANGEMENT DU STATUT
+  ========================================================= */
 
-  useEffect(() => {
-    if (!currentSchool) {
-      setEleves([]);
-      setListePromotionsUniques([]);
-      setLoading(false);
-      return undefined;
-    }
+  const handleChangerStatutManuel =
+    async (
+      studentId,
+      nouveauStatut
+    ) => {
+      if (
+        !studentId ||
+        !nouveauStatut
+      ) {
+        return;
+      }
 
-    setLoading(true);
-
-    const q = query(collection(db, 'users'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list = [];
-        const setPromos = new Set();
-
-        snapshot.forEach((docSnap) => {
-          const d = docSnap.data();
-
-          const schoolCleanDoc = (d.schoolId || '')
-            .toString()
-            .trim()
-            .toLowerCase();
-
-          const roleClean = (d.role || '')
-            .toString()
-            .trim()
-            .toLowerCase();
-
-          // Seulement les élèves de l'établissement courant
-          if (
-            schoolCleanDoc !== currentSchool ||
-            roleClean !== 'eleve'
-          ) {
-            return;
-          }
-
-          // ====================================================
-          // CALCUL DES POINTS CUMULÉS
-          // ====================================================
-
-          const sourceNotes = d.notes || {};
-
-          let totalPointsCumules = 0;
-
-          Object.values(sourceNotes).forEach(
-            (notesArray) => {
-              if (!Array.isArray(notesArray)) {
-                return;
-              }
-
-              notesArray.forEach((val) => {
-                totalPointsCumules +=
-                  parseFloat(val) || 0;
-              });
-            }
-          );
-
-          // ====================================================
-          // PROMOTION
-          // ====================================================
-
-          if (
-            d.promotion &&
-            d.promotion.toString().trim() !== ''
-          ) {
-            const promoUnifiee =
-              nettoyerPromotionIvoirienne(
-                d.promotion
-              );
-
-            if (promoUnifiee) {
-              setPromos.add(promoUnifiee);
-            }
-          }
-
-          // ====================================================
-          // ÉLÈVE
-          // ====================================================
-
-          list.push({
-            id: docSnap.id,
-            totalPointsCumules,
-            ...d,
-          });
-        });
-
-        // Tri alphabétique
-        list.sort((a, b) => {
-          const nomA = `${a.nom || ''} ${
-            a.prenoms || a.prenom || ''
-          }`.trim();
-
-          const nomB = `${b.nom || ''} ${
-            b.prenoms || b.prenom || ''
-          }`.trim();
-
-          return nomA.localeCompare(
-            nomB,
-            'fr',
-            {
-              sensitivity: 'base',
-            }
-          );
-        });
-
-        const promotionsTriees = Array.from(
-          setPromos
-        ).sort((a, b) =>
-          a.localeCompare(b, 'fr', {
-            sensitivity: 'base',
-            numeric: true,
-          })
+      try {
+        const studentRef = doc(
+          db,
+          'users',
+          studentId
         );
 
-        setListePromotionsUniques(
-          promotionsTriees
+        const maintenant =
+          new Date().toISOString();
+
+        await updateDoc(
+          studentRef,
+          {
+            statut:
+              nouveauStatut,
+
+            statutAcces:
+              nouveauStatut,
+
+            updatedAtStatut:
+              maintenant,
+
+            updatedAt:
+              maintenant,
+          }
         );
 
-        setEleves(list);
-        setLoading(false);
-      },
-      (err) => {
+        setEleves(
+          (liste) =>
+            liste.map(
+              (eleve) =>
+                eleve.id ===
+                studentId
+                  ? {
+                      ...eleve,
+
+                      statut:
+                        nouveauStatut,
+
+                      statutAcces:
+                        nouveauStatut,
+
+                      updatedAtStatut:
+                        maintenant,
+                    }
+                  : eleve
+            )
+        );
+
+        afficherMessage(
+          'success',
+          `Statut mis à jour : ${String(
+            nouveauStatut
+          ).toUpperCase()}`
+        );
+      } catch (error) {
         console.error(
-          "Erreur d'écoute de la table des statuts :",
-          err
+          'Erreur changement statut :',
+          error
         );
-
-        setLoading(false);
 
         afficherMessage(
           'error',
-          "Impossible de synchroniser les élèves en temps réel."
+          error?.message ||
+            'Impossible de modifier le statut.'
         );
       }
-    );
+    };
 
-    return () => unsubscribe();
-  }, [currentSchool]);
+  /* =========================================================
+     GÉNÉRATION DU BADGE + QR
+     
+     IMPORTANT :
+     On relit Firestore juste avant de générer le PDF.
+  ========================================================= */
 
-  // ============================================================
-  // FILTRE PROMOTION
-  // ============================================================
-
-  const elevesFiltres = useMemo(() => {
-    return eleves.filter((student) => {
-      if (filtrePromotion === 'all') {
-        return true;
-      }
-
-      return (
-        nettoyerPromotionIvoirienne(
-          student.promotion
-        ) === filtrePromotion
-      );
-    });
-  }, [eleves, filtrePromotion]);
-
-  // ============================================================
-  // ENVOI DU BULLETIN AUX PARENTS
-  // ============================================================
-
-  const handleAdminEnvoyerBulletinAuxParents =
-    async (studentTarget) => {
-      const emailParent =
-        studentTarget.emailParent ||
-        studentTarget.email ||
-        '';
-
-      if (!emailParent.trim()) {
+  const handleGenererBadge =
+    async (student) => {
+      if (!student?.id) {
         afficherMessage(
           'error',
-          "Envoi impossible : l'adresse e-mail de la famille est absente."
+          "Identifiant de l'élève introuvable."
         );
 
         return;
       }
 
-      setEnvoiEnCours(studentTarget.id);
+      setBadgeEnCours(
+        student.id
+      );
 
       try {
-        // ======================================================
-        // NOTES
-        // ======================================================
-
-        const sourceNotes =
-          studentTarget.notes || {};
-
-        const listeMatieresPDF = [];
-
-        let totalPtsGlobal = 0;
-        let countMat = 0;
-
-        Object.entries(sourceNotes).forEach(
-          ([nomMatiere, notesArray]) => {
-            if (
-              !Array.isArray(notesArray) ||
-              notesArray.length === 0
-            ) {
-              return;
-            }
-
-            if (
-              nomMatiere.toLowerCase() === 'eps'
-            ) {
-              return;
-            }
-
-            const sommeMatiere =
-              notesArray.reduce(
-                (acc, value) =>
-                  acc + (parseFloat(value) || 0),
-                0
-              );
-
-            const moyenneMatiere = parseFloat(
-              (
-                sommeMatiere /
-                notesArray.length
-              ).toFixed(2)
-            );
-
-            listeMatieresPDF.push({
-              nom: nomMatiere.toUpperCase(),
-              notes: notesArray.join(' - '),
-              moyenne: moyenneMatiere,
-            });
-
-            totalPtsGlobal +=
-              moyenneMatiere;
-
-            countMat++;
-          }
-        );
-
-        const moyenneCalculee =
-          countMat > 0
-            ? parseFloat(
-                (
-                  totalPtsGlobal / countMat
-                ).toFixed(2)
-              )
-            : 0;
-
-        // ======================================================
-        // SIGNATURES
-        // ======================================================
-
-        const signatureEducateur =
-          studentTarget.signatureManuscriteBase64 ||
-          sessionStorage.getItem(
-            'sgs_educateur_sig'
-          ) ||
-          null;
-
-        const signatureAdmin =
-          sessionStorage.getItem(
-            'sgs_admin_sig'
-          ) || null;
-
-        // ======================================================
-        // NOM ÉLÈVE
-        // ======================================================
-
-        const nomEleve =
-          `${studentTarget.nom || ''} ${
-            studentTarget.prenoms ||
-            studentTarget.prenom ||
-            ''
-          }`.trim();
-
-        // ======================================================
-        // PROMOTION
-        // ======================================================
-
-        const promotionNormalisee =
-          nettoyerPromotionIvoirienne(
-            studentTarget.promotion
+        const studentRef =
+          doc(
+            db,
+            'users',
+            student.id
           );
 
-        // ======================================================
-        // ENVOI BACKEND
-        // ======================================================
+        const studentSnap =
+          await getDoc(
+            studentRef
+          );
 
-        const response = await fetch(
-          'http://localhost:10000/api/send-email',
-          {
-            method: 'POST',
+        if (
+          !studentSnap.exists()
+        ) {
+          throw new Error(
+            "Le document de l'élève n'existe plus."
+          );
+        }
 
-            headers: {
-              'Content-Type': 'application/json',
-            },
+        const studentFreshData =
+          studentSnap.data() || {};
 
-            body: JSON.stringify({
-              to_email: emailParent
-                .trim()
-                .toLowerCase(),
+        /*
+         * PRIORITÉ AU STATUT ENREGISTRÉ
+         * DANS FIRESTORE.
+         */
+        const statutFirestore =
+          String(
+            studentFreshData.statutAcces ||
+              studentFreshData.statut ||
+              student.statutAcces ||
+              student.statut ||
+              'actif'
+          )
+            .trim()
+            .toLowerCase();
 
-              student_name:
-                nomEleve.toUpperCase(),
+        /*
+         * Fusion complète.
+         */
+        const studentComplet = {
+          ...studentFreshData,
 
-              matricule:
-                studentTarget.matricule ||
-                studentTarget.id ||
-                'N/A',
+          id:
+            studentSnap.id,
 
-              promotion:
-                promotionNormalisee
-                  .toUpperCase(),
+          statut:
+            statutFirestore,
 
-              classeId:
-                (
-                  studentTarget.classeId ||
-                  'N/A'
-                ).toUpperCase(),
+          statutAcces:
+            statutFirestore,
 
-              school_name:
-                schoolName || 'Edulink',
+          schoolId:
+            studentFreshData.schoolId ||
+            currentSchool,
 
-              schoolId: currentSchool,
+          schoolName:
+            studentFreshData.schoolName ||
+            schoolName ||
+            '',
+        };
 
-              moyenne: moyenneCalculee,
-
-              absences:
-                studentTarget.absences || 0,
-
-              matieres: listeMatieresPDF,
-
-              appreciationEducateur:
-                studentTarget
-                  .appreciationConduiteEducateur ||
-                'Élève suivi régulièrement par la vie scolaire.',
-
-              signature_educateur:
-                signatureEducateur,
-
-              signature_admin:
-                signatureAdmin,
-            }),
-          }
+        console.log(
+          '🪪 Génération badge avec statut :',
+          statutFirestore
         );
 
-        if (!response.ok) {
+        /*
+         * GÉNÉRATION RÉELLE DU PDF.
+         */
+        const resultat =
+          await genererFicheAvecQRCodePDF(
+            studentComplet
+          );
+
+        if (
+          resultat === false ||
+          resultat?.success === false
+        ) {
           throw new Error(
-            `Erreur serveur HTTP ${response.status}`
+            "La génération du badge a échoué."
           );
         }
 
         afficherMessage(
           'success',
-          `Le bulletin PDF de ${nomEleve.toUpperCase()} a été transmis avec succès à la famille.`
+          `Badge généré — statut : ${String(
+            statutFirestore
+          ).toUpperCase()}`
         );
-      } catch (err) {
+      } catch (error) {
         console.error(
-          'Erreur routage SMTP bulletin :',
-          err
+          'Erreur génération badge :',
+          error
         );
 
         afficherMessage(
           'error',
-          "Une erreur technique a bloqué l'envoi du bulletin PDF."
+          error?.message ||
+            'Impossible de générer le badge.'
         );
       } finally {
-        setEnvoiEnCours(null);
+        setBadgeEnCours(
+          null
+        );
       }
     };
 
-  // ============================================================
-  // CHANGEMENT DE STATUT
-  // ============================================================
+  /* =========================================================
+     ENVOI / IMPRESSION BULLETIN
+  ========================================================= */
 
-  const handleChangerStatutManuel = async (
-    studentId,
-    nouveauStatut
-  ) => {
-    if (!studentId || !nouveauStatut) {
-      return;
+  const handleAdminEnvoyerBulletinAuxParents =
+    async (
+      studentTarget
+    ) => {
+      if (!studentTarget?.id) {
+        return;
+      }
+
+      const nomComplet =
+        `${studentTarget.nom || ''} ${
+          studentTarget.prenoms ||
+          studentTarget.prenom ||
+          ''
+        }`
+          .trim()
+          .toUpperCase();
+
+      setEnvoiEnCours(
+        studentTarget.id
+      );
+
+      try {
+        const studentRef =
+          doc(
+            db,
+            'users',
+            studentTarget.id
+          );
+
+        await updateDoc(
+          studentRef,
+          {
+            [`bulletin_somme_t${trimestreFiltre}`]:
+              Number(
+                studentTarget.moyenneGeneraleCalcul ||
+                  0
+              ),
+
+            [`bulletin_statut_t${trimestreFiltre}`]:
+              'transmis_aux_parents',
+
+            updatedAt:
+              new Date().toISOString(),
+          }
+        );
+
+        const success =
+          await imprimerBulletinTrimestriel(
+            studentTarget,
+            schoolName,
+            currentSchool
+          );
+
+        if (success) {
+          afficherMessage(
+            'success',
+            `✓ ${nomComplet}`
+          );
+        } else {
+          throw new Error(
+            "Impossible de générer le bulletin."
+          );
+        }
+      } catch (error) {
+        console.error(
+          error
+        );
+
+        afficherMessage(
+          'error',
+          error?.message ||
+            "Erreur lors de l'impression."
+        );
+      } finally {
+        setEnvoiEnCours(
+          null
+        );
+      }
+    };
+
+  /* =========================================================
+     FIRESTORE — ÉLÈVES TEMPS RÉEL
+  ========================================================= */
+
+  useEffect(() => {
+    if (!currentSchool) {
+      setEleves([]);
+      setListePromotionsUniques(
+        []
+      );
+      setLoading(false);
+
+      return undefined;
     }
 
-    try {
-      await updateDoc(
-        doc(db, 'users', studentId),
-        {
-          statut: nouveauStatut,
-          updatedAtStatut:
-            new Date().toISOString(),
+    setLoading(true);
+
+    const q = query(
+      collection(
+        db,
+        'users'
+      )
+    );
+
+    const unsubscribe =
+      onSnapshot(
+        q,
+        (snapshot) => {
+          const list = [];
+          const promos =
+            new Set();
+
+          const coefficientsCollege =
+            {
+              francais: 5,
+              français: 5,
+              mathematiques: 3,
+              mathématiques: 3,
+              maths: 3,
+              anglais: 2,
+              lv1: 2,
+              'physique-chimie': 2,
+              pc: 2,
+              svt: 2,
+              'histoire-geographie': 2,
+              hg: 2,
+              allemand: 1,
+              espagnol: 1,
+              lv2: 1,
+              edhc: 1,
+              'arts plastiques': 1,
+              musique: 1,
+              arts: 1,
+              eps: 1,
+            };
+
+          const coefficientsLycee =
+            {
+              A: {
+                francais: 5,
+                français: 5,
+                philosophie: 5,
+                mathematiques: 2,
+                mathématiques: 2,
+                maths: 2,
+                'physique-chimie': 1,
+                pc: 1,
+                svt: 1,
+                'histoire-geographie': 4,
+                hg: 4,
+                anglais: 4,
+                lv1: 4,
+                allemand: 4,
+                espagnol: 4,
+                lv2: 4,
+                edhc: 1,
+                arts: 1,
+                eps: 1,
+              },
+
+              C: {
+                francais: 2,
+                français: 2,
+                philosophie: 2,
+                mathematiques: 5,
+                mathématiques: 5,
+                maths: 5,
+                'physique-chimie': 5,
+                pc: 5,
+                svt: 2,
+                'histoire-geographie': 2,
+                hg: 2,
+                anglais: 2,
+                lv1: 2,
+                allemand: 1,
+                espagnol: 1,
+                lv2: 1,
+                edhc: 1,
+                arts: 1,
+                eps: 1,
+              },
+
+              D: {
+                francais: 3,
+                français: 3,
+                philosophie: 2,
+                mathematiques: 4,
+                mathématiques: 4,
+                maths: 4,
+                'physique-chimie': 4,
+                pc: 4,
+                svt: 5,
+                'histoire-geographie': 2,
+                hg: 2,
+                anglais: 2,
+                lv1: 2,
+                allemand: 1,
+                espagnol: 1,
+                lv2: 1,
+                edhc: 1,
+                arts: 1,
+                eps: 1,
+              },
+            };
+
+          snapshot.forEach(
+            (docSnap) => {
+              const d =
+                docSnap.data() || {};
+
+              const schoolIdEleve =
+                String(
+                  d.schoolId || ''
+                )
+                  .trim()
+                  .toLowerCase();
+
+              const roleEleve =
+                String(
+                  d.role || ''
+                )
+                  .trim()
+                  .toLowerCase();
+
+              if (
+                schoolIdEleve !==
+                  currentSchool ||
+                roleEleve !==
+                  'eleve'
+              ) {
+                return;
+              }
+
+              const niveau =
+                nettoyerPromotionIvoirienne(
+                  d.promotion
+                );
+
+              const estLycee =
+                [
+                  'Terminal',
+                  '1ere',
+                  '2nd',
+                ].includes(
+                  niveau
+                );
+
+              const classeBrute =
+                String(
+                  d.serie ||
+                    d.classeNom ||
+                    d.classe ||
+                    'D'
+                ).toUpperCase();
+
+              const serieIdentifiee =
+                classeBrute.includes(
+                  'A'
+                )
+                  ? 'A'
+                  : classeBrute.includes(
+                      'C'
+                    )
+                  ? 'C'
+                  : 'D';
+
+              const cleTrimestre =
+                `notes_trimestre_${trimestreFiltre}`;
+
+              const trimestreData =
+                d.notes?.[
+                  cleTrimestre
+                ] || {};
+
+              let totalPointsPonderesBulletin =
+                0;
+
+              let totalCoefficientsBulletin =
+                0;
+
+              Object.entries(
+                trimestreData
+              ).forEach(
+                ([
+                  nomMatiere,
+                  notesMatiere,
+                ]) => {
+                  if (
+                    !Array.isArray(
+                      notesMatiere
+                    ) ||
+                    notesMatiere.length ===
+                      0
+                  ) {
+                    return;
+                  }
+
+                  if (
+                    [
+                      'eps',
+                      'education physique',
+                    ].includes(
+                      nomMatiere
+                        .toLowerCase()
+                    )
+                  ) {
+                    return;
+                  }
+
+                  let pointsPonderesMatiere =
+                    0;
+
+                  let coefficientsNotesMatiere =
+                    0;
+
+                  notesMatiere.forEach(
+                    (item) => {
+                      let noteValeur = 0;
+
+                      let typeEvaluation =
+                        'interrogation';
+
+                      if (
+                        typeof item ===
+                          'object' &&
+                        item !== null
+                      ) {
+                        noteValeur =
+                          parseFloat(
+                            item.note ?? 0
+                          );
+
+                        typeEvaluation =
+                          String(
+                            item.type ||
+                              item.categorie ||
+                              'interrogation'
+                          ).toLowerCase();
+                      } else {
+                        noteValeur =
+                          parseFloat(
+                            item || 0
+                          );
+                      }
+
+                      if (
+                        Number.isNaN(
+                          noteValeur
+                        ) ||
+                        !Number.isFinite(
+                          noteValeur
+                        )
+                      ) {
+                        return;
+                      }
+
+                      let coeffInterne = 1;
+
+                      if (
+                        typeEvaluation.includes(
+                          'commun'
+                        ) ||
+                        typeEvaluation.includes(
+                          'classe'
+                        ) ||
+                        typeEvaluation.includes(
+                          'devoir'
+                        ) ||
+                        typeEvaluation.includes(
+                          'surveille'
+                        )
+                      ) {
+                        coeffInterne = 2;
+                      } else if (
+                        typeEvaluation.includes(
+                          'comp'
+                        ) ||
+                        typeEvaluation.includes(
+                          'composition'
+                        )
+                      ) {
+                        coeffInterne = 3;
+                      }
+
+                      pointsPonderesMatiere +=
+                        noteValeur *
+                        coeffInterne;
+
+                      coefficientsNotesMatiere +=
+                        coeffInterne;
+                    }
+                  );
+
+                  if (
+                    coefficientsNotesMatiere >
+                    0
+                  ) {
+                    const moyenneMatiereBase20 =
+                      pointsPonderesMatiere /
+                      coefficientsNotesMatiere;
+
+                    const nomNettoye =
+                      nomMatiere
+                        .toLowerCase()
+                        .trim();
+
+                    let coeffGlobalMatiere =
+                      1;
+
+                    if (
+                      estLycee
+                    ) {
+                      coeffGlobalMatiere =
+                        coefficientsLycee[
+                          serieIdentifiee
+                        ]?.[
+                          nomNettoye
+                        ] || 1;
+                    } else {
+                      coeffGlobalMatiere =
+                        coefficientsCollege[
+                          nomNettoye
+                        ] || 1;
+                    }
+
+                    totalPointsPonderesBulletin +=
+                      moyenneMatiereBase20 *
+                      coeffGlobalMatiere;
+
+                    totalCoefficientsBulletin +=
+                      coeffGlobalMatiere;
+                  }
+                }
+              );
+
+              const moyenneGeneraleCalcul =
+                totalCoefficientsBulletin >
+                0
+                  ? parseFloat(
+                      (
+                        totalPointsPonderesBulletin /
+                        totalCoefficientsBulletin
+                      ).toFixed(2)
+                    )
+                  : 0;
+
+              if (niveau) {
+                promos.add(
+                  niveau
+                );
+              }
+
+              const statutActuel =
+                d.statutAcces ||
+                d.statut ||
+                'actif';
+
+              list.push({
+                ...d,
+
+                id:
+                  docSnap.id,
+
+                moyenneGeneraleCalcul,
+
+                statut:
+                  statutActuel,
+
+                statutAcces:
+                  statutActuel,
+              });
+            }
+          );
+
+          list.sort(
+            (a, b) =>
+              `${a.nom || ''} ${
+                a.prenoms || ''
+              }`
+                .trim()
+                .localeCompare(
+                  `${b.nom || ''} ${
+                    b.prenoms || ''
+                  }`.trim(),
+                  'fr'
+                )
+          );
+
+          setListePromotionsUniques(
+            Array.from(
+              promos
+            ).sort()
+          );
+
+          setEleves(
+            list
+          );
+
+          setLoading(false);
+        },
+        (error) => {
+          console.error(
+            'Erreur Firestore :',
+            error
+          );
+
+          setLoading(false);
         }
       );
 
-      /*
-       * Pas besoin de setEleves ici.
-       *
-       * Firestore déclenche automatiquement
-       * onSnapshot() ci-dessus et l'élève est
-       * immédiatement mis à jour dans le tableau.
-       */
+    return () =>
+      unsubscribe();
+  }, [
+    currentSchool,
+    trimestreFiltre,
+  ]);
 
-      afficherMessage(
-        'success',
-        `Statut mis à jour : ${nouveauStatut.toUpperCase()}`
-      );
-    } catch (err) {
-      console.error(
-        'Erreur modification statut :',
-        err
-      );
+  /* =========================================================
+     FILTRE PROMOTION
+  ========================================================= */
 
-      afficherMessage(
-        'error',
-        "Impossible de modifier le statut de l'élève."
-      );
-    }
-  };
+  const elevesFiltres =
+    useMemo(() => {
+      return eleves.filter(
+        (student) => {
+          if (
+            filtrePromotion ===
+            'all'
+          ) {
+            return true;
+          }
 
-  // ============================================================
-  // CHARGEMENT
-  // ============================================================
+          return (
+            nettoyerPromotionIvoirienne(
+              student.promotion
+            ) ===
+            filtrePromotion
+          );
+        }
+      );
+    }, [
+      eleves,
+      filtrePromotion,
+    ]);
+
+  /* =========================================================
+     CHARGEMENT
+  ========================================================= */
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-3xl mb-3">
-            ⏳
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
+        <div className="bg-white  p-8 rounded-2xl text-center shadow-sm animate-pulse">
+          <div className="text-4xl mb-3">
+            📚
           </div>
 
-          <p className="text-xs font-bold text-gray-400 animate-pulse uppercase tracking-wider">
-            Analyse des fiches élèves...
+          <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+            {sessionStorage.getItem(
+              'sgs_label_loading_bulletins'
+            ) ||
+              'Chargement des notes et livrets...'}
           </p>
         </div>
       </div>
     );
   }
 
-  // ============================================================
-  // RENDU
-  // ============================================================
+  /* =========================================================
+     INTERFACE
+  ========================================================= */
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 font-sans text-gray-700 text-left bg-gray-50 min-h-screen">
+    <div className="min-h-screen bg-white text-slate-700 font-sans p-4 sm:p-6 lg:p-8 text-left">
+      <div className="max-w-7xl mx-auto">
 
-      {/* ======================================================
-          BANDEAU
-      ====================================================== */}
+        {/* BANDEAU */}
 
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-white  -slate-200 rounded-2xl shadow-sm overflow-hidden mb-6">
 
-        <div>
-          <h2 className="text-base font-black text-gray-800 uppercase tracking-wide">
-            ⚖️ Console de Gestion des Statuts
-          </h2>
+          <div className="bg-slate-950 px-6 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
 
-          <p className="text-[11px] text-gray-400 font-medium mt-1">
-            Modifiez le statut des apprenants ou
-            expédiez leur livret de notes aux parents.
-          </p>
+            <div>
 
-          <div className="mt-2 text-[10px] text-emerald-600 font-black uppercase">
-            ● Données synchronisées en temps réel
-          </div>
-        </div>
+              <div className="flex items-center gap-3 mb-2">
 
-        {/* FILTRE */}
-        <div>
-          <select
-            value={filtrePromotion}
-            onChange={(e) =>
-              setFiltrePromotion(
-                e.target.value
-              )
-            }
-            className="bg-white border border-gray-300 p-2.5 text-xs font-black uppercase rounded-xl outline-none text-gray-800 cursor-pointer focus:ring-2 focus:ring-orange-500"
-          >
-            <option value="all">
-              ⭐ Toutes les promotions
-            </option>
+                <div>
+                  <h1 className="gestion text-lg sm:text-xl font-black uppercase tracking-wide ">
+                    {sessionStorage.getItem(
+                      'sgs_label_admin_title'
+                    ) ||
+                      'Gestion des bulletins & Notes'}
+                  </h1>
+                  <p className="text-[9px] font-black tracking-[0.2em] uppercase text-orange-400">
+                    {sessionStorage.getItem(
+                      'sgs_label_admin_sub'
+                    ) ||
+                      'Administration académique'}
+                  </p>
+                </div>
 
-            {listePromotionsExistantes.map(
-              (promoName) => (
-                <option
-                  key={promoName}
-                  value={promoName}
-                >
-                  Promotion{' '}
-                  {promoName.toUpperCase()}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={
+                  filtrePromotion
+                }
+                onChange={(e) =>
+                  setFiltrePromotion(
+                    e.target.value
+                  )
+                }
+                className="bg-white text-slate-800 -0 p-3 border text-xs font-black uppercase rounded-xl outline-none cursor-pointer font-sans"
+              >
+
+                <option value="all">
+                  {sessionStorage.getItem(
+                    'sgs_label_all_promos'
+                  ) ||
+                    'Toutes les promotions'}
                 </option>
-              )
-            )}
-          </select>
+
+                {listePromotionsExistantes.map(
+                  (promo) => (
+                    <option
+                      key={promo}
+                      value={promo}
+                    >
+                      {(sessionStorage.getItem(
+                        'sgs_label_promo_prefix'
+                      ) ||
+                        'PROMOTION') +
+                        ' ' +
+                        String(
+                          promo
+                        ).toUpperCase()}
+                    </option>
+                  )
+                )}
+
+              </select>
+
+            </div>
+
+          </div>
+
+          <div className="px-6 py-4 bg-slate-50 -t -slate-200">
+
+            <p className="gestion-1 text-[10px] text-slate-500 font-bold uppercase tracking-wide">
+              {(
+                sessionStorage.getItem(
+                  'sgs_label_extraction_prefix'
+                ) ||
+                'Extraction dynamique des moyennes du Trimestre'
+              ) +
+                ' ' +
+                trimestreFiltre +
+                ' ' +
+                (sessionStorage.getItem(
+                  'sgs_label_extraction_suffix'
+                ) ||
+                  "depuis l'arborescence Cloud Firestore.")}
+            </p>
+
+          </div>
+
         </div>
-      </div>
 
-      {/* ======================================================
-          MESSAGE
-      ====================================================== */}
+        {/* MESSAGE */}
 
-      {message.text && (
-        <div
-          className={`mb-6 rounded-xl border p-4 text-xs font-bold ${
-            message.type === 'error'
-              ? 'bg-red-50 border-red-200 text-red-700'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
+        {message.text && (
+          <div
+            className={`mb-6 rounded-xl  p-4 text-xs font-black flex items-center gap-3 ${
+              message.type ===
+              'error'
+                ? 'bg-red-50 -red-200 text-red-700'
+                : 'bg-emerald-50 -emerald-200 text-emerald-700'
+            }`}
+          >
 
-      {/* ======================================================
-          STATISTIQUES
-      ====================================================== */}
+            <span>
+              {message.type ===
+              'error'
+                ? '⚠️'
+                : '✓'}
+            </span>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <span>
+              {message.text}
+            </span>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <p className="text-[10px] font-black uppercase text-gray-400">
-            Élèves
-          </p>
+          </div>
+        )}
 
-          <p className="text-2xl font-black text-gray-800 mt-1">
-            {elevesFiltres.length}
-          </p>
-        </div>
+        {/* TABLEAU */}
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <p className="text-[10px] font-black uppercase text-gray-400">
-            Promotions
-          </p>
+        <div className="bg-white rounded-2xl  -slate-200 shadow-sm overflow-hidden">
 
-          <p className="text-2xl font-black text-gray-800 mt-1">
-            {listePromotionsExistantes.length}
-          </p>
-        </div>
+          <div className="px-5 py-4 -b -slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <p className="text-[10px] font-black uppercase text-gray-400">
-            Établissement
-          </p>
+            <div className='gestion-2'>
 
-          <p className="text-sm font-black text-gray-800 mt-2 truncate">
-            {schoolName ||
-              currentSchool}
-          </p>
-        </div>
-      </div>
+             {/*  <h2 className="text-sm font-black uppercase text-slate-900">
+                {sessionStorage.getItem(
+                  'sgs_label_table_title'
+                ) ||
+                  'Registres des Notes Apprenants'}
+              </h2> */}
 
-      {/* ======================================================
-          TABLEAU
-      ====================================================== */}
+             {/*  <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                {sessionStorage.getItem(
+                  'sgs_label_table_sub'
+                ) ||
+                  'Calculateur de moyenne temps réel'}
+              </p> */}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-bold text-gray-700 border-collapse">
+            {/* <div className="text-info px-3 text-[9px] font-black uppercase text-slate-400">
+              {elevesFiltres.length}{' '}
+              {sessionStorage.getItem(
+                'sgs_label_count_apprenants'
+              ) ||
+                'apprenant(s)'}
+            </div> */}
 
-            <thead>
-              <tr className="bg-gray-50 text-gray-400 uppercase border-b text-[10px] tracking-wider">
+          </div>
 
-                <th className="p-3">
-                  Matricule
-                </th>
+          <div className="overflow-x-auto">
 
-                <th className="p-3">
-                  Promotion
-                </th>
+            <table className="table-1 w-full text-left -collapse">
 
-                <th className="p-3">
-                  Classe
-                </th>
+              <thead>
 
-                <th className="p-3">
-                  Nom & Prénoms
-                </th>
+                <tr className="bg-slate-50 -b -slate-200 text-[9px] uppercase tracking-wider text-slate-400 font-black">
 
-                <th className="p-3 text-center">
-                  Somme Notes
-                </th>
+                  <th className="p-4">
+                    {sessionStorage.getItem(
+                      'sgs_th_matricule'
+                    ) ||
+                      'Matricule'}
+                  </th>
 
-                <th className="p-3 text-center">
-                  Fiche Statut
-                </th>
+                  <th className="p-4">
+                    {sessionStorage.getItem(
+                      'sgs_th_promotion'
+                    ) ||
+                      'Promotion'}
+                  </th>
 
-                <th className="p-3 text-right">
-                  Actions
-                </th>
+                  <th className="p-4">
+                    {sessionStorage.getItem(
+                      'sgs_th_classe'
+                    ) ||
+                      'Classe'}
+                  </th>
 
-              </tr>
-            </thead>
+                  <th className="p-4">
+                    {sessionStorage.getItem(
+                      'sgs_th_eleve'
+                    ) ||
+                      'Élève'}
+                  </th>
 
-            <tbody>
+                  <th className="p-4 text-center">
+                    {sessionStorage.getItem(
+                      'sgs_th_moyenne'
+                    ) ||
+                      'Moyenne Calculée'}
+                  </th>
 
-              {elevesFiltres.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="7"
-                    className="p-12 text-center text-gray-400 italic font-medium"
-                  >
-                    Aucun élève trouvé dans cette
-                    section.
-                  </td>
+                  <th className="p-4 text-center">
+                    {sessionStorage.getItem(
+                      'sgs_th_statut'
+                    ) ||
+                      'Statut'}
+                  </th>
+
+                  <th className="p-4 text-right">
+                    {sessionStorage.getItem(
+                      'sgs_th_actions'
+                    ) ||
+                      'Actions'}
+                  </th>
+
                 </tr>
-              ) : (
-                elevesFiltres.map((student) => {
-                  const estExclu =
-                    student.statut ===
-                    'exclu';
 
-                  const estRedoublant =
-                    student.statut ===
-                    'redoublant';
+              </thead>
 
-                  const promoAffichee =
-                    nettoyerPromotionIvoirienne(
-                      student.promotion
-                    );
+              <tbody>
 
-                  const nomComplet =
-                    `${student.nom || ''} ${
-                      student.prenoms ||
-                      student.prenom ||
-                      ''
-                    }`.trim();
+                {elevesFiltres.length ===
+                0 ? (
+                  <tr>
 
-                  const statutActuel =
-                    student.statut ||
-                    'actif';
-
-                  const envoi =
-                    envoiEnCours ===
-                    student.id;
-
-                  return (
-                    <tr
-                      key={student.id}
-                      className="border-b border-gray-100 hover:bg-purple-50/20 transition"
+                    <td
+                      colSpan="7"
+                      className="p-16 text-center"
                     >
 
-                      {/* MATRICULE */}
-                      <td className="p-3 font-mono text-purple-700 truncate max-w-[120px]">
-                        {student.matricule ||
-                          student.id}
-                      </td>
+                      <div className="text-4xl mb-3">
+                        📂
+                      </div>
 
-                      {/* PROMOTION */}
-                      <td className="p-3 uppercase text-gray-500">
-                        <span className="px-2 py-1 rounded-md text-[10px] bg-slate-100 border border-slate-200 text-slate-700 font-black">
-                          {promoAffichee ||
-                            'N/A'}
-                        </span>
-                      </td>
+                      <p className="text-xs font-black uppercase text-slate-400">
+                        {sessionStorage.getItem(
+                          'sgs_label_no_student'
+                        ) ||
+                          'Aucun élève trouvé pour cette promotion'}
+                      </p>
 
-                      {/* CLASSE */}
-                      <td className="p-3 font-mono text-slate-600 uppercase">
-                        {student.classeNom ||
-                          student.classeId ||
-                          'N/A'}
-                      </td>
+                    </td>
 
-                      {/* NOM */}
-                      <td className="p-3 text-gray-900 uppercase font-black truncate max-w-[200px]">
-                        {nomComplet ||
-                          'Élève sans nom'}
-                      </td>
+                  </tr>
+                ) : (
+                  elevesFiltres.map(
+                    (student) => {
 
-                      {/* NOTES */}
-                      <td className="p-3 text-center font-mono text-purple-800 text-sm">
-                        {Number(
-                          student.totalPointsCumules ||
-                            0
-                        ).toFixed(1)}{' '}
-                        pts
-                      </td>
+                      const statutActuel =
+                        student.statutAcces ||
+                        student.statut ||
+                        'actif';
 
-                      {/* STATUT */}
-                      <td className="p-3 text-center">
-                        <span
-                          className={`text-[9px] uppercase px-2 py-1 rounded-full font-black ${
-                            estExclu
-                              ? 'bg-red-100 text-red-800'
-                              : estRedoublant
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
+                      const estExclu =
+                        statutActuel ===
+                        'exclu';
+
+                      const estRedoublant =
+                        statutActuel ===
+                        'redoublant';
+
+                      const nomComplet =
+                        `${student.nom || ''} ${
+                          student.prenoms || ''
+                        }`
+                          .trim()
+                          .toUpperCase();
+
+                      const envoi =
+                        envoiEnCours ===
+                        student.id;
+
+                      const badge =
+                        badgeEnCours ===
+                        student.id;
+
+                      return (
+                        <tr
+                          key={
+                            student.id
+                          }
+                          className="-b -slate-100 hover:bg-slate-50/50 transition"
                         >
-                          {statutActuel}
-                        </span>
-                      </td>
 
-                      {/* ACTIONS */}
-                      <td className="p-3 text-right">
+                          <td className="p-4">
 
-                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <span className="font-mono text-[10px] font-black text-indigo-700">
+                              {student.matricule ||
+                                student.id}
+                            </span>
 
-                          {/* STATUT */}
-                          <select
-                            value={
-                              statutActuel
-                            }
-                            onChange={(e) =>
-                              handleChangerStatutManuel(
-                                student.id,
-                                e.target.value
-                              )
-                            }
-                            className="bg-white border border-gray-300 text-[9px] font-black uppercase p-1.5 rounded-md outline-none text-gray-700 cursor-pointer focus:ring-2 focus:ring-orange-500"
-                          >
-                            <option value="actif">
-                              ✓ Actif
-                            </option>
+                          </td>
 
-                            <option value="redoublant">
-                              ⚠️ Redoublant
-                            </option>
+                          <td className="p-4">
 
-                            <option value="exclu">
-                              ❌ Exclu
-                            </option>
-                          </select>
+                            <span className="inline-flex px-2.5 py-1 rounded-lg bg-slate-100  -slate-200 text-[9px] font-black uppercase text-slate-600">
+                              {nettoyerPromotionIvoirienne(
+                                student.promotion
+                              ) ||
+                                'N/A'}
+                            </span>
 
-                          {/* BULLETIN */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleAdminEnvoyerBulletinAuxParents(
-                                student
-                              )
-                            }
-                            disabled={envoi}
-                            className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-black text-[9px] uppercase px-2.5 py-1.5 rounded-lg transition cursor-pointer border-0 shadow-sm whitespace-nowrap"
-                          >
-                            {envoi
-                              ? '⏳ Envoi...'
-                              : '✉️ Envoyer Bulletin'}
-                          </button>
+                          </td>
 
-                        </div>
+                          <td className="p-4">
 
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                            <span className="text-[10px] font-black uppercase text-slate-600">
+                              {student.classeNom ||
+                                student.classe ||
+                                'N/A'}
+                            </span>
 
-            </tbody>
-          </table>
+                          </td>
+
+                          <td className="p-4">
+
+                            <div>
+
+                              <p className="text-xs font-black uppercase text-slate-900">
+                                {nomComplet}
+                              </p>
+
+                              <p className="text-[9px] text-slate-400 mt-1 truncate max-w-[240px] font-medium">
+                                {student.emailParent ||
+                                  sessionStorage.getItem(
+                                    'sgs_label_no_email_parent'
+                                  ) ||
+                                  "Aucun e-mail parent enregistré"}
+                              </p>
+
+                            </div>
+
+                          </td>
+
+                          <td className="p-4 text-center">
+
+                            <span className="text-sm font-black font-mono text-indigo-700">
+                              {student.moyenneGeneraleCalcul
+                                ? student.moyenneGeneraleCalcul.toFixed(
+                                    2
+                                  )
+                                : '0.00'}
+                            </span>
+
+                            <span className="text-[8px] text-slate-400 ml-1 uppercase">
+                              /20
+                            </span>
+
+                          </td>
+
+                          <td className="p-4 text-center">
+
+                            <span
+                              className={`inline-flex px-2.5 py-1 rounded-full text-[8px] uppercase font-black ${
+                                estExclu
+                                  ? 'bg-red-100 text-red-700'
+                                  : estRedoublant
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                              }`}
+                            >
+                              {statutActuel}
+                            </span>
+
+                          </td>
+
+                          <td className="p-4">
+
+                            <div className="flex justify-end items-center gap-2 flex-wrap">
+
+                              {/* STATUT */}
+
+                              <select
+                                value={
+                                  statutActuel
+                                }
+                                onChange={(e) =>
+                                  handleChangerStatutManuel(
+                                    student.id,
+                                    e.target.value
+                                  )
+                                }
+                                className="bg-white  -slate-300 text-[8px] font-black uppercase p-2 rounded-lg outline-none text-slate-700 cursor-pointer"
+                              >
+
+                                <option value="actif">
+                                  {sessionStorage.getItem(
+                                    'sgs_opt_actif'
+                                  ) ||
+                                    '✓ Actif'}
+                                </option>
+
+                                <option value="redoublant">
+                                  {sessionStorage.getItem(
+                                    'sgs_opt_redoublant'
+                                  ) ||
+                                    '⚠️ Redoublant'}
+                                </option>
+
+                                <option value="exclu">
+                                  {sessionStorage.getItem(
+                                    'sgs_opt_exclu'
+                                  ) ||
+                                    '❌ Exclu'}
+                                </option>
+
+                              </select>
+
+                              {/* BULLETIN */}
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleAdminEnvoyerBulletinAuxParents(
+                                    student
+                                  )
+                                }
+                                disabled={envoi}
+                                className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 font-black text-[8px] uppercase px-3 py-2 rounded-lg transition shadow-sm whitespace-nowrap -0 cursor-pointer"
+                              >
+
+                                {envoi
+                                  ? sessionStorage.getItem(
+                                      'sgs_btn_processing'
+                                    ) ||
+                                    '⏳ Traitement...'
+                                  : sessionStorage.getItem(
+                                      'sgs_btn_print'
+                                    ) ||
+                                    '📜 Imprimer le bulletin'}
+
+                              </button>
+
+                              {/* BADGE */}
+
+                              <button
+                                type="button"
+                                disabled={
+                                  badge
+                                }
+                                onClick={() =>
+                                  handleGenererBadge(
+                                    student
+                                  )
+                                }
+                                className=" -slate-200 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-wait text-slate-700 font-black text-[8px] uppercase px-2.5 py-2 rounded-lg transition bg-white cursor-pointer"
+                              >
+
+                                {badge
+                                  ? '⏳ Génération...'
+                                  : sessionStorage.getItem(
+                                      'sgs_btn_badge'
+                                    ) ||
+                                    '🪪 Badge'}
+
+                              </button>
+
+                            </div>
+
+                          </td>
+
+                        </tr>
+                      );
+                    }
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
         </div>
+
+        {/* NOTICE */}
+
+        <div className="mt-5 bg-indigo-50  -indigo-100 rounded-xl px-5 py-4">
+
+          <p className="text-[9px] font-black uppercase tracking-wider text-indigo-700">
+            {sessionStorage.getItem(
+              'sgs_notice_title'
+            ) ||
+              'Calculateur Multi-Tenant Autonome'}
+          </p>
+
+          <p className="text-[9px] text-indigo-600 font-medium mt-1">
+            {sessionStorage.getItem(
+              'sgs_notice_text'
+            ) ||
+              "Les moyennes sont compilées en direct. Le clic sur imprimer extrait instantanément le relevé au format PDF sans solliciter de ressource serveur externe."}
+          </p>
+
+        </div>
+
       </div>
+
     </div>
   );
 };

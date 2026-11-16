@@ -46,13 +46,14 @@ import HomeAdmin from './features/admin/pages/HomeAdmin.jsx';
 import PageSecretariat from './features/admin/pages/PageSecretariat.jsx';
 import DashboardAdmin from './features/admin/pages/DashboardAdmin';
 import AjouterEleve from './features/admin/pages/AjouterEleve';
-import BaseDonneCentraleAdmin from './features/admin/pages/BaseDonneCentraleAdmin';
+import BaseDonneCentraleAdmin from './features/admin/pages/BaseDonneCentraleAdmin.jsx';
 import AjouterPersonnel from './features/admin/pages/AjouterPersonnel';
 import ListeDesClasse from './features/admin/pages/listeDesClasse';
 import GestionTrimestres from './features/admin/pages/GestionTrimestres.jsx';
 import ConfigurationTerminal from './features/admin/pages/ConfigurationTerminal.jsx';
 import EmploiDuTempsAdmin from './features/admin/pages/EmploiDuTempsAdmin.jsx';
 import GestionPubSaas from './pages/GestionPubSaas';
+
 // =====================================================
 // PROFESSEUR
 // =====================================================
@@ -93,19 +94,37 @@ import HistoriqueMessage from './features/admin/pages/messages/HistoriqueMessage
 
 import GestionPublicites from './components/GestionPublicites';
 import FormulaireClasse from './features/admin/pages/FormulaireClasse.jsx';
-
+import Messagerie from './components/Messagerie.jsx';
+import MesCours from './features/eleve/pages/MesCours.jsx';
+import GestionStatut from './features/admin/pages/GestionStatut.jsx';
+import GestionProfils from './features/admin/pages/GestionProfils.jsx';
+import ReceptionAdmin from './features/admin/pages/messages/ReceptionAdmin.jsx';
+import EmploiDuTempsProf from './features/professeur/pages/EmploiDuTempsProf.jsx';
+import ReceptionProf from './features/professeur/pages/message/ReceptionProf.jsx';
+import MesClasses from './features/professeur/pages/classes/MesClasses.jsx';
+import RechercheEleveAdmin from './features/admin/pages/RechercheEleveAdmin.jsx';
+import ConseilClasse from './features/professeur/pages/espacePP/ConseilClasse.jsx';
+import MoyennesTrimestres from './features/professeur/pages/evaluations/MoyennesTrimestre.jsx';
+import EnvoyerMessageUnique from './components/EnvoyerMessageUnique.jsx';
+import Rectification from './features/educateur/pages/Rectification.jsx';
+import GestionPaieVacations from './features/educateur/pages/arbitrages/GestionPaieVacations.jsx';
+import Monbulletin from './features/eleve/pages/Monbulletin.jsx';
+import TestFirebase from './pages/TestFirebase.jsx';
+import BoiteReceptionUnique from './components/BoiteReceptionUnique.jsx';
+import MessagesNotifications from './components/MessagesNotifications.jsx';
+import SignaturePadModal from './components/SignaturePadModal.jsx';
 
 const App = () => {
   return (
-    
     <AuthProvider>
 
       <BrowserRouter>
 
         {/* =================================================
             ÉCRAN DE VEILLE GLOBAL
-            Il affiche children normalement.
-            Il affiche le verrou uniquement après inactivité.
+
+            L'écran de veille est désactivé automatiquement
+            sur /login et /recuperer-cle.
         ================================================= */}
 
         <EcranEveilSecurite>
@@ -115,7 +134,6 @@ const App = () => {
             <main className="flex-grow">
 
               <Routes>
-
 
                 {/* =================================================
                     ROUTES PUBLIQUES
@@ -140,11 +158,21 @@ const App = () => {
                   path="/recuperer-cle"
                   element={<RecupererCleAcces />}
                 />
-
-                 <Route
+                 
+                   <Route
+                  path="/components/messages_sos"
+                  element={<EnvoyerMessageUnique />}
+                />
+                 
+                <Route
                   path="/components/pub-notification"
                   element={<GestionPublicites />}
                 />
+                <Route
+                  path="/pages/synchronisation"
+                  element={<TestFirebase />}
+                />
+                 <Route path="/components/communication" element={<Messagerie/>}/>
                 {/* =================================================
                     ROUTES COMMUNES SÉCURISÉES
                 ================================================= */}
@@ -175,7 +203,6 @@ const App = () => {
 
                 </Route>
 
-
                 {/* =================================================
                     ESPACE ADMIN
                 ================================================= */}
@@ -187,7 +214,12 @@ const App = () => {
                     />
                   }
                 >
-                 <Route path="/superadmin/publicites" element={<GestionPubSaas />} />
+
+                  <Route
+                    path="/superadmin/publicites"
+                    element={<GestionPubSaas />}
+                  />
+
                   <Route
                     path="/admin/home"
                     element={<HomeAdmin />}
@@ -223,11 +255,10 @@ const App = () => {
                     element={<ListeDesClasse />}
                   />
 
-                   <Route
+                  <Route
                     path="/admin/ajouter-classe"
                     element={<FormulaireClasse />}
                   />
-
 
                   <Route
                     path="/admin/gestion-trimestres"
@@ -244,15 +275,48 @@ const App = () => {
                     element={<ConfigurationTerminal />}
                   />
 
+                   <Route
+                    path="/admin/signature-admin"
+                    element={<SignaturePadModal />}
+                  />
+
                   <Route
                     path="/admin/emploi-du-temps"
                     element={<EmploiDuTempsAdmin />}
                   />
 
+                  <Route 
+                  path="/admin/gestion-des-statut"
+                  element={<GestionStatut/>}
+                  />
+
+                  <Route
+                  path="/admin/gestion-des-profil"
+                  element={<GestionProfils/>}
+                  />
+
+                  <Route
+                  path="/admin/message-reçu"
+                  element={<BoiteReceptionUnique/>}
+                  />
+                  <Route
+                  path="/admin/nouveau-message"
+                  element={<MessagesNotifications/>}
+                  />
+
+                  <Route
+                  path="/admin/modifier-un-statut"
+                  element={<ModifierStatut/>}
+                  />
+
+                   <Route
+                  path="/admin/Rechercher-un-eleve"
+                  element={<RechercheEleveAdmin/>}
+                  />
+
                 </Route>
 
-
-                {/* =================================================
+               {/* =================================================
                     ESPACE PROFESSEUR
                 ================================================= */}
 
@@ -269,6 +333,11 @@ const App = () => {
                     element={<DashboardProf />}
                   />
 
+                   <Route
+                    path="/professeur/conseil-classe"
+                    element={<ConseilClasse />}
+                  />
+
                   <Route
                     path="/professeur/notes"
                     element={<SaisieNotes />}
@@ -277,6 +346,10 @@ const App = () => {
                   <Route
                     path="/professeur/appel"
                     element={<RegistreAppelEleves />}
+                  />
+                  <Route
+                    path="/professeur/voir-moyenne-trimestrielle"
+                    element={<MoyennesTrimestres />}
                   />
 
                   <Route
@@ -299,13 +372,27 @@ const App = () => {
                     element={<DashboardPP />}
                   />
 
-                  <Route
+                 {/*  <Route
                     path="/professeur/emploi-du-temps"
                     element={<EmploiDuTempsAdmin />}
                   />
+ */}
+                   <Route
+                  path="/professeur/mon-emploie-du-Temps"
+                  element={<EmploiDuTempsProf/>}
+                  />
 
+                  <Route
+                  path="/professeur/ma-boite-reception"
+                  element={<ReceptionProf/>}
+                  />
+
+                  <Route
+                  path="/professeur/mes-classes"
+                  element={<MesClasses/>}
+                  />
+                    
                 </Route>
-
 
                 {/* =================================================
                     ESPACE ÉDUCATEUR
@@ -318,7 +405,10 @@ const App = () => {
                     />
                   }
                 >
-
+                  <Route
+                  path="/admin/message-reçu"
+                  element={<ReceptionAdmin/>}
+                  />
                   <Route
                     path="/educateur/dashboard"
                     element={<DashboardEducateur />}
@@ -328,9 +418,15 @@ const App = () => {
                     path="/educateur/promotions"
                     element={<ListePromotion />}
                   />
-
+                <Route
+                    path="/educateur/rectification"
+                    element={<Rectification />}
+                  />
+                  <Route
+                    path="/educateur/arbitrages/paie-vacation"
+                    element={<GestionPaieVacations />}
+                  />
                 </Route>
-
 
                 {/* =================================================
                     ESPACE ÉLÈVE
@@ -349,8 +445,17 @@ const App = () => {
                     element={<DashboardEleve />}
                   />
 
-                </Route>
+                    <Route 
+                  path="/eleve/mescours"
+                  element={<MesCours />}
+                  />
 
+                 <Route
+                  path="/eleve/mon-bulletin"
+                  element={<Monbulletin/>}
+                  />
+
+                </Route>
 
                 {/* =================================================
                     ESPACE SUPER ADMIN
@@ -388,13 +493,13 @@ const App = () => {
                     path="/superadmin/publicites"
                     element={<ChangerMotDePasse />}
                   />
-                 
+
                   <Route
                     path="/superadmin/configure-terminal"
                     element={<ConfigurationTerminal />}
                   />
-                </Route>
 
+                </Route>
 
                 {/* =================================================
                     ROUTE INCONNUE

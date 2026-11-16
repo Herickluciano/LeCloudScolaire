@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../../services/api';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import Header from '../../../../pages/Header';
 
 const ReceptionAdmin = ({ currentSchool }) => {
   const [messages, setMessages] = useState([]);
@@ -89,7 +90,8 @@ const ReceptionAdmin = ({ currentSchool }) => {
   if (loading) return <div className="p-6 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">Vérification de la boîte aux lettres...</div>;
 
   return (
-    <div className="space-y-4 text-left font-sans text-gray-700">
+    <div className="bg-white space-y-4 text-left font-sans text-gray-700">
+     
       {messages.length === 0 ? (
         <p className="text-xs text-center text-gray-400 py-12 border rounded-2xl border-dashed italic bg-white font-medium">
           📥 Aucun rapport de cumul ou réclamation d'élève dans la boîte direction.

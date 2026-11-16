@@ -213,7 +213,7 @@ const MessagerieProf = () => {
             </div>
 
             <div className="text-right">
-              <button type="submit" disabled={sending || !titre.trim() || !corps.trim() || !classeCible.trim()} className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase px-6 py-3 rounded-xl shadow-md transition cursor-pointer border-0 disabled:bg-gray-200">
+              <button type="submit" disabled={sending || !titre.trim() || !corps.trim() || !classeCible.trim()} className="bg-purple-600 hover:bg-purple-700  font-black text-xs uppercase px-6 py-3 rounded-xl shadow-md transition cursor-pointer border-0 disabled:bg-gray-200">
                 {sending ? "Transmission SMTP..." : "🚀 Envoyer le communiqué"}
               </button>
             </div>

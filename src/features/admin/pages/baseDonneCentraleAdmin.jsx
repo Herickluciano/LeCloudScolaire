@@ -8,6 +8,7 @@ import {
   serverTimestamp,
   enableNetwork, // 🟢 Importation du contrôleur de secours réseau
 } from 'firebase/firestore';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   ref,
   uploadBytes,
@@ -15,6 +16,7 @@ import {
 } from 'firebase/storage';
 import { db, storage } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
+import Header from '../../../pages/Header';
 
 /* =========================================================
    OUTILS DE NORMALISATION ET D'EXTRACTION RESILIENTE
@@ -57,6 +59,10 @@ const estActif = (personne) => normaliser(getStatut(personne)) !== 'inactif';
 /* =========================================================
    COMPOSANT PRINCIPAL
 ========================================================= */
+const thStyle = { padding: '13px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' };
+const tdStyle = { padding: '14px 16px', fontSize: '12px', color: '#334155', verticalAlign: 'middle' };
+const actionButton = { border: 0, padding: '7px 10px', borderRadius: '7px', background: '#eef2ff', color: '#3730a3', fontSize: '11px', fontWeight: 700, cursor: 'pointer' };
+
 const BaseDonneCentraleAdmin = () => {
   const auth = useAuth();
   const currentSchool = (auth?.schoolId || auth?.user?.schoolId || sessionStorage.getItem('sgs_school_id') || '').trim().toLowerCase();
@@ -162,21 +168,22 @@ const BaseDonneCentraleAdmin = () => {
     return () => unsubscribe();
   }, [currentSchool]);
 
-  const rolesDisponibles = useMemo(() => {
-    const roles = new Set();
-    personnes.forEach(p => { if (p.role) roles.add(p.role); });
-    return Array.from(roles).sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b), 'fr'));
-  }, [personnes]);
-
   const personnesFiltrees = useMemo(() => {
     const termeSaisi = recherche.toString().toLowerCase().replace(/[\s_-]/g, '').trim();
 
     return personnes
       .filter((p) => {
         if (filtreRole !== 'tous') {
-          const roleCible = filtreRole.toString().toLowerCase().replace(/[➔\s_-]/g, '').trim();
-          const roleUser = (p.role || '').toString().toLowerCase().replace(/[➔\s_-]/g, '').trim();
-          if (roleUser !== roleCible) return false;
+          const roleUser = normaliser(p.role).replace(/[\s_-]/g, '');
+          if (filtreRole === 'administration') {
+            if (!['admin', 'superadmin', 'secretaire'].includes(roleUser)) return false;
+          } else if (filtreRole === 'professeur') {
+            if (!['professeur', 'prof', 'profprincipal'].includes(roleUser)) return false;
+          } else if (filtreRole === 'educateur') {
+            if (roleUser !== 'educateur') return false;
+          } else if (filtreRole === 'eleve') {
+            if (roleUser !== 'eleve') return false;
+          }
         }
 
         if (filtreStatut === 'actif' && !estActif(p)) return false;
@@ -354,7 +361,8 @@ const BaseDonneCentraleAdmin = () => {
   const fermerReactivation = () => setPersonneReactiver(null);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f7fb', padding: '24px' }}>
+    <div style={{ minHeight: '100vh', background: '#f5f7fb' }}>
+      <Header/>
       <div style={{ maxWidth: '1500px', margin: '0 auto' }}>
         
         {/* EN-TÊTE PRINCIPAL BANDEAU */}
@@ -364,7 +372,11 @@ const BaseDonneCentraleAdmin = () => {
               <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: '#172033' }}>Base de Données Centrale</h1>
               <p style={{ margin: '6px 0 0', color: '#667085', fontSize: '13px' }}>Gestion centralisée des élèves et du personnel de l'établissement.</p>
             </div>
-            <div style={{ padding: '10px 15px', background: '#ecfdf3', color: '#067647', borderRadius: '10px', fontWeight: 700, fontSize: '12px' }}>● Synchronisation en temps réel</div>
+           
+         <Link to="/pages/synchronisation" className="px-3 py-2  whitespace-nowrap self-center no-underline" style={{ padding: '10px 15px', background: '#ecfdf3', color: '#067647', borderRadius: '10px', fontWeight: 700, fontSize: '12px' }}>
+          ● Synchronisation en temps réel
+          </Link>
+           <div style={{ padding: '10px 15px', color: 'hsl(0, 91%, 49%)', borderRadius: '10px', fontWeight: 700, fontSize: '12px' }}>● Gestion centralisée des élèves et du personnel de l'établissement.</div>
           </div>
         </div>
 
@@ -390,9 +402,10 @@ const BaseDonneCentraleAdmin = () => {
           
           <select value={filtreRole} onChange={handleFiltreRole} style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '13px', fontWeight: 700, backgroundColor: '#ffffff', cursor: 'pointer', outline: 'none' }}>
             <option value="tous">👥 Tous les corps</option>
-            {rolesDisponibles.map(r => (
-              <option key={r} value={r}>➔ {getRoleLabel(r)}</option>
-            ))}
+            <option value="administration">🏛️ Administration</option>
+            <option value="professeur">👨‍🏫 Professeurs</option>
+            <option value="educateur">🧑‍💼 Éducateurs</option>
+            <option value="eleve">🎓 Élèves</option>
           </select>
 
           <select value={filtreStatut} onChange={handleFiltreStatut} style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '13px', fontWeight: 700, backgroundColor: '#ffffff', cursor: 'pointer', outline: 'none' }}>
@@ -405,14 +418,130 @@ const BaseDonneCentraleAdmin = () => {
         {/* SECTION TABLEAU COMPOSITE CENTRAL DE BASE */}
         <div style={{ background: '#ffffff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.06)' }}>
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#667085', fontWeight: 700, fontSize: '13px' }}>⏳ Synchronisation en direct avec le cloud...</div>
-          ) : personnesAffichees.length === 0 ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#667085', fontWeight: 700, fontSize: '13px' }}>🔍 Aucun dossier matricule ne correspond aux filtres.</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              {/* L'arborescence des lignes de données <table> vient s'injecter ici */}
-            </div>
-          )}
+  <div style={{
+    padding: '60px',
+    textAlign: 'center',
+    color: '#667085',
+    fontWeight: 700,
+    fontSize: '13px'
+  }}>
+    ⏳ Synchronisation en direct avec le cloud...
+  </div>
+) : personnesAffichees.length === 0 ? (
+  <div style={{
+    padding: '60px',
+    textAlign: 'center',
+    color: '#667085',
+    fontWeight: 700,
+    fontSize: '13px'
+  }}>
+    🔍 Aucun dossier ne correspond à votre recherche.
+  </div>
+) : (
+  <div style={{ overflowX: 'auto' }}>
+    <table style={{
+      width: '100%',
+      borderCollapse: 'collapse',
+      minWidth: '900px'
+    }}>
+      <thead>
+        <tr style={{ background: '#f8fafc' }}>
+          <th style={thStyle}>Nom & Prénoms</th>
+          <th style={thStyle}>Matricule</th>
+          <th style={thStyle}>Rôle</th>
+          <th style={thStyle}>Classe / Promotion</th>
+          <th style={thStyle}>Email</th>
+          <th style={thStyle}>Statut</th>
+          <th style={thStyle}>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {personnesAffichees.map((p) => (
+          <tr key={p.id} style={{ borderTop: '1px solid #eaecf0' }}>
+            
+            <td style={tdStyle}>
+              <strong>{getNomComplet(p)}</strong>
+            </td>
+
+            <td style={tdStyle}>
+              {getMatricule(p)}
+            </td>
+
+            <td style={tdStyle}>
+              {getRoleLabel(p.role)}
+            </td>
+
+            <td style={tdStyle}>
+              {estEleve(p)
+                ? getClasse(p)
+                : getPromotion(p)}
+            </td>
+
+            <td style={tdStyle}>
+              {p.email || '—'}
+            </td>
+
+            <td style={tdStyle}>
+              {estActif(p) ? '🟢 Actif' : '🔴 Inactif'}
+            </td>
+
+            <td style={tdStyle}>
+              <div style={{
+                display: 'flex',
+                gap: '6px',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => ouvrirEdition(p)}
+                  style={actionButton}
+                >
+                  ✏️ Modifier
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => ouvrirSituation(p)}
+                  style={actionButton}
+                >
+                  ⚙️ Situation
+                </button>
+
+                {estActif(p) ? (
+                  <button
+                    type="button"
+                    onClick={() => ouvrirRenvoi(p)}
+                    style={{
+                      ...actionButton,
+                      background: '#fee2e2',
+                      color: '#b42318'
+                    }}
+                  >
+                    🚫 Archiver
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => ouvrirReactivation(p)}
+                    style={{
+                      ...actionButton,
+                      background: '#dcfce7',
+                      color: '#166534'
+                    }}
+                  >
+                    ♻️ Réactiver
+                  </button>
+                )}
+              </div>
+            </td>
+
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
 
                    {/* BARRE DE PAGINATION BAS DE PAGE */}
           <div style={{ padding: '14px 24px', background: '#ffffff', borderTop: '1px solid #eaecf0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -565,5 +694,4 @@ const Modal = ({ titre, children, onClose }) => {
     </div>
   );
 };
-
 export default BaseDonneCentraleAdmin;

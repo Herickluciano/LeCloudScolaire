@@ -1,236 +1,336 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { Link } from 'react-router-dom';
-
-// 🟢 RECTIFICATION DES CHEMINS : On remonte de 4 niveaux depuis le dossier evaluations/
-import { useAuth } from '../../../../context/AuthContext';
-import { db } from '../../../../services/api';
+// src/features/professeur/pages/evaluations/SaisieNotes.jsx
+import { useState, useEffect } from 'react';
+import { db } from '../../../../services/api'; 
+import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from 'firebase/firestore'; 
+import { useAuth } from '../../../../context/AuthContext'; 
+import { useParams, Link } from 'react-router-dom';
+import MoyennesTrimestres from './MoyennesTrimestre';
+import Header from '../../../../pages/Header';
 
 const SaisieNotes = () => {
   const { user, schoolId } = useAuth();
+  const { classIdUrl } = useParams();
   
-  // Normalisation de la casse de l'établissement pour éviter les conflits d'index
-  const currentSchool = (schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_moderne_gagnoa').trim().toLowerCase();
-  
-  const idProf = (user?.matricule || user?.id || 'PROF_UNKNOWN').trim();
-  const nomProf = (user?.nom || user?.name || 'Enseignant').trim();
-  const matiereProf = (user?.matiereEnseignee || 'Français').trim();
+  const currentSchool = (schoolId || user?.schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_saint_bernard').trim().toLowerCase();
 
-  // --- ÉTATS ---
-  const [classes, setClasses] = useState([]);
-  const [selectedClasse, setSelectedClasse] = useState('');
-  const [eleves, setEleves] = useState([]);
+  // --- ÉTATS INTERNES ---
+  const [classesAutorisees, setClassesAutorisees] = useState([]);
+  const [classeSelectionnee, setClasseSelectionnee] = useState('');
+  const [matiereActive, setMatiereActive] = useState('');
+  const [listeEleves, setListeEleves] = useState([]);
   const [trimestre, setTrimestre] = useState('1');
-  const [typeDevoir, setTypeDevoir] = useState('Interrogation');
-  const [notesSaisies, setNotesSaisies] = useState({}); // { eleveId: { valeur: '', appreciation: '' } }
+  const [notesState, setNotesState] = useState({}); 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState({ type: '', text: '' });
 
-  // 🔄 ÉCOUTEUR 1 : Charger les classes rattachées à l'établissement
+  /* =========================================================
+     🔄 ÉTAPE 1 : EXTRACTION DES CLASSES DE L'EDT DU PROF
+  ========================================================= */
   useEffect(() => {
-    if (!currentSchool) return;
-    const q = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
-    const unsub = onSnapshot(q, (snap) => {
-      const list = [];
-      snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-      setClasses(list);
-      if (list.length > 0 && !selectedClasse) {
-        setSelectedClasse(list[0].id);
-      }
+    if (!user?.id || !currentSchool) {
       setLoading(false);
+      return;
+    }
+
+    const qEdt = query(
+      collection(db, "emplois_du_temps"),
+      where("schoolId", "==", currentSchool)
+    );
+
+    const unsubscribeEdt = onSnapshot(qEdt, (snapshot) => {
+      const classesTrouvees = [];
+      let disciplineDetectee = '';
+
+      snapshot.forEach((docSnap) => {
+        const edtData = docSnap.data();
+        const creneaux = edtData.creneaux || [];
+
+        creneaux.forEach((creneau) => {
+          if (String(creneau.professeurId).trim() === String(user.id).trim()) {
+            if (!disciplineDetectee) {
+              disciplineDetectee = creneau.matiere;
+            }
+            if (!classesTrouvees.some(c => c.id === creneau.classeId)) {
+              classesTrouvees.push({
+                id: creneau.classeId,
+                nom: creneau.nomClasse || creneau.classeNom || "N/A"
+              });
+            }
+          }
+        });
+      });
+
+      setClassesAutorisees(classesTrouvees);
+      setMatiereActive(disciplineDetectee || user?.matiereEnseignee || 'Anglais');
+
+      if (classesTrouvees.length > 0) {
+        const classeParDefaut = classIdUrl && classesTrouvees.some(c => c.id === classIdUrl)
+          ? classIdUrl
+          : classesTrouvees[0].id;
+        setClasseSelectionnee(classeParDefaut);
+      } else {
+        setLoading(false);
+      }
     }, (err) => {
-      console.error("Erreur écoute classes :", err);
+      console.error(err);
       setLoading(false);
     });
-    return () => unsub();
-  }, [currentSchool]);
 
-  // 🔄 ÉCOUTEUR 2 : Charger les élèves de la classe sélectionnée
+    return () => unsubscribeEdt();
+  }, [user, currentSchool, classIdUrl]);
+
+  /* =========================================================
+     🔄 ÉTAPE 2 : LISTE DES ELEVES DE LA CLASSE SELECTIONNEE
+  ========================================================= */
   useEffect(() => {
-    if (!selectedClasse || !currentSchool) return;
-    
-    // Extraction de la racine de la classe (ex: tle_d_1)
-    const morceaux = selectedClasse.toLowerCase().split('gagnoa_');
-    const racineClasse = morceaux.length > 1 ? morceaux[1] : selectedClasse.toLowerCase();
+    if (!currentSchool || !classeSelectionnee || !matiereActive) {
+      if (!loading && classesAutorisees.length === 0) setLoading(false);
+      return undefined;
+    }
 
-    const q = query(collection(db, "users"), where("role", "==", "eleve"));
-    const unsub = onSnapshot(q, (snap) => {
+    setLoading(true);
+    const qEleves = query(
+      collection(db, "users"),
+      where("schoolId", "==", currentSchool),
+      where("role", "==", "eleve"),
+      where("classeId", "==", classeSelectionnee)
+    );
+
+    const unsubscribeEleves = onSnapshot(qEleves, (snapshot) => {
       const list = [];
-      const structureInitiale = {};
+      const initialInputs = {};
       
-      snap.forEach(d => {
-        const data = d.data();
-        const schoolClean = (data.schoolId || '').trim().toLowerCase();
-        const classeClean = (data.classeId || '').trim().toLowerCase();
-
-        if (schoolClean === currentSchool && (classeClean === racineClasse || selectedClasse.toLowerCase().includes(classeClean))) {
-          list.push({ id: d.id, ...data });
-          structureInitiale[d.id] = { valeur: '', appreciation: '' };
-        }
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({ id: docSnap.id, ...data });
+        // Les champs restent vides à l'ouverture pour saisir une nouvelle série de notes librement
+        initialInputs[docSnap.id] = { interro: '', ds: '', devCommun: '' };
       });
       
       list.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-      setEleves(list);
-      setNotesSaisies(structureInitiale);
+      setListeEleves(list);
+      setNotesState(initialInputs);
+      setLoading(false);
     }, (err) => {
-      console.error("Erreur écoute élèves :", err);
+      console.error(err);
+      setLoading(false);
     });
-    return () => unsub();
-  }, [selectedClasse, currentSchool]);
 
-  const handleChangerNote = (eleveId, champ, valeur) => {
-    setNotesSaisies(prev => ({
+    return () => unsubscribeEleves();
+  }, [currentSchool, classeSelectionnee, trimestre, matiereActive, classesAutorisees]);
+
+  const handleNoteChange = (eleveId, champ, value) => {
+    if (value !== '') {
+      const num = parseFloat(value.replace(',', '.'));
+      if (isNaN(num) || num < 0 || num > 20) return; 
+    }
+
+    setNotesState(prev => ({
       ...prev,
-      [eleveId]: { ...prev[eleveId], [champ]: valeur }
+      [eleveId]: { ...prev[eleveId], [champ]: value }
     }));
   };
 
-  // 🚀 ACTION : Enregistrement de la grille de notes dans Firestore
-  const handleValiderNotesDevoir = async (e) => {
+  /* =========================================================
+     🚀 TRANSMISSION ACCUMULATIVE SANS LIMITE VERS FIRESTORE (arrayUnion)
+  ========================================================= */
+  const handleSauvegarderNotesNotes = async (e) => {
     e.preventDefault();
-    if (eleves.length === 0) return;
-
-    setSaving(true);
-    setMessage('');
+    setToast({ type: '', text: '' });
+    setIsSubmitting(true);
 
     try {
-     for (const eleve of eleves) {
-        const itemNote = notesSaisies[eleve.id];
-        if (!itemNote || itemNote.valeur === '') continue;
+      const cleTrimestre = `notes_trimestre_${trimestre}`;
 
-        const eleveRef = doc(db, "users", eleve.id);
-        
-        // 🟢 CLOISONNEMENT NoSQL : On pousse la note dans le tableau de la matière de CE trimestre spécifiquement
-        // Structure finale en base : notes_trimestre_1.Français = [12, 12.45]
-        await updateDoc(eleveRef, {
-          [`notes_trimestre_${trimestre}.${matiereProf}`]: arrayUnion(parseFloat(itemNote.valeur)),
-          updatedAt: new Date().toISOString()
-        });
-      }
-      setMessage(`🎉 Grille de notes de ${matiereProf} enregistrée avec succès pour le Trimestre ${trimestre} !`);
-      setTimeout(() => setMessage(''), 4000);
+      await Promise.all(
+        listeEleves.map(async (el) => {
+          const Saisie = notesState[el.id];
+          if (!Saisie) return;
+
+          const nouveauxObjetsNotes = [];
+
+          if (Saisie.interro !== '') {
+            nouveauxObjetsNotes.push({
+              note: parseFloat(String(Saisie.interro).replace(',', '.')),
+              type: "Interrogation",
+              date: new Date().toLocaleDateString('fr-FR'),
+              professeurId: user?.id || "PROF_AFFECTE"
+            });
+          }
+
+          if (Saisie.ds !== '') {
+            nouveauxObjetsNotes.push({
+              note: parseFloat(String(Saisie.ds).replace(',', '.')),
+              type: "Devoir Surveillé",
+              date: new Date().toLocaleDateString('fr-FR'),
+              professeurId: user?.id || "PROF_AFFECTE"
+            });
+          }
+
+          if (Saisie.devCommun !== '') {
+            nouveauxObjetsNotes.push({
+              note: parseFloat(String(Saisie.devCommun).replace(',', '.')),
+              type: "Devoir Commun",
+              date: new Date().toLocaleDateString('fr-FR'),
+              professeurId: user?.id || "PROF_AFFECTE"
+            });
+          }
+
+          // arrayUnion ajoute chaque note sans écraser le passé
+          if (nouveauxObjetsNotes.length > 0) {
+            const studentRef = doc(db, "users", el.id);
+            await updateDoc(studentRef, {
+              [`notes.${cleTrimestre}.${matiereActive}`]: arrayUnion(...nouveauxObjetsNotes),
+              updatedAt: new Date().toISOString()
+            });
+          }
+        })
+      );
+
+      setToast({
+        type: 'success',
+        text: sessionStorage.getItem("sgs_toast_save_success") || "🎯 Relevé enregistré et synchronisé avec succès !"
+      });
+
+      // Remise à blanc complète des inputs après envoi réussi pour la session de saisie suivante
+      const clearedNotes = {};
+      listeEleves.forEach(el => {
+        clearedNotes[el.id] = { interro: '', ds: '', devCommun: '' };
+      });
+      setNotesState(clearedNotes);
+
     } catch (err) {
-      console.error("Erreur écriture notes :", err);
-      alert("💥 Erreur d'écriture sur Cloud Firestore.");
+      console.error(err);
+      setToast({
+        type: 'error',
+        text: sessionStorage.getItem("sgs_toast_save_error") || "💥 Erreur technique lors du téléversement."
+      });
     } finally {
-      setSaving(false);
+      setIsSubmitting(false);
+      setTimeout(() => setToast({ type: '', text: '' }), 4000);
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">Ouverture du carnet de notes...</div>;
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-xs font-bold text-gray-400 animate-pulse uppercase">
+        {sessionStorage.getItem("sgs_loading_carnet") || "Ouverture du carnet de notes cloud..."}
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 font-sans text-gray-700 text-left animate-fadeIn">
-      
-      {/* RETOUR ACCUEIL PROF */}
-      <div className="mb-4">
-        <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs">
-          ⬅️ Bureau Enseignant
+    <div className="max-w-4xl mx-auto  sm:p-6 font-sans bg-white min-h-screen relative animate-fadeIn text-left text-slate-700">
+      <Header/>
+      {/* TOAST POP-UP */}
+      {toast.text && (
+        <div className={`fixed top-6 right-6 z-50 p-4 rounded-xl shadow-2xl border-l-4 bg-slate-900 text-xs font-bold ${
+          toast.type === 'success' ? 'border-emerald-500 text-emerald-400' : 'border-red-500 text-red-400'
+        }`}>
+          <p className="whitespace-pre-line text-left">{toast.text}</p>
+        </div>
+      )}
+
+      {/* BOUTON RETOUR */}
+      <div className="mb-4 text-left">
+        <Link to="/professeur/dashboard" className="bgvalidbnt inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-lg transition shadow-2xs">
+          {sessionStorage.getItem("sgs_btn_back_bureau") || "⬅ Bureau Virtuel"}
         </Link>
       </div>
 
-      {/* BARRE DE FILTRAGE DES SESSIONS */}
-      <div className="bg-white p-5 rounded-2xl border shadow-2xs mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold">
-        <div>
-          <label className="block text-gray-400 uppercase mb-1">1. Trimestre</label>
-          <select value={trimestre} onChange={(e) => setTrimestre(e.target.value)} className="w-full bg-gray-50 border p-2.5 rounded-lg cursor-pointer outline-none bg-white">
-            <option value="1">1er Trimestre</option>
-            <option value="2">2ème Trimestre</option>
-            <option value="3">3ème Trimestre</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-gray-400 uppercase mb-1">2. Classe</label>
-          <select value={selectedClasse} onChange={(e) => setSelectedClasse(e.target.value)} className="w-full bg-gray-50 border p-2.5 rounded-lg cursor-pointer outline-none bg-white">
-            {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.nom || c.id.replace(`${currentSchool}_`, '').toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-gray-400 uppercase mb-1">3. Type d'Évaluation</label>
-          <select value={typeDevoir} onChange={(e) => setTypeDevoir(e.target.value)} className="w-full bg-gray-50 border p-2.5 rounded-lg cursor-pointer outline-none bg-white">
-            <option value="Interrogation">Interrogation</option>
-            <option value="Devoir Surveillé">Devoir Surveillé</option>
-            <option value="Devoir Commun">Devoir Commun</option>
-          </select>
-        </div>
-        <div className="bg-purple-50 p-2.5 rounded-lg border border-purple-100 flex flex-col justify-center">
-          <p className="text-[10px] uppercase font-black text-purple-700">Discipline Attribuée</p>
-          <p className="text-sm font-black text-purple-900 mt-0.5 uppercase">📚 {matiereProf}</p>
+      {/* BANDEAU INTERACTIF */}
+      <div className="bg-slate-900  p-6 rounded-2xl shadow-md mb-6 text-left">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center flex-wrap gap-4">
+          <div>
+            <h2 className="bgvalidtext text-xl font-black uppercase tracking-tight">
+              {sessionStorage.getItem("sgs_title_registre") || "Registre d'Évaluations & Coefficients"}
+            </h2>
+            <p className="bgvalidtext-1 text-xs text-slate-400 mt-1">
+              {sessionStorage.getItem("sgs_label_discipline") || "Discipline :"} <span className="text-orange-400 font-bold">{matiereActive || "—"}</span>
+            </p>
+          </div>
+          
+          <div className="bgvalidtext-btn flex items-center gap-3 w-full sm:w-auto">
+            <select 
+              value={classeSelectionnee} 
+              onChange={(e) => setClasseSelectionnee(e.target.value)} 
+              className="cla border border-slate-700 rounded-xl px-2 py-2 text-xs font-black  outline-none cursor-pointer flex-1 sm:flex-initial"
+            >
+                           {classesAutorisees.length === 0 ? (
+                <option value="">{sessionStorage.getItem("sgs_opt_no_class") || "Aucune classe assignée"}</option>
+              ) : (
+                classesAutorisees.map((c) => (
+                  <option key={c.id} value={c.id}>{String(c.nom).toUpperCase()}</option>
+                ))
+              )}
+            </select>
+
+            <select 
+              value={trimestre} 
+              onChange={(e) => setTrimestre(e.target.value)} 
+              className="bg-slate-800 border border-slate-700 rounded-xl px-1 py-2 text-xs font-black text-orange-400 outline-none cursor-pointer"
+            >
+              <option value="1">{sessionStorage.getItem("sgs_opt_t1") || "1er Trimestre"}</option>
+              <option value="2">{sessionStorage.getItem("sgs_opt_t2") || "2ème Trimestre"}</option>
+              <option value="3">{sessionStorage.getItem("sgs_opt_t3") || "3ème Trimestre"}</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {message && <div className="mb-6 p-3 bg-slate-900 text-orange-400 text-xs font-bold rounded-lg border-l-4 border-orange-500 animate-pulse text-left">{message}</div>}
-
-      {/* FORMULAIRE DE GRILLE DE COMPOSITION */}
-      <form onSubmit={handleValiderNotesDevoir} className="bg-white rounded-2xl border shadow-2xs overflow-hidden">
+      {/* TABLEAU DE SAISIE DES MOYENNES */}
+      <form onSubmit={handleSauvegarderNotesNotes} className="bg-white rounded-2xl border p-6 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-bold text-gray-700 border-collapse">
+          <table className="claform w-full text-left text-xs font-bold text-gray-700 border-collapse">
             <thead>
               <tr className="bg-gray-50 text-gray-400 uppercase border-b border-gray-100">
-                <th className="p-3">Matricule</th>
-                <th className="p-3">Nom & Prénoms de l'Apprenant</th>
-                <th className="p-3 text-center w-28">Note /20 *</th>
-                <th className="p-3">Appréciation Pédagogique</th>
+                <th className="p-3">{sessionStorage.getItem("sgs_th_apprenant_name") || "Nom & Prénoms de l'Apprenant"}</th>
+                <th className="p-3 text-center">{sessionStorage.getItem("sgs_th_interro_label") || "Interrogation (Coeff 1)"}</th>
+                <th className="p-3 text-center">{sessionStorage.getItem("sgs_th_ds_label") || "Devoir Surveillé (Coeff 2)"}</th>
+                <th className="p-3 text-center">{sessionStorage.getItem("sgs_th_dc_label") || "Devoir Commun (Coeff 2)"}</th>
               </tr>
             </thead>
             <tbody>
-              {eleves.length === 0 ? (
+              {listeEleves.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="p-12 text-center text-gray-400 italic">
-                    Aucun élève trouvé dans cette division pour le moment.
+                  <td colSpan="4" className="p-6 text-center text-gray-400 italic">
+                    {sessionStorage.getItem("sgs_label_no_student_classe") || "Aucun élève enregistré dans cette classe."}
                   </td>
                 </tr>
               ) : (
-                eleves.map((el) => {
-                  const dossierNote = notesSaisies[el.id] || { valeur: '', appreciation: '' };
-                  return (
-                    <tr key={el.id} className="border-b border-gray-100 hover:bg-gray-50/30 transition">
-                      <td className="p-3 font-mono text-gray-400">{el.matricule || el.id}</td>
-                      <td className="p-3 text-gray-900 uppercase font-black">{el.nom} {el.prenoms || ''}</td>
-                      <td className="p-3 text-center">
-                        <input 
-                          type="number" 
-                          min="0" 
-                          max="20" 
-                          step="0.25" 
-                          placeholder="--/20" 
-                          value={dossierNote.valeur} 
-                          onChange={(e) => handleChangerNote(el.id, 'valeur', e.target.value)} 
-                          className="w-20 bg-gray-50 border rounded-lg p-2 text-center text-gray-900 font-mono font-bold outline-none focus:ring-2 focus:ring-purple-500" 
-                        />
-                      </td>
-                                            <td className="p-3">
-                        <input 
-                          type="text" 
-                          placeholder="Ex: Bon travail, continuez ainsi." 
-                          value={dossierNote.appreciation} 
-                          onChange={(e) => handleChangerNote(el.id, 'appreciation', e.target.value)} 
-                          className="w-full bg-gray-50 border rounded-lg p-2 text-gray-800 font-medium outline-none focus:ring-2 focus:ring-purple-500" 
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
+                listeEleves.map((el) => (
+                  <tr key={el.id} className="border-b border-gray-100 hover:bg-gray-50/40 transition">
+                    <td className="p-3 text-gray-900 uppercase font-black text-left">{el.nom} {el.prenoms || el.prenom || ''}</td>
+                    <td className="p-3 text-center">
+                      <input type="text" placeholder="—" value={notesState[el.id]?.interro || ''} onChange={(e) => handleNoteChange(el.id, 'interro', e.target.value)} className="w-16 p-1.5 border bg-gray-50 rounded-lg text-center font-mono font-black outline-none focus:ring-2 focus:ring-orange-500" disabled={isSubmitting} />
+                    </td>
+                    <td className="p-3 text-center">
+                      <input type="text" placeholder="—" value={notesState[el.id]?.ds || ''} onChange={(e) => handleNoteChange(el.id, 'ds', e.target.value)} className="w-16 p-1.5 border bg-gray-50 rounded-lg text-center font-mono font-black outline-none focus:ring-2 focus:ring-orange-500" disabled={isSubmitting} />
+                    </td>
+                    <td className="p-3 text-center">
+                      <input type="text" placeholder="—" value={notesState[el.id]?.devCommun || ''} onChange={(e) => handleNoteChange(el.id, 'devCommun', e.target.value)} className="w-16 p-1.5 border bg-gray-50 rounded-lg text-center font-mono font-black outline-none focus:ring-2 focus:ring-orange-500" disabled={isSubmitting} />
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
 
-        {eleves.length > 0 && (
-          <div className="p-4 bg-gray-50 border-t text-right">
-            <button 
-              type="submit" 
-              disabled={saving} 
-              className="bg-slate-900 hover:bg-slate-800 text-orange-400 font-black text-xs uppercase tracking-wider px-6 py-3 rounded-xl transition cursor-pointer disabled:bg-gray-200"
-            >
-              {saving ? "Sauvegarde Cloud en cours..." : "💾 Enregistrer la Grille de Notes"}
-            </button>
-          </div>
-        )}
+        <button 
+          type="submit" 
+          disabled={isSubmitting || listeEleves.length === 0}
+          className="bgvalido w-full bg-orange-600 hover:bg-orange-700  font-black py-1 px-0 rounded-xl uppercase tracking-wider transition shadow-sm cursor-pointer mt-6 disabled:bg-gray-200 text-xs border-0"
+        >
+          {isSubmitting ? (sessionStorage.getItem("sgs_btn_saving") || "⏳ Synchronisation...") : (sessionStorage.getItem("sgs_btn_save_notes") || "Valider et Enregistrer les Notes de la Classe")}
+        </button>
       </form>
+      <div className="mb-4 text-left">
+        <Link to="/professeur/voir-moyenne-trimestrielle" className="bgvalida inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-0 py-1 rounded-lg transition shadow-2xs">
+         Confrontation & Calcul des Moyennes
+        </Link>
+      </div>
 
     </div>
   );

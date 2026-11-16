@@ -8,9 +8,12 @@ import {
   query,
   onSnapshot,
   addDoc,
+  doc,
+  updateDoc,
+  arrayUnion,
 } from 'firebase/firestore';
 
-import HistoriqueMessage from '../../features/admin/pages/messages/HistoriqueMessage';
+import Header from '../../pages/Header';
 
 /* =========================================================
    SERVER.JS
@@ -24,6 +27,12 @@ const SERVER_URL = (
 /* =========================================================
    ROLES
 ========================================================= */
+
+const ROLES_ADMIN = [
+  'admin',
+  'super_admin',
+  'secretaire',
+];
 
 const ROLES_PROFESSEURS = [
   'professeur',
@@ -68,6 +77,17 @@ const nomCompletUtilisateur = (person) =>
 const emailValide = (email) =>
   String(email || '').includes('@');
 
+const obtenirRoleNormalise = (person) =>
+  normaliser(person?.role);
+
+const obtenirIdentifiantDocument = (person) =>
+  String(
+    person?.id ||
+    person?.uid ||
+    person?.matricule ||
+    ''
+  ).trim();
+
 /* =========================================================
    COMPOSANT
 ========================================================= */
@@ -81,24 +101,50 @@ const NotificationCentre = () => {
     schoolName,
   } = useAuth();
 
-  const currentSchool = (
+  /* =======================================================
+     ECOLE
+  ======================================================= */
+
+  const currentSchool = String(
     schoolId ||
     sessionStorage.getItem('sgs_school_id') ||
-    'lycee_moderne_gagnoa'
+    ''
   )
     .trim()
     .toLowerCase();
 
-  const idUtilisateurConnecte =
+  /* =======================================================
+     IDENTIFICATION
+  ======================================================= */
+
+  const idUtilisateurConnecte = String(
     user?.matricule ||
     user?.id ||
-    'UNKNOWN';
+    user?.uid ||
+    ''
+  ).trim();
 
-  const roleUtilisateur =
-    normaliser(user?.role);
+  const roleUtilisateur = normaliser(
+    user?.role
+  );
+
+  const estAdministrateur =
+    ROLES_ADMIN.includes(
+      roleUtilisateur
+    );
+
+  const estEducateur =
+    ROLES_EDUCATEURS.includes(
+      roleUtilisateur
+    );
+
+  const estEleve =
+    ROLES_ELEVES.includes(
+      roleUtilisateur
+    );
 
   /* =======================================================
-     ÉTATS
+     ETATS
   ======================================================= */
 
   const [
@@ -111,51 +157,103 @@ const NotificationCentre = () => {
     setListeCamaradesEtPersonnels,
   ] = useState([]);
 
-  const [loading, setLoading] = useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [canalActif, setCanalActif] =
-    useState('OFFICIEL');
+  /*
+   * CANAL :
+   *
+   * OFFICIEL
+   * PROMOTION
+   * ADMIN
+   * DIRECT
+   */
+  const [
+    canalActif,
+    setCanalActif,
+  ] = useState('OFFICIEL');
 
-  const [scopeFiltreContacts, setScopeFiltreContacts] =
-    useState('eleve');
+  /*
+   * Destinataire individuel séparé du canal.
+   *
+   * Cela évite les confusions entre :
+   * OFFICIEL / ADMIN / PROMOTION
+   * et l'ID réel d'un utilisateur.
+   */
+  const [
+    destinataireIndividuel,
+    setDestinataireIndividuel,
+  ] = useState(null);
 
-  const [barreRechercheContact, setBarreRechercheContact] =
-    useState('');
+  const [
+    scopeFiltreContacts,
+    setScopeFiltreContacts,
+  ] = useState('eleve');
 
-  const [titreAnnonce, setTitreAnnonce] =
-    useState('');
+  const [
+    barreRechercheContact,
+    setBarreRechercheContact,
+  ] = useState('');
 
-  const [corpsAnnonceOrChat, setCorpsAnnonceOrChat] =
-    useState('');
+  const [
+    titreAnnonce,
+    setTitreAnnonce,
+  ] = useState('');
 
-  const [cibleAudienceGlobale, setCibleAudienceGlobale] =
-    useState('all');
+  const [
+    corpsAnnonceOrChat,
+    setCorpsAnnonceOrChat,
+  ] = useState('');
 
-  const [sending, setSending] =
-    useState(false);
+  const [
+    cibleAudienceGlobale,
+    setCibleAudienceGlobale,
+  ] = useState('all');
 
-  const [feedback, setFeedback] =
-    useState('');
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
 
-  const [fileBase64, setFileBase64] =
-    useState(null);
+  const [
+    feedback,
+    setFeedback,
+  ] = useState('');
 
-  const [fileName, setFileName] =
-    useState('');
+  const [
+    fileBase64,
+    setFileBase64,
+  ] = useState(null);
+
+  const [
+    fileName,
+    setFileName,
+  ] = useState('');
+
+  const [
+    suppressionEnCours,
+    setSuppressionEnCours,
+  ] = useState('');
 
   /* =======================================================
-     UTILISATEUR CONNECTÉ
+     UTILISATEUR CONNECTE
   ======================================================= */
 
   const utilisateurConnecte = useMemo(
     () =>
       listeCamaradesEtPersonnels.find(
         (person) =>
-          person.id ===
+          String(person.id || '').trim() ===
             idUtilisateurConnecte ||
-          person.matricule ===
+          String(person.matricule || '').trim() ===
+            idUtilisateurConnecte ||
+          String(person.uid || '').trim() ===
             idUtilisateurConnecte
-      ) || user || {},
+      ) ||
+      user ||
+      {},
     [
       listeCamaradesEtPersonnels,
       idUtilisateurConnecte,
@@ -164,7 +262,7 @@ const NotificationCentre = () => {
   );
 
   /* =======================================================
-     ÉCOUTE TEMPS RÉEL
+     FIREBASE TEMPS REEL
   ======================================================= */
 
   useEffect(() => {
@@ -172,18 +270,22 @@ const NotificationCentre = () => {
       !idUtilisateurConnecte ||
       !currentSchool
     ) {
+      setLoading(false);
       return undefined;
     }
 
-    const qNotifications =
-      query(
-        collection(
-          db,
-          'notifications'
-        )
-      );
+    /* =====================================================
+       NOTIFICATIONS
+    ===================================================== */
 
-    const unsubNotifications =
+    const qNotifications = query(
+      collection(
+        db,
+        'notifications'
+      )
+    );
+
+    const unsubscribeNotifications =
       onSnapshot(
         qNotifications,
         (snapshot) => {
@@ -191,34 +293,53 @@ const NotificationCentre = () => {
 
           snapshot.forEach(
             (docSnap) => {
-              const d =
-                docSnap.data();
-
-              const schoolCleanDoc =
-                normaliser(
-                  d.schoolId
-                );
+              const data =
+                docSnap.data() || {};
 
               if (
-                schoolCleanDoc ===
-                currentSchool
+                normaliser(
+                  data.schoolId
+                ) !==
+                normaliser(
+                  currentSchool
+                )
               ) {
-                list.push({
-                  id: docSnap.id,
-                  ...d,
-                });
+                return;
               }
+
+              const masquePour =
+                Array.isArray(
+                  data.masquePour
+                )
+                  ? data.masquePour.map(
+                      (id) =>
+                        String(id).trim()
+                    )
+                  : [];
+
+              if (
+                masquePour.includes(
+                  idUtilisateurConnecte
+                )
+              ) {
+                return;
+              }
+
+              list.push({
+                id: docSnap.id,
+                ...data,
+              });
             }
           );
 
           list.sort(
             (a, b) =>
               new Date(
-                a.createdAt || 0
-              ) -
-              new Date(
                 b.createdAt || 0
-              )
+              ).getTime() -
+              new Date(
+                a.createdAt || 0
+              ).getTime()
           );
 
           setTousLesMessagesDuEtablissement(
@@ -230,18 +351,25 @@ const NotificationCentre = () => {
             '❌ Erreur écoute notifications :',
             error
           );
+
+          setFeedback(
+            '❌ Impossible de suivre les notifications en temps réel.'
+          );
         }
       );
 
-    const qUsers =
-      query(
-        collection(
-          db,
-          'users'
-        )
-      );
+    /* =====================================================
+       UTILISATEURS
+    ===================================================== */
 
-    const unsubUsers =
+    const qUsers = query(
+      collection(
+        db,
+        'users'
+      )
+    );
+
+    const unsubscribeUsers =
       onSnapshot(
         qUsers,
         (snapshot) => {
@@ -249,27 +377,48 @@ const NotificationCentre = () => {
 
           snapshot.forEach(
             (docSnap) => {
-              const uData =
-                docSnap.data();
+              const data =
+                docSnap.data() || {};
 
-              const schoolCleanDoc =
-                normaliser(
-                  uData.schoolId
-                );
+              const docId =
+                String(
+                  docSnap.id
+                ).trim();
+
+              const matricule =
+                String(
+                  data.matricule ||
+                  ''
+                ).trim();
 
               if (
-                schoolCleanDoc ===
-                  currentSchool &&
-                docSnap.id !==
-                  idUtilisateurConnecte &&
-                uData.matricule !==
+                normaliser(
+                  data.schoolId
+                ) !==
+                normaliser(
+                  currentSchool
+                )
+              ) {
+                return;
+              }
+
+              /*
+               * Ne pas afficher l'utilisateur connecté
+               * dans ses propres destinataires.
+               */
+              if (
+                docId ===
+                  idUtilisateurConnecte ||
+                matricule ===
                   idUtilisateurConnecte
               ) {
-                uList.push({
-                  id: docSnap.id,
-                  ...uData,
-                });
+                return;
               }
+
+              uList.push({
+                id: docId,
+                ...data,
+              });
             }
           );
 
@@ -290,13 +439,129 @@ const NotificationCentre = () => {
       );
 
     return () => {
-      unsubNotifications();
-      unsubUsers();
+      unsubscribeNotifications();
+      unsubscribeUsers();
     };
   }, [
     idUtilisateurConnecte,
     currentSchool,
   ]);
+
+  /* =======================================================
+     SUPPRESSION NOTIFICATION
+  ======================================================= */
+
+  const supprimerNotificationRecue =
+    async (notification) => {
+      if (
+        !notification ||
+        !notification.id
+      ) {
+        return;
+      }
+
+      if (
+        !ROLES_ADMIN.includes(
+          roleUtilisateur
+        )
+      ) {
+        return;
+      }
+
+      const idAdmin =
+        String(
+          idUtilisateurConnecte
+        ).trim();
+
+      if (!idAdmin) {
+        return;
+      }
+
+      const expediteurId =
+        String(
+          notification.expediteurId ||
+          notification.senderId ||
+          ''
+        ).trim();
+
+      if (
+        expediteurId &&
+        normaliser(expediteurId) ===
+          normaliser(idAdmin)
+      ) {
+        setFeedback(
+          '⚠️ Vous ne pouvez pas supprimer ici votre propre message envoyé.'
+        );
+
+        setTimeout(
+          () => setFeedback(''),
+          3000
+        );
+
+        return;
+      }
+
+      const confirmation =
+        window.confirm(
+          'Voulez-vous supprimer cette notification de votre historique ?'
+        );
+
+      if (!confirmation) {
+        return;
+      }
+
+      setSuppressionEnCours(
+        notification.id
+      );
+
+      try {
+        const notificationRef =
+          doc(
+            db,
+            'notifications',
+            notification.id
+          );
+
+        await updateDoc(
+          notificationRef,
+          {
+            masquePour:
+              arrayUnion(
+                idAdmin
+              ),
+          }
+        );
+
+        setTousLesMessagesDuEtablissement(
+          (ancienneListe) =>
+            ancienneListe.filter(
+              (item) =>
+                item.id !==
+                notification.id
+            )
+        );
+
+        setFeedback(
+          '✅ Notification supprimée de votre historique.'
+        );
+
+        setTimeout(
+          () => setFeedback(''),
+          3000
+        );
+      } catch (error) {
+        console.error(
+          '❌ Erreur suppression notification :',
+          error
+        );
+
+        setFeedback(
+          '❌ Impossible de supprimer cette notification.'
+        );
+      } finally {
+        setSuppressionEnCours('');
+      }
+    };
 
   /* =======================================================
      FICHIER
@@ -323,12 +588,16 @@ const NotificationCentre = () => {
       return;
     }
 
-    setFileName(file.name);
+    setFileName(
+      file.name
+    );
 
     const reader =
       new FileReader();
 
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(
+      file
+    );
 
     reader.onload = () => {
       setFileBase64(
@@ -347,20 +616,219 @@ const NotificationCentre = () => {
   };
 
   /* =======================================================
-     EST-CE UN ÉLÈVE ?
+     AUTORISATION MESSAGE INDIVIDUEL
   ======================================================= */
 
-  const estEleve =
-    ROLES_ELEVES.includes(
-      roleUtilisateur
+  const peutEnvoyerIndividuelA =
+    (person) => {
+      if (!person) {
+        return false;
+      }
+
+      const role =
+        obtenirRoleNormalise(
+          person
+        );
+
+      /*
+       * ADMIN :
+       * professeur + éducateur + élève
+       */
+      if (estAdministrateur) {
+        return (
+          ROLES_PROFESSEURS.includes(
+            role
+          ) ||
+          ROLES_EDUCATEURS.includes(
+            role
+          ) ||
+          ROLES_ELEVES.includes(
+            role
+          )
+        );
+      }
+
+      /*
+       * EDUCATEUR :
+       * uniquement élève.
+       */
+      if (estEducateur) {
+        return ROLES_ELEVES.includes(
+          role
+        );
+      }
+
+      /*
+       * Pour les autres utilisateurs,
+       * on conserve la possibilité de contacter
+       * les contacts affichés.
+       */
+      return true;
+    };
+
+  /* =======================================================
+     CONTACTS INDIVIDUELS AUTORISES
+  ======================================================= */
+
+  const contactsIndividuelsAutorises =
+    useMemo(
+      () =>
+        listeCamaradesEtPersonnels.filter(
+          (person) =>
+            peutEnvoyerIndividuelA(
+              person
+            )
+        ),
+      [
+        listeCamaradesEtPersonnels,
+        roleUtilisateur,
+        estAdministrateur,
+        estEducateur,
+      ]
     );
 
   /* =======================================================
-     DESTINATAIRES D'UN MESSAGE PRIVÉ
+     DESTINATAIRES EMAIL - MESSAGE INDIVIDUEL
      
-     Élève → autre élève + parent
-     Professeur → élève + parent
-     Éducateur → élève + parent
+     IMPORTANT :
+     Ici on envoie uniquement à la personne choisie.
+     
+     PAS d'emailParent automatique.
+  ======================================================= */
+
+  const construireDestinataireIndividuelEmail =
+    (person) => {
+      if (
+        !person ||
+        !emailValide(
+          person.email
+        )
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          email:
+            String(
+              person.email
+            )
+              .trim()
+              .toLowerCase(),
+
+          name:
+            nomCompletUtilisateur(
+              person
+            ) ||
+            'UTILISATEUR EDULINK',
+
+          type:
+            normaliser(
+              person.role
+            ) || 'utilisateur',
+
+          userId:
+            obtenirIdentifiantDocument(
+              person
+            ),
+
+          role:
+            normaliser(
+              person.role
+            ),
+        },
+      ];
+    };
+
+  /* =======================================================
+     DESTINATAIRES PROMOTION
+  ======================================================= */
+
+  const construireDestinatairesPromotion =
+    (promotion) => {
+      const result = [];
+
+      if (!promotion) {
+        return result;
+      }
+
+      listeCamaradesEtPersonnels
+        .filter(
+          (person) =>
+            ROLES_ELEVES.includes(
+              normaliser(
+                person.role
+              )
+            ) &&
+            normaliser(
+              person.promotion
+            ) ===
+              normaliser(
+                promotion
+              )
+        )
+        .forEach(
+          (person) => {
+            /*
+             * Pour les messages de promotion,
+             * on conserve le comportement existant :
+             * élève + parent.
+             */
+            if (
+              emailValide(
+                person.email
+              )
+            ) {
+              result.push({
+                email:
+                  String(
+                    person.email
+                  )
+                    .trim()
+                    .toLowerCase(),
+
+                name:
+                  nomCompletUtilisateur(
+                    person
+                  ),
+
+                type:
+                  'eleve',
+              });
+            }
+
+            if (
+              emailValide(
+                person.emailParent
+              )
+            ) {
+              result.push({
+                email:
+                  String(
+                    person.emailParent
+                  )
+                    .trim()
+                    .toLowerCase(),
+
+                name:
+                  `Parent de ${nomCompletUtilisateur(
+                    person
+                  )}`,
+
+                type:
+                  'parent',
+              });
+            }
+          }
+        );
+
+      return result;
+    };
+
+  /* =======================================================
+     DESTINATAIRES UTILISATEUR
+     
+     Fonction utilisée pour les audiences générales.
   ======================================================= */
 
   const construireDestinatairesPourUtilisateur =
@@ -388,18 +856,21 @@ const NotificationCentre = () => {
             nomCompletUtilisateur(
               person
             ) ||
-            'Utilisateur Edulink',
+            'EDULINK - LE LIEN SCOLAIRE',
 
-          type: 'eleve',
+          type:
+            normaliser(
+              person.role
+            ) || 'personnel',
         });
       }
 
       /*
-        Pour un élève :
-        on récupère automatiquement
-        emailParent.
-      */
-
+       * Parent uniquement pour les messages
+       * collectifs/audience élève.
+       *
+       * PAS pour le message individuel.
+       */
       if (
         ROLES_ELEVES.includes(
           normaliser(
@@ -419,46 +890,12 @@ const NotificationCentre = () => {
               .toLowerCase(),
 
           name:
-            `Parent de ${
-              nomCompletUtilisateur(
-                person
-              )
-            }`,
-
-          type: 'parent',
-        });
-      }
-
-      /*
-        Si un compte parent existe
-        directement dans users.
-      */
-
-      if (
-        ROLES_PARENTS.includes(
-          normaliser(
-            person.role
-          )
-        ) &&
-        emailValide(
-          person.email
-        )
-      ) {
-        result.push({
-          email:
-            String(
-              person.email
-            )
-              .trim()
-              .toLowerCase(),
-
-          name:
-            nomCompletUtilisateur(
+            `Parent de ${nomCompletUtilisateur(
               person
-            ) ||
-            'Parent Edulink',
+            )}`,
 
-          type: 'parent',
+          type:
+            'parent',
         });
       }
 
@@ -466,50 +903,7 @@ const NotificationCentre = () => {
     };
 
   /* =======================================================
-     DESTINATAIRES D'UNE PROMOTION
-  ======================================================= */
-
-  const construireDestinatairesPromotion =
-    (promotion) => {
-      const result = [];
-
-      if (!promotion) {
-        return result;
-      }
-
-      const promotionNormalisee =
-        normaliser(
-          promotion
-        );
-
-      listeCamaradesEtPersonnels
-        .filter(
-          (person) =>
-            ROLES_ELEVES.includes(
-              normaliser(
-                person.role
-              )
-            ) &&
-            normaliser(
-              person.promotion
-            ) ===
-              promotionNormalisee
-        )
-        .forEach(
-          (person) => {
-            result.push(
-              ...construireDestinatairesPourUtilisateur(
-                person
-              )
-            );
-          }
-        );
-
-      return result;
-    };
-
-  /* =======================================================
-     DESTINATAIRES D'UNE AUDIENCE
+     AUDIENCE
   ======================================================= */
 
   const construireDestinatairesAudience =
@@ -528,10 +922,6 @@ const NotificationCentre = () => {
               person.role
             );
 
-          /*
-            TOUT L'ÉTABLISSEMENT
-          */
-
           if (
             audience ===
             'all'
@@ -546,38 +936,32 @@ const NotificationCentre = () => {
                   person
                 )
               );
-            } else {
-              if (
-                emailValide(
-                  person.email
-                )
-              ) {
-                result.push({
-                  email:
-                    String(
-                      person.email
-                    )
-                      .trim()
-                      .toLowerCase(),
+            } else if (
+              emailValide(
+                person.email
+              )
+            ) {
+              result.push({
+                email:
+                  String(
+                    person.email
+                  )
+                    .trim()
+                    .toLowerCase(),
 
-                  name:
-                    nomCompletUtilisateur(
-                      person
-                    ) ||
-                    'Utilisateur Edulink',
+                name:
+                  nomCompletUtilisateur(
+                    person
+                  ) ||
+                  'EDULINK - LE LIEN SCOLAIRE',
 
-                  type:
-                    'personnel',
-                });
-              }
+                type:
+                  'personnel',
+              });
             }
 
             return;
           }
-
-          /*
-            PROFESSEURS
-          */
 
           if (
             audience ===
@@ -602,8 +986,7 @@ const NotificationCentre = () => {
                 name:
                   nomCompletUtilisateur(
                     person
-                  ) ||
-                  'Professeur Edulink',
+                  ),
 
                 type:
                   'professeur',
@@ -612,10 +995,6 @@ const NotificationCentre = () => {
 
             return;
           }
-
-          /*
-            ÉDUCATEURS
-          */
 
           if (
             audience ===
@@ -640,8 +1019,7 @@ const NotificationCentre = () => {
                 name:
                   nomCompletUtilisateur(
                     person
-                  ) ||
-                  'Éducateur Edulink',
+                  ),
 
                 type:
                   'educateur',
@@ -650,10 +1028,6 @@ const NotificationCentre = () => {
 
             return;
           }
-
-          /*
-            ÉLÈVES + PARENTS
-          */
 
           if (
             audience ===
@@ -675,7 +1049,7 @@ const NotificationCentre = () => {
     };
 
   /* =======================================================
-     SUPPRESSION DES DOUBLONS
+     DEDUPLICATION EMAILS
   ======================================================= */
 
   const supprimerDoublonsEmails =
@@ -700,11 +1074,6 @@ const NotificationCentre = () => {
               .trim()
               .toLowerCase();
 
-          /*
-            Ne jamais envoyer
-            à l'expéditeur.
-          */
-
           const emailExpediteur =
             normaliser(
               user?.email
@@ -719,7 +1088,9 @@ const NotificationCentre = () => {
           }
 
           if (
-            !map.has(email)
+            !map.has(
+              email
+            )
           ) {
             map.set(
               email,
@@ -744,10 +1115,26 @@ const NotificationCentre = () => {
   const obtenirDestinatairesEmail =
     () => {
       /*
-        ---------------------------------------------------
-        COMMUNIQUÉ OFFICIEL
-        ---------------------------------------------------
-      */
+       * MESSAGE INDIVIDUEL
+       *
+       * Priorité absolue à la personne sélectionnée.
+       */
+      if (
+        canalActif ===
+        'DIRECT'
+      ) {
+        if (
+          !destinataireIndividuel
+        ) {
+          return [];
+        }
+
+        return supprimerDoublonsEmails(
+          construireDestinataireIndividuelEmail(
+            destinataireIndividuel
+          )
+        );
+      }
 
       if (
         canalActif ===
@@ -757,12 +1144,6 @@ const NotificationCentre = () => {
           construireDestinatairesAudience()
         );
       }
-
-      /*
-        ---------------------------------------------------
-        MESSAGE À LA PROMOTION
-        ---------------------------------------------------
-      */
 
       if (
         canalActif ===
@@ -775,34 +1156,43 @@ const NotificationCentre = () => {
         );
       }
 
-      /*
-        ---------------------------------------------------
-        MESSAGE PRIVÉ
-        ---------------------------------------------------
-      */
+      if (
+        canalActif ===
+        'ADMIN'
+      ) {
+        const admins =
+          listeCamaradesEtPersonnels.filter(
+            (person) =>
+              ROLES_ADMIN.includes(
+                normaliser(
+                  person.role
+                )
+              )
+          );
 
-      const contact =
-        listeCamaradesEtPersonnels.find(
-          (person) =>
-            person.id ===
-            canalActif ||
-            person.matricule ===
-              canalActif
+        return supprimerDoublonsEmails(
+          admins.map(
+            (person) => ({
+              email:
+                person.email,
+
+              name:
+                nomCompletUtilisateur(
+                  person
+                ),
+
+              type:
+                'administration',
+            })
+          )
         );
-
-      if (!contact) {
-        return [];
       }
 
-      return supprimerDoublonsEmails(
-        construireDestinatairesPourUtilisateur(
-          contact
-        )
-      );
+      return [];
     };
 
   /* =======================================================
-     ENVOI EMAIL
+     EMAIL
   ======================================================= */
 
   const envoyerNotificationsEmail =
@@ -811,104 +1201,151 @@ const NotificationCentre = () => {
       message,
       destinataires,
       typeMessage,
+      destinataire = null,
     }) => {
-      const destinatairesPropres =
-        supprimerDoublonsEmails(
-          destinataires || []
-        );
-
       if (
-        destinatairesPropres.length ===
-        0
+        !destinataires ||
+        destinataires.length ===
+          0
       ) {
         return {
           success: true,
           sent: 0,
-          failed: 0,
         };
       }
 
       try {
+        const listeEmailsExtrait =
+          destinataires
+            .map(
+              (d) =>
+                d.email
+            )
+            .filter(Boolean);
+
+        if (
+          listeEmailsExtrait.length ===
+          0
+        ) {
+          return {
+            success: true,
+            sent: 0,
+          };
+        }
+
         const response =
           await fetch(
             `${SERVER_URL}/api/send-notification-email`,
             {
-              method: 'POST',
+              method:
+                'POST',
 
               headers: {
                 'Content-Type':
                   'application/json',
               },
 
-              body: JSON.stringify({
-                recipients:
-                  destinatairesPropres,
+              body:
+                JSON.stringify({
+                  recipients:
+                    listeEmailsExtrait,
 
-                schoolName:
-                  schoolName ||
-                  currentSchool,
+                  schoolName:
+                    schoolName ||
+                    currentSchool,
 
-                schoolId:
-                  currentSchool,
+                  schoolId:
+                    currentSchool,
 
-                title:
-                  titre ||
-                  'Nouveau message Edulink',
+                  title:
+                    titre,
 
-                message:
-                  message ||
-                  '',
+                  message:
+                    message,
 
-                senderName:
-                  nomCompletUtilisateur(
-                    user
-                  ) ||
-                  'UTILISATEUR EDULINK',
+                  senderName:
+                    nomCompletUtilisateur(
+                      utilisateurConnecte
+                    ) ||
+                    'Administration',
 
-                type:
-                  typeMessage ||
-                  'message',
+                  senderRole:
+                    roleUtilisateur,
 
-                appUrl:
-                  import.meta.env
-                    .VITE_EDULINK_APP_URL ||
-                  window.location.origin,
+                  senderId:
+                    idUtilisateurConnecte,
 
-                hasAttachment:
-                  Boolean(
-                    fileName
-                  ),
-              }),
+                  recipientName:
+                    destinataire
+                      ? nomCompletUtilisateur(
+                          destinataire
+                        )
+                      : '',
+
+                  recipientRole:
+                    destinataire
+                      ? normaliser(
+                          destinataire.role
+                        )
+                      : '',
+
+                  recipientId:
+                    destinataire
+                      ? obtenirIdentifiantDocument(
+                          destinataire
+                        )
+                      : '',
+
+                  type:
+                    typeMessage ||
+                    'notification',
+
+                  appUrl:
+                    window.location.origin,
+
+                  hasAttachment:
+                    !!fileBase64,
+                }),
             }
           );
 
-        const data =
+        if (
+          response.ok
+        ) {
+          return {
+            success: true,
+            sent:
+              listeEmailsExtrait.length,
+          };
+        }
+
+        const errData =
           await response
             .json()
             .catch(
               () => ({})
             );
 
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              data?.msg ||
-              'Erreur du serveur d’e-mail.'
-          );
-        }
-
-        return data;
-      } catch (error) {
         console.error(
-          '❌ Erreur e-mail :',
+          '⚠️ Erreur serveur email :',
+          errData
+        );
+
+        return {
+          success: false,
+          error:
+            errData,
+        };
+      } catch (
+        error
+      ) {
+        console.error(
+          '❌ Erreur email :',
           error
         );
 
         return {
           success: false,
-          sent: 0,
-          failed:
-            destinatairesPropres.length,
           error:
             error.message,
         };
@@ -916,7 +1353,83 @@ const NotificationCentre = () => {
     };
 
   /* =======================================================
-     ENVOI DU MESSAGE
+     SELECTION DESTINATAIRE INDIVIDUEL
+  ======================================================= */
+
+  const selectionnerDestinataireIndividuel =
+    (person) => {
+      if (
+        !peutEnvoyerIndividuelA(
+          person
+        )
+      ) {
+        return;
+      }
+
+      setDestinataireIndividuel(
+        person
+      );
+
+      setCanalActif(
+        'DIRECT'
+      );
+
+      setFeedback('');
+    };
+
+  /* =======================================================
+     OUVRIR CANAL OFFICIEL
+  ======================================================= */
+
+  const ouvrirCanalOfficiel =
+    () => {
+      setCanalActif(
+        'OFFICIEL'
+      );
+
+      setDestinataireIndividuel(
+        null
+      );
+
+      setFeedback('');
+    };
+
+  /* =======================================================
+     OUVRIR PROMOTION
+  ======================================================= */
+
+  const ouvrirCanalPromotion =
+    () => {
+      setCanalActif(
+        'PROMOTION'
+      );
+
+      setDestinataireIndividuel(
+        null
+      );
+
+      setFeedback('');
+    };
+
+  /* =======================================================
+     OUVRIR ADMIN
+  ======================================================= */
+
+  const ouvrirCanalAdmin =
+    () => {
+      setCanalActif(
+        'ADMIN'
+      );
+
+      setDestinataireIndividuel(
+        null
+      );
+
+      setFeedback('');
+    };
+
+  /* =======================================================
+     ENVOI MESSAGE
   ======================================================= */
 
   const handlePublishMessageCentral =
@@ -928,13 +1441,12 @@ const NotificationCentre = () => {
       if (
         !corpsAnnonceOrChat.trim()
       ) {
+        setFeedback(
+          '❌ Veuillez saisir un message.'
+        );
+
         return;
       }
-
-      /*
-        COMMUNIQUÉ OFFICIEL :
-        uniquement administration.
-      */
 
       if (
         canalActif ===
@@ -954,9 +1466,9 @@ const NotificationCentre = () => {
       try {
         const expediteurNomComplet =
           nomCompletUtilisateur(
-            user
+            utilisateurConnecte
           ) ||
-          'UTILISATEUR EDULINK';
+          '';
 
         const titreFinal =
           titreAnnonce.trim() ||
@@ -965,11 +1477,218 @@ const NotificationCentre = () => {
         const messageFinal =
           corpsAnnonceOrChat.trim();
 
-        /* ================================================
-           PROMOTION
+        /* =================================================
+           MESSAGE INDIVIDUEL
         ================================================= */
 
         if (
+          canalActif ===
+          'DIRECT'
+        ) {
+          if (
+            !destinataireIndividuel
+          ) {
+            throw new Error(
+              'Veuillez sélectionner un destinataire.'
+            );
+          }
+
+          if (
+            !peutEnvoyerIndividuelA(
+              destinataireIndividuel
+            )
+          ) {
+            throw new Error(
+              'Vous n’êtes pas autorisé à contacter cet utilisateur.'
+            );
+          }
+
+          const destinataireId =
+            obtenirIdentifiantDocument(
+              destinataireIndividuel
+            );
+
+          if (
+            !destinataireId
+          ) {
+            throw new Error(
+              'Identifiant du destinataire introuvable.'
+            );
+          }
+
+          const destinataireNom =
+            nomCompletUtilisateur(
+              destinataireIndividuel
+            ) ||
+            'UTILISATEUR';
+
+          const destinataireRole =
+            normaliser(
+              destinataireIndividuel.role
+            );
+
+          /*
+           * DOCUMENT FIRESTORE INDIVIDUEL
+           */
+          const notificationData = {
+            schoolId:
+              currentSchool,
+
+            expediteurId:
+              idUtilisateurConnecte,
+
+            expediteurNom:
+              expediteurNomComplet,
+
+            expediteurRole:
+              roleUtilisateur,
+
+            expediteurEmail:
+              user?.email ||
+              '',
+
+            expediteurClasseId:
+              utilisateurConnecte?.classeId ||
+              null,
+
+            expediteurClasse:
+              utilisateurConnecte?.classe ||
+              null,
+
+            expediteurPromotionId:
+              utilisateurConnecte?.promotionId ||
+              null,
+
+            expediteurPromotion:
+              utilisateurConnecte?.promotion ||
+              null,
+
+            destinataireId:
+              destinataireId,
+
+            destinataireNom:
+              destinataireNom,
+
+            destinataireRole:
+              destinataireRole,
+
+            destinataireEmail:
+              destinataireIndividuel.email ||
+              '',
+
+            destinataireClasseId:
+              destinataireIndividuel.classeId ||
+              null,
+
+            destinataireClasse:
+              destinataireIndividuel.classe ||
+              null,
+
+            destinatairePromotionId:
+              destinataireIndividuel.promotionId ||
+              null,
+
+            destinatairePromotion:
+              destinataireIndividuel.promotion ||
+              null,
+
+            titre:
+              titreAnnonce.trim() ||
+              'Message individuel',
+
+            message:
+              messageFinal,
+
+            cible:
+              'individuel',
+
+            audience:
+              'individuel',
+
+            type:
+              'message_individuel',
+
+            pjName:
+              fileName ||
+              null,
+
+            pjData:
+              fileBase64 ||
+              null,
+
+            lu:
+              false,
+
+            masquePour:
+              [],
+
+            createdAt:
+              new Date().toISOString(),
+          };
+
+          await addDoc(
+            collection(
+              db,
+              'notifications'
+            ),
+            notificationData
+          );
+
+          /*
+           * EMAIL UNIQUEMENT AU DESTINATAIRE
+           */
+          const destinataires =
+            obtenirDestinatairesEmail();
+
+          const emailResult =
+            await envoyerNotificationsEmail(
+              {
+                titre:
+                  titreAnnonce.trim() ||
+                  'Message individuel Edulink',
+
+                message:
+                  messageFinal,
+
+                destinataires,
+
+                typeMessage:
+                  'message_individuel',
+
+                destinataire:
+                  destinataireIndividuel,
+              }
+            );
+
+          if (
+            emailResult.success
+          ) {
+            setFeedback(
+              `✅ Message individuel envoyé à ${destinataireNom}.`
+            );
+          } else {
+            setFeedback(
+              `⚠️ Message enregistré pour ${destinataireNom}, mais l'e-mail n'a pas pu être envoyé.`
+            );
+          }
+
+          /*
+           * RESET INDIVIDUEL
+           */
+          setDestinataireIndividuel(
+            null
+          );
+
+          setCanalActif(
+            'DIRECT'
+          );
+        }
+
+        /* =================================================
+           PROMOTION
+        ================================================= */
+
+        else if (
           canalActif ===
           'PROMOTION'
         ) {
@@ -982,49 +1701,57 @@ const NotificationCentre = () => {
             );
           }
 
-          const notificationData =
-            {
-              schoolId:
-                currentSchool,
+          const notificationData = {
+            schoolId:
+              currentSchool,
 
-              expediteurId:
-                idUtilisateurConnecte,
+            expediteurId:
+              idUtilisateurConnecte,
 
-              expediteurNom:
-                expediteurNomComplet,
+            expediteurNom:
+              expediteurNomComplet,
 
-              destinataireId:
-                `PROMOTION_${user.promotion}`,
+            expediteurRole:
+              roleUtilisateur,
 
-              destinataireNom:
-                `PROMOTION ${user.promotion}`,
+            destinataireId:
+              `PROMOTION_${user.promotion}`,
 
-              titre:
-                'Message de promotion',
+            destinataireNom:
+              `PROMOTION ${user.promotion}`,
 
-              message:
-                messageFinal,
+            titre:
+              'Message de promotion',
 
-              promotion:
-                user.promotion,
+            message:
+              messageFinal,
 
-              type:
-                'promotion',
+            promotion:
+              user.promotion,
 
-              audience:
-                'promotion',
+            cible:
+              'promotion',
 
-              pjName:
-                fileName ||
-                null,
+            type:
+              'promotion',
 
-              pjData:
-                fileBase64 ||
-                null,
+            audience:
+              'promotion',
 
-              createdAt:
-                new Date().toISOString(),
-            };
+            pjName:
+              fileName ||
+              null,
+
+            pjData:
+              fileBase64 ||
+              null,
+
+            masquePour:
+              [],
+
+            createdAt:
+              new Date().toISOString(),
+          };
 
           await addDoc(
             collection(
@@ -1053,67 +1780,69 @@ const NotificationCentre = () => {
               }
             );
 
-          if (
+          setFeedback(
             emailResult.success
-          ) {
-            setFeedback(
-              `✅ Message envoyé à la promotion. ${emailResult.sent || 0} notification(s) e-mail envoyée(s).`
-            );
-          } else {
-            setFeedback(
-              '⚠️ Message enregistré dans Edulink, mais l’envoi des e-mails a rencontré un problème.'
-            );
-          }
+              ? '✅ Message envoyé à la promotion.'
+              : "⚠️ Message enregistré, mais l’e-mail n’a pas pu être envoyé."
+          );
         }
 
-        /* ================================================
-           COMMUNIQUÉ OFFICIEL
+        /* =================================================
+           OFFICIEL
         ================================================= */
 
         else if (
           canalActif ===
           'OFFICIEL'
         ) {
-          const notificationData =
-            {
-              schoolId:
-                currentSchool,
+          const notificationData = {
+            schoolId:
+              currentSchool,
 
-              expediteurId:
-                idUtilisateurConnecte,
+            expediteurId:
+              idUtilisateurConnecte,
 
-              expediteurNom:
-                expediteurNomComplet,
+            expediteurNom:
+              expediteurNomComplet,
 
-              destinataireId:
-                'ALL',
+            expediteurRole:
+              roleUtilisateur,
 
-              destinataireNom:
-                "TOUT L'ÉTABLISSEMENT",
+            destinataireId:
+              'ALL',
 
-              titre:
-                titreFinal,
+            destinataireNom:
+              "TOUT L'ÉTABLISSEMENT",
 
-              message:
-                messageFinal,
+            titre:
+              titreFinal,
 
-              audience:
-                cibleAudienceGlobale,
+            message:
+              messageFinal,
 
-              type:
-                'global',
+            audience:
+              cibleAudienceGlobale,
 
-              pjName:
-                fileName ||
-                null,
+            cible:
+              'groupe',
 
-              pjData:
-                fileBase64 ||
-                null,
+            type:
+              'global',
 
-              createdAt:
-                new Date().toISOString(),
-            };
+            pjName:
+              fileName ||
+              null,
+
+            pjData:
+              fileBase64 ||
+              null,
+
+            masquePour:
+              [],
+
+            createdAt:
+              new Date().toISOString(),
+          };
 
           await addDoc(
             collection(
@@ -1126,71 +1855,70 @@ const NotificationCentre = () => {
           const destinataires =
             obtenirDestinatairesEmail();
 
-          const emailResult =
-            await envoyerNotificationsEmail(
-              {
-                titre:
-                  titreFinal,
+          await envoyerNotificationsEmail(
+            {
+              titre:
+                titreFinal,
 
-                message:
-                  messageFinal,
+              message:
+                messageFinal,
 
-                destinataires,
+              destinataires,
 
-                typeMessage:
-                  'global',
-              }
-            );
+              typeMessage:
+                'global',
+            }
+          );
 
-          if (
-            emailResult.success
-          ) {
-            setFeedback(
-              `✅ Communiqué enregistré. ${emailResult.sent || 0} e-mail(s) envoyé(s).`
-            );
-          } else {
-            setFeedback(
-              '⚠️ Communiqué enregistré dans Edulink, mais l’envoi e-mail a échoué.'
-            );
-          }
+          setFeedback(
+            '✅ Communiqué enregistré.'
+          );
 
           setTitreAnnonce('');
         }
 
-        /* ================================================
-           ADMINISTRATION
+        /* =================================================
+           ADMIN / RECLAMATION
         ================================================= */
 
         else if (
           canalActif ===
           'ADMIN'
         ) {
-          const notificationData =
-            {
-              schoolId:
-                currentSchool,
+          const notificationData = {
+            schoolId:
+              currentSchool,
 
-              expediteurId:
-                idUtilisateurConnecte,
+            expediteurId:
+              idUtilisateurConnecte,
 
-              expediteurNom:
-                expediteurNomComplet,
+            expediteurNom:
+              expediteurNomComplet,
 
-              destinataireId:
-                'ADMIN',
+            expediteurRole:
+              roleUtilisateur,
 
-              destinataireNom:
-                'ADMINISTRATION CENTRALE',
+            destinataireId:
+              'ADMIN',
 
-              message:
-                messageFinal,
+            destinataireNom:
+              'ADMINISTRATION CENTRALE',
 
-              type:
-                'reclamation',
+            message:
+              messageFinal,
 
-              createdAt:
-                new Date().toISOString(),
-            };
+            cible:
+              'administration',
+
+            type:
+              'reclamation',
+
+            masquePour:
+              [],
+
+            createdAt:
+              new Date().toISOString(),
+          };
 
           await addDoc(
             collection(
@@ -1200,20 +1928,10 @@ const NotificationCentre = () => {
             notificationData
           );
 
-          /*
-            On envoie aussi un e-mail
-            à l'administration si elle
-            possède une adresse.
-          */
-
           const admins =
             listeCamaradesEtPersonnels.filter(
               (person) =>
-                [
-                  'admin',
-                  'super_admin',
-                  'secretaire',
-                ].includes(
+                ROLES_ADMIN.includes(
                   normaliser(
                     person.role
                   )
@@ -1231,160 +1949,70 @@ const NotificationCentre = () => {
                     nomCompletUtilisateur(
                       person
                     ),
+
+                  type:
+                    'administration',
                 })
               )
             );
 
-          const emailResult =
-            await envoyerNotificationsEmail(
-              {
-                titre:
-                  'Nouvelle réclamation',
-
-                message:
-                  messageFinal,
-
-                destinataires,
-
-                typeMessage:
-                  'reclamation',
-              }
-            );
-
-          if (
-            emailResult.success
-          ) {
-            setFeedback(
-              `✅ Réclamation envoyée. ${emailResult.sent || 0} e-mail(s) envoyé(s).`
-            );
-          } else {
-            setFeedback(
-              '⚠️ Réclamation enregistrée dans Edulink, mais l’e-mail n’a pas pu être envoyé.'
-            );
-          }
-        }
-
-        /* ================================================
-           MESSAGE PRIVÉ
-        ================================================= */
-
-        else {
-          const contactCibleObj =
-            listeCamaradesEtPersonnels.find(
-              (x) =>
-                x.id ===
-                  canalActif ||
-                x.matricule ===
-                  canalActif
-            );
-
-          if (
-            !contactCibleObj
-          ) {
-            throw new Error(
-              'Destinataire introuvable.'
-            );
-          }
-
-          const typeMessageCalcule =
-            'chat_eleve';
-
-          await addDoc(
-            collection(
-              db,
-              'notifications'
-            ),
+          await envoyerNotificationsEmail(
             {
-              schoolId:
-                currentSchool,
-
-              expediteurId:
-                idUtilisateurConnecte,
-
-              expediteurNom:
-                expediteurNomComplet,
-
-              destinataireId:
-                contactCibleObj.id,
-
-              destinataireNom:
-                nomCompletUtilisateur(
-                  contactCibleObj
-                ),
+              titre:
+                'Nouvelle réclamation',
 
               message:
                 messageFinal,
 
-              type:
-                typeMessageCalcule,
+              destinataires,
 
-              createdAt:
-                new Date().toISOString(),
+              typeMessage:
+                'reclamation',
             }
           );
 
-          /*
-            E-mail au destinataire
-            + parent si le destinataire
-            est un élève.
-          */
-
-          const destinataires =
-            obtenirDestinatairesEmail();
-
-          const emailResult =
-            await envoyerNotificationsEmail(
-              {
-                titre:
-                  'Nouveau message Edulink',
-
-                message:
-                  messageFinal,
-
-                destinataires,
-
-                typeMessage:
-                  'prive',
-              }
-            );
-
-          if (
-            emailResult.success
-          ) {
-            setFeedback(
-              `✅ Message envoyé. ${emailResult.sent || 0} e-mail(s) envoyé(s).`
-            );
-          } else {
-            setFeedback(
-              '⚠️ Message enregistré dans Edulink, mais l’e-mail n’a pas pu être envoyé.'
-            );
-          }
+          setFeedback(
+            '✅ Réclamation envoyée.'
+          );
         }
 
-        /* ================================================
-           NETTOYAGE
+        /* =================================================
+           RESET
         ================================================= */
 
-        setCorpsAnnonceOrChat('');
-        setFileBase64(null);
-        setFileName('');
+        setCorpsAnnonceOrChat(
+          ''
+        );
+
+        setFileBase64(
+          null
+        );
+
+        setFileName(
+          ''
+        );
 
         const fileInput =
           document.getElementById(
             'fileCentralInput'
           );
 
-        if (fileInput) {
-          fileInput.value = '';
+        if (
+          fileInput
+        ) {
+          fileInput.value =
+            '';
         }
-      } catch (err) {
+      } catch (
+        error
+      ) {
         console.error(
           '❌ Erreur lors de l’envoi :',
-          err
+          error
         );
 
         setFeedback(
-          `❌ ${err.message || 'Une erreur est survenue lors de l’envoi.'}`
+          `❌ ${error.message}`
         );
       } finally {
         setSending(false);
@@ -1392,35 +2020,95 @@ const NotificationCentre = () => {
     };
 
   /* =======================================================
-     CONTACTS
+     FILTRE CONTACTS
   ======================================================= */
 
   const filtrerFichesDestinatairesLeft =
-    listeCamaradesEtPersonnels.filter(
+    contactsIndividuelsAutorises.filter(
       (contact) => {
         const role =
           normaliser(
             contact.role
           );
 
-        const matcheRole =
-          role ===
-            normaliser(
-              scopeFiltreContacts
-            ) ||
-          (
-            scopeFiltreContacts ===
-              'professeur' &&
-            role ===
-              'prof_principal'
-          );
+        /*
+         * ÉDUCATEUR :
+         * seulement les élèves.
+         */
+        if (
+          estEducateur
+        ) {
+          if (
+            !ROLES_ELEVES.includes(
+              role
+            )
+          ) {
+            return false;
+          }
+        }
+
+        /*
+         * ADMIN :
+         * filtre selon l'onglet.
+         */
+        let matcheRole =
+          false;
+
+        if (
+          scopeFiltreContacts ===
+          'eleve'
+        ) {
+          matcheRole =
+            ROLES_ELEVES.includes(
+              role
+            );
+        }
+
+        if (
+          scopeFiltreContacts ===
+          'professeur'
+        ) {
+          matcheRole =
+            ROLES_PROFESSEURS.includes(
+              role
+            );
+        }
+
+        if (
+          scopeFiltreContacts ===
+          'educateur'
+        ) {
+          matcheRole =
+            ROLES_EDUCATEURS.includes(
+              role
+            );
+        }
+
+        /*
+         * Pour les éducateurs,
+         * l'onglet élèves est forcé.
+         */
+        if (
+          estEducateur
+        ) {
+          matcheRole =
+            ROLES_ELEVES.includes(
+              role
+            );
+        }
 
         const nomComplet =
           `${contact.nom || ''} ${
             contact.prenoms ||
             contact.prenom ||
             ''
-          } ${contact.id}`
+          } ${
+            contact.matricule ||
+            ''
+          } ${
+            contact.id ||
+            ''
+          }`
             .toLowerCase();
 
         return (
@@ -1435,15 +2123,15 @@ const NotificationCentre = () => {
     );
 
   /* =======================================================
-     MESSAGES
+     MESSAGES A AFFICHER
   ======================================================= */
 
   const messagesFiltresAAfficher =
     tousLesMessagesDuEtablissement.filter(
-      (m) => {
-        /* -----------------------------------------------
+      (message) => {
+        /* ================================================
            OFFICIEL
-        ------------------------------------------------ */
+        ================================================ */
 
         if (
           canalActif ===
@@ -1454,7 +2142,7 @@ const NotificationCentre = () => {
               'global',
               'promotion',
             ].includes(
-              m.type
+              message.type
             )
           ) {
             return false;
@@ -1472,13 +2160,13 @@ const NotificationCentre = () => {
           }
 
           if (
-            m.type ===
+            message.type ===
             'promotion'
           ) {
             return (
               estEleve &&
               normaliser(
-                m.promotion
+                message.promotion
               ) ===
                 normaliser(
                   user?.promotion
@@ -1487,31 +2175,31 @@ const NotificationCentre = () => {
           }
 
           return (
-            m.audience ===
+            message.audience ===
               'all' ||
-            m.audience ===
+            message.audience ===
               roleUtilisateur ||
             (
-              m.audience ===
+              message.audience ===
                 'eleve' &&
               estEleve
             )
           );
         }
 
-        /* -----------------------------------------------
+        /* ================================================
            PROMOTION
-        ------------------------------------------------ */
+        ================================================ */
 
         if (
           canalActif ===
           'PROMOTION'
         ) {
           return (
-            m.type ===
+            message.type ===
               'promotion' &&
             normaliser(
-              m.promotion
+              message.promotion
             ) ===
               normaliser(
                 user?.promotion
@@ -1519,54 +2207,122 @@ const NotificationCentre = () => {
           );
         }
 
-        /* -----------------------------------------------
+        /* ================================================
            ADMIN
-        ------------------------------------------------ */
+        ================================================ */
 
         if (
           canalActif ===
           'ADMIN'
         ) {
           return (
-            m.type ===
+            message.type ===
               'reclamation' &&
             (
-              m.expediteurId ===
+              String(
+                message.expediteurId ||
+                ''
+              ) ===
                 idUtilisateurConnecte ||
-              m.destinataireId ===
+              String(
+                message.destinataireId ||
+                ''
+              ) ===
                 idUtilisateurConnecte ||
-              m.destinataireId ===
+              message.destinataireId ===
                 'ADMIN'
             )
           );
         }
 
-        /* -----------------------------------------------
-           PRIVÉ
-        ------------------------------------------------ */
+        /* ================================================
+           MESSAGE INDIVIDUEL
+        ================================================ */
 
-        return (
-          (
-            m.type ===
-              'chat_eleve' ||
-            m.type ===
-              'reclamation'
-          ) &&
-          (
+        if (
+          canalActif ===
+          'DIRECT'
+        ) {
+          /*
+           * Si aucun destinataire n'est sélectionné,
+           * on montre les messages individuels où
+           * l'utilisateur connecté intervient.
+           */
+          if (
+            !destinataireIndividuel
+          ) {
+            return (
+              message.cible ===
+                'individuel' ||
+              message.type ===
+                'message_individuel' ||
+              message.type ===
+                'chat_eleve'
+            ) &&
             (
-              m.expediteurId ===
-                idUtilisateurConnecte &&
-              m.destinataireId ===
-                canalActif
-            ) ||
+              normaliser(
+                message.expediteurId
+              ) ===
+                normaliser(
+                  idUtilisateurConnecte
+                ) ||
+              normaliser(
+                message.destinataireId
+              ) ===
+                normaliser(
+                  idUtilisateurConnecte
+                )
+            );
+          }
+
+          const selectedId =
+            obtenirIdentifiantDocument(
+              destinataireIndividuel
+            );
+
+          return (
             (
-              m.expediteurId ===
-                canalActif &&
-              m.destinataireId ===
-                idUtilisateurConnecte
+              message.cible ===
+                'individuel' ||
+              message.type ===
+                'message_individuel' ||
+              message.type ===
+                'chat_eleve'
+            ) &&
+            (
+              (
+                normaliser(
+                  message.expediteurId
+                ) ===
+                  normaliser(
+                    idUtilisateurConnecte
+                  ) &&
+                normaliser(
+                  message.destinataireId
+                ) ===
+                  normaliser(
+                    selectedId
+                  )
+              ) ||
+              (
+                normaliser(
+                  message.expediteurId
+                ) ===
+                  normaliser(
+                    selectedId
+                  ) &&
+                normaliser(
+                  message.destinataireId
+                ) ===
+                  normaliser(
+                    idUtilisateurConnecte
+                  )
+              )
             )
-          )
-        );
+          );
+        }
+
+        return false;
       }
     );
 
@@ -1574,44 +2330,28 @@ const NotificationCentre = () => {
      CHARGEMENT
   ======================================================= */
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
-      <div
-        className="
-          p-8
-          text-center
-          text-xs
-          font-bold
-          text-purple-600
-          animate-pulse
-          uppercase
-        "
-      >
-        Ouverture de la centrale des messages...
+      <div className="p-8 text-center text-xs font-bold text-purple-600 animate-pulse uppercase">
+        Ouverture de la centrale...
       </div>
     );
   }
 
   /* =======================================================
-     INTERFACE
+     RENDU
   ======================================================= */
 
   return (
-    <div
-      className="
-        max-w-7xl
-        mx-auto
-        p-4
-        sm:p-6
-        font-sans
-        text-gray-700
-        text-left
-        animate-fadeIn
-        min-h-screen
-        bg-gray-50
-      "
-    >
-      {/* RETOUR */}
+    <div className="max-w-7xl mx-auto p-0 sm:p-6 font-sans text-gray-700 text-left bg-white min-h-screen">
+
+      <Header />
+
+      {/* ===================================================
+          RETOUR
+      =================================================== */}
 
       <div className="mb-4">
         <button
@@ -1619,428 +2359,272 @@ const NotificationCentre = () => {
           onClick={() =>
             navigate(-1)
           }
-          className="
-            inline-flex
-            items-center
-            text-xs
-            font-black
-            bg-white
-            border
-            hover:bg-gray-100
-            text-gray-700
-            px-4
-            py-2
-            rounded-xl
-            transition
-            shadow-sm
-            cursor-pointer
-          "
+          className="inline-flex items-center text-xs font-black bg-white border hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-xl transition shadow-sm cursor-pointer"
         >
           ⬅️ Retour au Bureau Établissement
         </button>
       </div>
 
-      {/* BANDEAU */}
+      {/* ===================================================
+          BANDEAU
+      =================================================== */}
 
-      <div
-        className="
-          bg-slate-900
-          p-5
-          rounded-2xl
-          border
-          shadow-md
-          mb-6
-        "
-      >
-        <span
-          className="
-            text-[10px]
-            font-black
-            uppercase
-            tracking-widest
-            text-orange-400
-            bg-orange-950/40
-            px-3
-            py-1
-            rounded-full
-          "
-        >
+      <div className="bg-slate-900 p-5 rounded-2xl border shadow-md mb-6">
+
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-950/40 px-3 py-1 rounded-full">
           📡 Routeur de Flux NoSQL
         </span>
 
-        <h2
-          className="
-            text-xl
-            font-black
-            mt-2
-            text-white
-          "
-        >
+        <h2 className="text-xl font-black mt-2 ">
           Centre National des Correspondances Scolaires
         </h2>
 
-        <p
-          className="
-            text-xs
-            text-slate-400
-            mt-0.5
-          "
-        >
-          Utilisateur connecté :
+        <p className="text-xs text-slate-400 mt-0.5">
 
-          <span
-            className="
-              font-bold
-              uppercase
-              ml-1
-            "
-          >
-            {user?.nom ||
-              'UTILISATEUR'}{' '}
-            ({idUtilisateurConnecte})
+          Connecté :
+
+          <span className="font-bold uppercase ml-1">
+
+            {
+              user?.nom ||
+              user?.name ||
+              'UTILISATEUR'
+            }
+
+            {' '}
+
+            (
+            {
+              idUtilisateurConnecte
+            }
+            )
+
           </span>
+
         </p>
+
       </div>
 
-      {/* FEEDBACK */}
+      {/* ===================================================
+          FEEDBACK
+      =================================================== */}
 
       {feedback && (
         <div
-          className={`
-            mb-5
-            p-3
-            rounded-xl
-            border
-            text-xs
-            font-bold
-            ${
-              feedback.startsWith('❌')
-                ? 'bg-red-50 text-red-700 border-red-200'
-                : feedback.startsWith('⚠️')
-                ? 'bg-orange-50 text-orange-700 border-orange-200'
-                : 'bg-green-50 text-green-700 border-green-200'
-            }
-          `}
+          className={`mb-5 p-3 rounded-xl border text-xs font-bold ${
+            feedback.startsWith('❌')
+              ? 'bg-red-50 text-red-700 border-red-200'
+              : feedback.startsWith('⚠️')
+              ? 'bg-orange-50 text-orange-700 border-orange-200'
+              : 'bg-green-50 text-green-700 border-green-200'
+          }`}
         >
           {feedback}
         </div>
       )}
 
-      {/* GRILLE */}
+      {/* ===================================================
+          PANNEAU
+      =================================================== */}
 
-      <div
-        className="
-          grid
-          grid-cols-1
-          lg:grid-cols-3
-          gap-6
-          items-start
-        "
-      >
-        {/* GAUCHE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        <div
-          className="
-            bg-white
-            rounded-2xl
-            border
-            shadow-sm
-            p-4
-            space-y-4
-            h-[540px]
-            flex
-            flex-col
-          "
-        >
+        {/* =================================================
+            GAUCHE
+        ================================================= */}
+
+        <div className="bg-white rounded-2xl border shadow-sm p-4 space-y-4 h-[540px] flex flex-col">
+
           <div>
-            <h3
-              className="
-                text-xs
-                font-black
-                text-gray-400
-                uppercase
-                tracking-wider
-                border-b
-                pb-2
-              "
-            >
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-2">
               Canaux d'Aiguillage
             </h3>
           </div>
 
-          <div
-            className="
-              space-y-1.5
-              flex-1
-              overflow-y-auto
-              pr-1
-            "
-          >
-            {/* OFFICIEL */}
+          <div className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+
+            {/* ============================================
+                OFFICIEL
+            ============================================ */}
 
             <button
               type="button"
-              onClick={() =>
-                setCanalActif(
-                  'OFFICIEL'
-                )
+              onClick={
+                ouvrirCanalOfficiel
               }
-              className={`
-                w-full
-                text-left
-                p-3
-                rounded-xl
-                transition
-                font-black
-                text-xs
-                flex
-                items-center
-                justify-between
-                cursor-pointer
-                border
-                ${
-                  canalActif ===
-                  'OFFICIEL'
-                    ? 'bg-purple-600 text-white border-purple-700 shadow-md'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }
-              `}
+              className={`w-full text-left p-3 rounded-xl transition font-black text-xs flex items-center justify-between cursor-pointer border ${
+                canalActif ===
+                'OFFICIEL'
+                  ? 'bg-purple-600  border-purple-700 shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
             >
               <span>
                 📢 Communiqués Officiels
               </span>
 
-              <span
-                className="
-                  text-[8px]
-                  bg-white/20
-                  text-white
-                  px-2
-                  py-0.5
-                  rounded
-                  uppercase
-                "
-              >
+              <span className="text-[8px] bg-white/20  px-2 py-0.5 rounded uppercase">
                 Général
               </span>
             </button>
 
-            {/* PROMOTION ÉLÈVE */}
+            {/* ============================================
+                PROMOTION
+            ============================================ */}
 
             {estEleve &&
               user?.promotion && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setCanalActif(
-                      'PROMOTION'
-                    )
+                  onClick={
+                    ouvrirCanalPromotion
                   }
-                  className={`
-                    w-full
-                    text-left
-                    p-3
-                    rounded-xl
-                    transition
-                    font-black
-                    text-xs
-                    flex
-                    items-center
-                    justify-between
-                    cursor-pointer
-                    border
-                    ${
-                      canalActif ===
-                      'PROMOTION'
-                        ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                    }
-                  `}
+                  className={`w-full text-left p-3 rounded-xl transition font-black text-xs flex items-center justify-between cursor-pointer border ${
+                    canalActif ===
+                    'PROMOTION'
+                      ? 'bg-blue-600  border-blue-700 shadow-md'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
                 >
                   <span>
                     🎓 Ma promotion
                   </span>
 
-                  <span
-                    className="
-                      text-[8px]
-                      bg-blue-200
-                      text-blue-800
-                      px-2
-                      py-0.5
-                      rounded
-                      uppercase
-                    "
-                  >
-                    {user.promotion}
+                  <span className="text-[8px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded uppercase">
+                    {
+                      user.promotion
+                    }
                   </span>
                 </button>
               )}
 
-            {/* ADMIN */}
+            {/* ============================================
+                ADMIN
+            ============================================ */}
 
-            {roleUtilisateur !==
-              'admin' &&
-              roleUtilisateur !==
-                'super_admin' && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCanalActif(
-                      'ADMIN'
-                    )
-                  }
-                  className={`
-                    w-full
-                    text-left
-                    p-3
-                    rounded-xl
-                    transition
-                    font-black
-                    text-xs
-                    flex
-                    items-center
-                    justify-between
-                    cursor-pointer
-                    border
-                    ${
-                      canalActif ===
-                      'ADMIN'
-                        ? 'bg-red-600 text-white border-red-700 shadow-md'
-                        : 'bg-red-50 text-red-700 hover:bg-red-100/50'
-                    }
-                  `}
-                >
-                  <span>
-                    🏛️ Réclamation Secrétariat Admin
-                  </span>
-
-                  <span
-                    className="
-                      text-[8px]
-                      bg-red-950
-                      text-red-300
-                      px-2
-                      py-0.5
-                      rounded
-                      font-mono
-                    "
-                  >
-                    SOS
-                  </span>
-                </button>
-              )}
-
-            {/* CONTACTS */}
-
-            <div
-              className="
-                pt-4
-                border-t
-                mt-4
-                space-y-2
-              "
-            >
-              <span
-                className="
-                  text-[10px]
-                  font-black
-                  uppercase
-                  text-gray-400
-                  tracking-wider
-                "
+            {!estAdministrateur && (
+              <button
+                type="button"
+                onClick={
+                  ouvrirCanalAdmin
+                }
+                className={`w-full text-left p-3 rounded-xl transition font-black text-xs flex items-center justify-between cursor-pointer border ${
+                  canalActif ===
+                  'ADMIN'
+                    ? 'bg-red-600  border-red-700 shadow-md'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100/50'
+                }`}
               >
-                Carnet de Contacts Interconnecté
-              </span>
+                <span>
+                  🏛️ Réclamation Secrétariat
+                </span>
 
-              <div
-                className="
-                  flex
-                  bg-gray-100
-                  p-0.5
-                  rounded-lg
-                  border
-                  text-[9px]
-                  font-black
-                  uppercase
-                "
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setScopeFiltreContacts(
-                      'eleve'
-                    )
-                  }
-                  className={`
-                    flex-1
-                    py-1
-                    rounded
-                    transition
-                    cursor-pointer
-                    ${
-                      scopeFiltreContacts ===
-                      'eleve'
-                        ? 'bg-slate-900 text-orange-400'
-                        : 'text-gray-400'
-                    }
-                  `}
-                >
-                  Élèves
-                </button>
+                <span className="text-[8px] bg-red-950 text-red-300 px-2 py-0.5 rounded font-mono">
+                  SOS
+                </span>
+              </button>
+            )}
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setScopeFiltreContacts(
-                      'professeur'
-                    )
-                  }
-                  className={`
-                    flex-1
-                    py-1
-                    rounded
-                    transition
-                    cursor-pointer
-                    ${
-                      scopeFiltreContacts ===
-                      'professeur'
-                        ? 'bg-slate-900 text-orange-400'
-                        : 'text-gray-400'
-                    }
-                  `}
-                >
-                  Professeurs
-                </button>
+            {/* ============================================
+                CONTACTS INDIVIDUELS
+            ============================================ */}
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setScopeFiltreContacts(
-                      'educateur'
-                    )
-                  }
-                  className={`
-                    flex-1
-                    py-1
-                    rounded
-                    transition
-                    cursor-pointer
-                    ${
-                      scopeFiltreContacts ===
-                      'educateur'
-                        ? 'bg-slate-900 text-orange-400'
-                        : 'text-gray-400'
-                    }
-                  `}
-                >
-                  Éducateurs
-                </button>
+            <div className="pt-4 border-t mt-4 space-y-2">
+
+              <div className="flex items-center justify-between">
+
+                <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                  💬 Messages individuels
+                </span>
+
+                {estAdministrateur && (
+                  <span className="text-[8px] font-black uppercase bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                    Admin
+                  </span>
+                )}
+
+                {estEducateur && (
+                  <span className="text-[8px] font-black uppercase bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                    Élèves uniquement
+                  </span>
+                )}
+
               </div>
+
+              {/* ==========================================
+                  FILTRES ADMIN
+              ========================================== */}
+
+              {estAdministrateur && (
+                <div className="flex bg-gray-100 p-0.5 rounded-lg border text-[9px] font-black uppercase">
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setScopeFiltreContacts(
+                        'eleve'
+                      )
+                    }
+                    className={`flex-1 py-1 rounded transition cursor-pointer ${
+                      scopeFiltreContacts ===
+                      'eleve'
+                        ? 'bg-slate-900 text-orange-400'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    Élèves
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setScopeFiltreContacts(
+                        'professeur'
+                      )
+                    }
+                    className={`flex-1 py-1 rounded transition cursor-pointer ${
+                      scopeFiltreContacts ===
+                      'professeur'
+                        ? 'bg-slate-900 text-orange-400'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    Profs
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setScopeFiltreContacts(
+                        'educateur'
+                      )
+                    }
+                    className={`flex-1 py-1 rounded transition cursor-pointer ${
+                      scopeFiltreContacts ===
+                      'educateur'
+                        ? 'bg-slate-900 text-orange-400'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    Éducateurs
+                  </button>
+
+                </div>
+              )}
+
+              {/* ==========================================
+                  EDUCATEUR
+              ========================================== */}
+
+              {estEducateur && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-2 text-[9px] font-bold text-blue-700">
+                  🧑‍💼 En tant qu'éducateur, vous pouvez envoyer un message individuel uniquement à un élève.
+                </div>
+              )}
 
               <input
                 type="text"
-                placeholder="🔍 Filtrer par nom ou prénom..."
+                placeholder="🔍 Rechercher un destinataire..."
                 value={
                   barreRechercheContact
                 }
@@ -2049,405 +2633,395 @@ const NotificationCentre = () => {
                     e.target.value
                   )
                 }
-                className="
-                  w-full
-                  bg-gray-50
-                  border
-                  p-2
-                  rounded-lg
-                  text-[11px]
-                  font-bold
-                  outline-none
-                  text-gray-700
-                  focus:ring-1
-                  focus:ring-purple-500
-                "
+                className="w-full bg-gray-50 border p-2 rounded-lg text-[11px] font-bold outline-none text-gray-700 focus:ring-1 focus:ring-purple-500"
               />
+
             </div>
 
-            {/* LISTE */}
+            {/* ============================================
+                LISTE DESTINATAIRES
+            ============================================ */}
 
-            <div
-              className="
-                space-y-1
-                max-h-[160px]
-                overflow-y-auto
-                pt-2
-              "
-            >
-              {filtrerFichesDestinatairesLeft.map(
-                (contact) => (
-                  <button
-                    key={
-                      contact.id
-                    }
-                    type="button"
-                    onClick={() =>
-                      setCanalActif(
-                        contact.id
-                      )
-                    }
-                    className={`
-                      w-full
-                      text-left
-                      p-2
-                      rounded-lg
-                      text-[11px]
-                      transition
-                      flex
-                      justify-between
-                      items-center
-                      cursor-pointer
-                      ${
-                        canalActif ===
-                        contact.id
-                          ? 'bg-slate-900 text-orange-400 font-black shadow-xs'
-                          : 'bg-white border hover:bg-gray-50'
-                      }
-                    `}
-                  >
-                    <span
-                      className="
-                        truncate
-                        uppercase
-                        font-black
-                      "
-                    >
-                      {contact.nom}{' '}
-                      {contact.prenoms ||
-                        contact.prenom ||
-                        contact.name ||
-                        ''}
-                    </span>
+            <div className="space-y-1 max-h-[190px] overflow-y-auto pt-2">
 
-                    <span
-                      className="
-                        font-mono
-                        text-[8px]
-                        text-gray-400
-                        bg-gray-100
-                        px-1
-                        py-0.5
-                        rounded
-                        uppercase
-                        font-bold
-                      "
-                    >
-                      {contact.classeId ||
-                        contact.promotion ||
-                        contact.role}
-                    </span>
-                  </button>
+              {filtrerFichesDestinatairesLeft.length ===
+              0 ? (
+                <div className="text-center py-5 text-[10px] text-gray-400 font-bold">
+                  Aucun destinataire trouvé.
+                </div>
+              ) : (
+                filtrerFichesDestinatairesLeft.map(
+                  (contact) => {
+
+                    const estSelectionne =
+                      canalActif ===
+                        'DIRECT' &&
+                      destinataireIndividuel &&
+                      obtenirIdentifiantDocument(
+                        destinataireIndividuel
+                      ) ===
+                        obtenirIdentifiantDocument(
+                          contact
+                        );
+
+                    return (
+                      <button
+                        key={
+                          contact.id
+                        }
+                        type="button"
+                        onClick={() =>
+                          selectionnerDestinataireIndividuel(
+                            contact
+                          )
+                        }
+                        className={`w-full text-left p-2.5 rounded-lg text-[11px] transition flex justify-between items-center cursor-pointer ${
+                          estSelectionne
+                            ? 'bg-slate-900 text-orange-400 font-black shadow-md border border-slate-900'
+                            : 'bg-white border hover:bg-gray-50'
+                        }`}
+                      >
+
+                        <span className="min-w-0">
+
+                          <span className="truncate uppercase font-black block">
+
+                            {
+                              contact.nom
+                            }
+
+                            {' '}
+
+                            {
+                              contact.prenoms ||
+                              contact.prenom ||
+                              ''
+                            }
+
+                          </span>
+
+                          <span
+                            className={`text-[8px] uppercase ${
+                              estSelectionne
+                                ? 'text-orange-300'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {
+                              normaliser(
+                                contact.role
+                              )
+                            }
+                          </span>
+
+                        </span>
+
+                        <span
+                          className={`font-mono text-[8px] px-1 py-0.5 rounded uppercase font-bold ${
+                            estSelectionne
+                              ? 'bg-white/10 text-orange-300'
+                              : 'text-gray-400 bg-gray-100'
+                          }`}
+                        >
+                          {
+                            contact.classeId ||
+                            contact.promotion ||
+                            contact.matricule ||
+                            contact.role
+                          }
+                        </span>
+
+                      </button>
+                    );
+                  }
                 )
               )}
+
             </div>
+
           </div>
+
         </div>
 
-        {/* DISCUSSION */}
+        {/* =================================================
+            CENTRE
+        ================================================= */}
 
-        <div
-          className="
-            lg:col-span-2
-            flex
-            flex-col
-            justify-between
-            bg-white
-            rounded-2xl
-            border
-            shadow-sm
-            h-[540px]
-            overflow-hidden
-          "
-        >
-          {/* HEADER */}
+        <div className="lg:col-span-2 flex flex-col bg-white rounded-2xl border shadow-sm h-[540px] overflow-hidden">
 
-          <div
-            className="
-              p-4
-              bg-gray-50
-              border-b
-              flex
-              justify-between
-              items-center
-              text-xs
-              font-black
-              text-gray-800
-            "
-          >
-            <p>
-              Fil Connecté :
+          {/* ==============================================
+              BANDEAU
+          ============================================== */}
 
-              <span
-                className="
-                  text-purple-700
-                  uppercase
-                  ml-1
-                "
-              >
-                {canalActif ===
-                'OFFICIEL'
-                  ? 'Affichage Communiqués Généraux'
-                  : canalActif ===
-                    'PROMOTION'
-                  ? `Promotion ${user?.promotion || ''}`
-                  : canalActif ===
-                    'ADMIN'
-                  ? 'Secrétariat de la Direction'
-                  : `Discussion avec ${
-                      listeCamaradesEtPersonnels.find(
-                        (v) =>
-                          v.id ===
-                            canalActif ||
-                          v.matricule ===
-                            canalActif
-                      )?.nom ||
-                      'Membre Équipe'
-                    }`}
-              </span>
-            </p>
+          <div className="p-4 bg-gray-50 border-b flex justify-between items-center text-xs font-black text-gray-800">
 
-            <span
-              className="
-                text-[10px]
-                font-mono
-                text-emerald-600
-                uppercase
-                bg-emerald-50
-                px-2
-                py-0.5
-                rounded
-                animate-pulse
-              "
-            >
+            <div>
+
+              <p>
+
+                Fil Connecté :
+
+                <span className="text-purple-700 uppercase ml-1">
+
+                  {canalActif ===
+                  'OFFICIEL'
+                    ? 'Communiqués Généraux'
+                    : canalActif ===
+                      'PROMOTION'
+                    ? `Promotion ${
+                        user?.promotion ||
+                        ''
+                      }`
+                    : canalActif ===
+                      'ADMIN'
+                    ? 'Secrétariat Direction'
+                    : canalActif ===
+                      'DIRECT'
+                    ? destinataireIndividuel
+                      ? `Message avec ${nomCompletUtilisateur(
+                          destinataireIndividuel
+                        )}`
+                      : 'Messages individuels'
+                    : 'Discussion Directe'}
+
+                </span>
+
+              </p>
+
+              {canalActif ===
+                'DIRECT' &&
+                destinataireIndividuel && (
+                  <p className="text-[9px] text-gray-400 mt-1">
+
+                    Destinataire :
+
+                    <span className="font-black text-gray-600 ml-1">
+
+                      {
+                        nomCompletUtilisateur(
+                          destinataireIndividuel
+                        )
+                      }
+
+                    </span>
+
+                    <span className="ml-2 uppercase">
+
+                      (
+                      {
+                        normaliser(
+                          destinataireIndividuel.role
+                        )
+                      }
+                      )
+
+                    </span>
+
+                  </p>
+                )}
+
+            </div>
+
+            <span className="text-[10px] font-mono text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded animate-pulse">
               ● Canal Actif
             </span>
+
           </div>
 
-          {/* MESSAGES */}
+          {/* ==============================================
+              HISTORIQUE
+          ============================================== */}
 
-          <div
-            className="
-              p-4
-              overflow-y-auto
-              flex-1
-              space-y-4
-              bg-gray-50/40
-              max-h-[340px]
-            "
-          >
+          <div className="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-50/40">
+
             {messagesFiltresAAfficher.length ===
             0 ? (
-              <div
-                className="
-                  text-center
-                  py-20
-                  text-gray-400
-                  italic
-                  text-xs
-                  font-medium
-                "
-              >
-                Aucun message échangé.
-                Saisissez votre texte ci-dessous
-                pour démarrer le dialogue en direct.
+
+              <div className="text-center py-20 text-gray-400 italic text-xs font-medium">
+
+                {canalActif ===
+                  'DIRECT' &&
+                !destinataireIndividuel
+                  ? 'Sélectionnez un destinataire pour ouvrir une conversation individuelle.'
+                  : 'Aucun message échangé.'}
+
               </div>
+
             ) : (
+
               messagesFiltresAAfficher.map(
-                (m, index) => {
+                (message, index) => {
+
                   const estAnnonceOfficielle =
-                    m.type ===
+                    message.type ===
                       'global' ||
-                    m.type ===
+                    message.type ===
                       'promotion';
 
                   const estMoi =
-                    m.expediteurId ===
-                    idUtilisateurConnecte;
-
-                  if (
-                    estAnnonceOfficielle
-                  ) {
-                    return (
-                      <div
-                        key={
-                          m.id ||
-                          index
-                        }
-                        className="
-                          p-4
-                          rounded-xl
-                          border-l-4
-                          border-l-purple-600
-                          bg-white
-                          shadow-2xs
-                          text-xs
-                          font-medium
-                          space-y-2
-                          animate-fadeIn
-                        "
-                      >
-                        <div
-                          className="
-                            flex
-                            justify-between
-                            items-center
-                            font-bold
-                            text-gray-900
-                            border-b
-                            pb-1
-                          "
-                        >
-                          <span
-                            className="
-                              text-purple-700
-                              uppercase
-                            "
-                          >
-                            📣 {m.titre}
-                          </span>
-
-                          <span
-                            className="
-                              text-[10px]
-                              text-gray-400
-                              font-mono
-                              font-bold
-                            "
-                          >
-                            {m.expediteurNom ||
-                              'DIRECTION'}
-                          </span>
-                        </div>
-
-                        <p
-                          className="
-                            text-gray-600
-                            leading-relaxed
-                            font-medium
-                            whitespace-pre-wrap
-                          "
-                        >
-                          {m.message}
-                        </p>
-
-                        {m.pjName &&
-                          m.pjData && (
-                            <div
-                              className="
-                                mt-2
-                                p-2
-                                bg-gray-50
-                                border
-                                rounded-lg
-                                flex
-                                items-center
-                                justify-between
-                                font-bold
-                              "
-                            >
-                              <span
-                                className="
-                                  text-[10px]
-                                  font-mono
-                                  text-gray-400
-                                "
-                              >
-                                📎 {m.pjName}
-                              </span>
-
-                              <a
-                                href={
-                                  m.pjData
-                                }
-                                download={
-                                  m.pjName
-                                }
-                                className="
-                                  text-purple-700
-                                  bg-purple-100
-                                  hover:bg-purple-200
-                                  px-2.5
-                                  py-1
-                                  rounded
-                                  text-[10px]
-                                  uppercase
-                                  font-black
-                                "
-                              >
-                                📥 Télécharger
-                              </a>
-                            </div>
-                          )}
-                      </div>
+                    normaliser(
+                      message.expediteurId
+                    ) ===
+                    normaliser(
+                      idUtilisateurConnecte
                     );
-                  }
+
+                  const estAdministrateurLocal =
+                    ROLES_ADMIN.includes(
+                      roleUtilisateur
+                    );
+
+                  const estRecu =
+                    !estMoi;
+
+                 
+                  /* ========================================
+                     MESSAGE NORMAL / INDIVIDUEL
+                  ======================================== */
 
                   return (
                     <div
                       key={
-                        m.id ||
+                        message.id ||
                         index
                       }
-                      className={`
-                        flex
-                        flex-col
-                        max-w-[80%]
-                        p-3
-                        rounded-2xl
-                        shadow-2xs
-                        text-xs
-                        ${
-                          estMoi
-                            ? 'ml-auto bg-slate-900 text-white rounded-br-none'
-                            : 'mr-auto bg-white border text-gray-800 rounded-bl-none'
-                        }
-                      `}
+                      className={`flex flex-col max-w-[80%] p-3 rounded-2xl shadow-sm text-xs ${
+                        estMoi
+                          ? 'ml-auto bg-slate-900  rounded-br-none'
+                          : 'mr-auto bg-white border text-gray-800 rounded-bl-none'
+                      }`}
                     >
-                      <span
-                        className="
-                          text-[8px]
-                          font-black
-                          uppercase
-                          text-purple-400
-                          mb-1
-                        "
-                      >
-                        {m.expediteurNom}
-                      </span>
 
-                      <p
-                        className="
-                          leading-relaxed
-                          whitespace-pre-wrap
-                          font-medium
-                        "
-                      >
-                        {m.message}
-                      </p>
+                      <div className="flex items-start gap-3">
+
+                        <div className="flex-1 min-w-0">
+
+                          <div className="flex items-center gap-2 mb-1">
+
+                            <span
+                              className={`text-[8px] font-black uppercase ${
+                                estMoi
+                                  ? 'text-orange-300'
+                                  : 'text-purple-400'
+                              }`}
+                            >
+                              {
+                                message.expediteurNom ||
+                                'UTILISATEUR'
+                              }
+                            </span>
+
+                            {message.expediteurRole && (
+                              <span
+                                className={`text-[7px] uppercase px-1.5 py-0.5 rounded ${
+                                  estMoi
+                                    ? 'bg-white/10 text-orange-200'
+                                    : 'bg-purple-50 text-purple-500'
+                                }`}
+                              >
+                                {
+                                  message.expediteurRole
+                                }
+                              </span>
+                            )}
+
+                          </div>
+
+                          {message.titre && (
+                            <div className="font-black mb-1">
+                              {
+                                message.titre
+                              }
+                            </div>
+                          )}
+
+                          {message.cible ===
+                            'individuel' && (
+                            <div
+                              className={`text-[8px] uppercase font-black mb-1 ${
+                                estMoi
+                                  ? 'text-slate-300'
+                                  : 'text-gray-400'
+                              }`}
+                            >
+                              🔒 Message individuel
+                            </div>
+                          )}
+
+                          <p className="leading-relaxed whitespace-pre-wrap font-medium">
+                            {
+                              message.message
+                            }
+                          </p>
+
+                          {message.destinataireNom &&
+                            estMoi && (
+                              <div
+                                className={`text-[8px] mt-2 ${
+                                  estMoi
+                                    ? 'text-slate-400'
+                                    : 'text-gray-400'
+                                }`}
+                              >
+                                À :{' '}
+                                {
+                                  message.destinataireNom
+                                }
+                              </div>
+                            )}
+
+                        </div>
+
+                        {estAdministrateurLocal &&
+                          estRecu && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                supprimerNotificationRecue(
+                                  message
+                                )
+                              }
+                              disabled={
+                                suppressionEnCours ===
+                                message.id
+                              }
+                              title="Supprimer de mon historique"
+                              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {
+                                suppressionEnCours ===
+                                message.id
+                                  ? '⏳'
+                                  : '🗑️'
+                              }
+                            </button>
+                          )}
+
+                      </div>
+
                     </div>
                   );
                 }
               )
+
             )}
+
           </div>
 
-          {/* FORMULAIRE */}
+          {/* ==============================================
+              SAISIE
+          ============================================== */}
 
           <form
             onSubmit={
               handlePublishMessageCentral
             }
-            className="
-              p-3
-              border-t
-              bg-gray-50
-              space-y-3
-              font-bold
-              text-xs
-            "
+            className="p-3 border-t bg-gray-50 space-y-3 font-bold text-xs"
           >
-            {/* OPTIONS OFFICIELLES */}
+
+            {/* ============================================
+                OBJET + AUDIENCE OFFICIEL
+            ============================================ */}
 
             {canalActif ===
               'OFFICIEL' &&
@@ -2457,15 +3031,8 @@ const NotificationCentre = () => {
               ].includes(
                 roleUtilisateur
               ) && (
-                <div
-                  className="
-                    grid
-                    grid-cols-1
-                    sm:grid-cols-3
-                    gap-3
-                    animate-fadeIn
-                  "
-                >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
                   <input
                     type="text"
                     placeholder="Objet du communiqué officiel *"
@@ -2477,19 +3044,7 @@ const NotificationCentre = () => {
                         e.target.value
                       )
                     }
-                    className="
-                      sm:col-span-2
-                      bg-white
-                      border
-                      rounded-xl
-                      px-3
-                      py-2
-                      outline-none
-                      text-gray-800
-                      focus:ring-1
-                      focus:ring-purple-500
-                      font-bold
-                    "
+                    className="sm:col-span-2 bg-white border rounded-xl px-3 py-2 outline-none text-gray-800 focus:ring-1 focus:ring-purple-500 font-bold"
                     required
                   />
 
@@ -2502,24 +3057,15 @@ const NotificationCentre = () => {
                         e.target.value
                       )
                     }
-                    className="
-                      bg-white
-                      border
-                      rounded-xl
-                      px-3
-                      py-2
-                      outline-none
-                      cursor-pointer
-                      text-purple-700
-                      font-black
-                    "
+                    className="bg-white border rounded-xl px-3 py-2 outline-none cursor-pointer text-purple-700 font-black"
                   >
+
                     <option value="all">
                       🌍 Tout l'Établissement
                     </option>
 
                     <option value="professeur">
-                      👨‍🏫 Corps Enseignant
+                      👨‍🏫 Corps enseignant
                     </option>
 
                     <option value="educateur">
@@ -2529,11 +3075,77 @@ const NotificationCentre = () => {
                     <option value="eleve">
                       🎓 Élèves & Parents
                     </option>
+
                   </select>
+
                 </div>
               )}
 
-            {/* PIÈCE JOINTE */}
+            {/* ============================================
+                DESTINATAIRE INDIVIDUEL
+            ============================================ */}
+
+            {canalActif ===
+              'DIRECT' &&
+              destinataireIndividuel && (
+                <div className="bg-white border border-purple-200 rounded-xl p-3">
+
+                  <div className="flex items-center justify-between gap-3">
+
+                    <div>
+
+                      <div className="text-[9px] text-gray-400 uppercase font-black">
+                        Message individuel vers
+                      </div>
+
+                      <div className="text-sm font-black text-purple-700 uppercase">
+                        {
+                          nomCompletUtilisateur(
+                            destinataireIndividuel
+                          )
+                        }
+                      </div>
+
+                      <div className="text-[9px] text-gray-400 uppercase">
+                        {
+                          normaliser(
+                            destinataireIndividuel.role
+                          )
+                        }
+
+                        {destinataireIndividuel.promotion &&
+                          ` • ${destinataireIndividuel.promotion}`}
+
+                        {destinataireIndividuel.classeId &&
+                          ` • ${destinataireIndividuel.classeId}`}
+                      </div>
+
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDestinataireIndividuel(
+                          null
+                        );
+
+                        setCanalActif(
+                          'DIRECT'
+                        );
+                      }}
+                      className="text-[9px] font-black uppercase bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-2 rounded-lg"
+                    >
+                      Changer
+                    </button>
+
+                  </div>
+
+                </div>
+              )}
+
+            {/* ============================================
+                PIECE JOINTE
+            ============================================ */}
 
             {canalActif ===
               'OFFICIEL' &&
@@ -2543,24 +3155,10 @@ const NotificationCentre = () => {
               ].includes(
                 roleUtilisateur
               ) && (
-                <div
-                  className="
-                    bg-white
-                    border
-                    p-2
-                    rounded-xl
-                    text-[10px]
-                    text-gray-400
-                    flex
-                    items-center
-                    justify-between
-                    gap-4
-                    animate-fadeIn
-                  "
-                >
+                <div className="bg-white border p-2 rounded-xl text-[10px] text-gray-400 flex items-center justify-between gap-4">
+
                   <span>
-                    📎 Attacher un document officiel
-                    (Max 2 Mo) :
+                    📎 Attacher un document officiel (Max 2 Mo) :
                   </span>
 
                   <input
@@ -2571,17 +3169,16 @@ const NotificationCentre = () => {
                       handleFileChange
                     }
                   />
+
                 </div>
               )}
 
-            {/* MESSAGE */}
+            {/* ============================================
+                MESSAGE
+            ============================================ */}
 
-            <div
-              className="
-                flex
-                gap-2
-              "
-            >
+            <div className="flex gap-2">
+
               <input
                 type="text"
                 placeholder={
@@ -2594,14 +3191,18 @@ const NotificationCentre = () => {
                         roleUtilisateur
                       )
                       ? 'Saisissez l’annonce administrative...'
-                      : 'Lecture seule. Droits d’écriture réservés à la Direction.'
+                      : 'Lecture seule. Droits réservés à la Direction.'
                     : canalActif ===
                       'PROMOTION'
                     ? 'Écrire un message à toute ma promotion...'
                     : canalActif ===
                       'ADMIN'
                     ? 'Exprimez votre réclamation...'
-                    : 'Écrire un message privé direct...'
+                    : destinataireIndividuel
+                    ? `Écrire un message à ${nomCompletUtilisateur(
+                        destinataireIndividuel
+                      )}...`
+                    : 'Sélectionnez d’abord un destinataire individuel...'
                 }
                 value={
                   corpsAnnonceOrChat
@@ -2612,37 +3213,6 @@ const NotificationCentre = () => {
                   )
                 }
                 disabled={
-                  canalActif ===
-                    'OFFICIEL' &&
-                  ![
-                    'admin',
-                    'super_admin',
-                  ].includes(
-                    roleUtilisateur
-                  )
-                }
-                className="
-                  flex-1
-                  bg-white
-                  border
-                  rounded-xl
-                  px-4
-                  py-2.5
-                  text-xs
-                  font-bold
-                  outline-none
-                  focus:ring-2
-                  focus:ring-purple-500
-                  text-gray-800
-                  disabled:bg-gray-100
-                "
-                required
-              />
-
-              <button
-                type="submit"
-                disabled={
-                  sending ||
                   (
                     canalActif ===
                       'OFFICIEL' &&
@@ -2653,34 +3223,43 @@ const NotificationCentre = () => {
                       roleUtilisateur
                     )
                   ) ||
-                  !corpsAnnonceOrChat.trim()
+                  (
+                    canalActif ===
+                      'DIRECT' &&
+                    !destinataireIndividuel
+                  )
                 }
-                className="
-                  bg-purple-600
-                  hover:bg-purple-700
-                  text-white
-                  font-black
-                  text-xs
-                  uppercase
-                  px-5
-                  py-2.5
-                  rounded-xl
-                  shadow-md
-                  transition
-                  cursor-pointer
-                  disabled:bg-gray-200
-                "
+                className="flex-1 bg-white border rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500 text-gray-800 disabled:bg-gray-100"
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={
+                  sending ||
+                  (
+                    canalActif ===
+                      'DIRECT' &&
+                    !destinataireIndividuel
+                  )
+                }
+                className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed  font-black px-4 py-2 rounded-xl transition"
               >
-                {sending
-                  ? 'Envoi...'
-                  : '⚡ Envoyer'}
+                {
+                  sending
+                    ? '⏳'
+                    : '📨'
+                }
               </button>
+
             </div>
+
           </form>
+
         </div>
+
       </div>
 
-      <HistoriqueMessage />
     </div>
   );
 };

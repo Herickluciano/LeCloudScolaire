@@ -1,10 +1,8 @@
 // src/routes/ProtectedRoute.jsx
-
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// 🟢 ALIGNEMENT DES PROPS : Gère à la fois 'allowedRoles' et 'rolesAutorises'
 const ProtectedRoute = ({ allowedRoles = [], rolesAutorises }) => {
   const { user, loading } = useAuth();
 
@@ -34,16 +32,18 @@ const ProtectedRoute = ({ allowedRoles = [], rolesAutorises }) => {
   }
 
   const roleFormate = String(roleActif).trim().toLowerCase();
-
-  // Fusion adaptative des deux sources de données possibles pour parer les erreurs d'App.jsx
   const listeSource = rolesAutorises || allowedRoles || [];
   
   const listeRolesAttendus = Array.isArray(listeSource)
     ? listeSource.map((role) => String(role).trim().toLowerCase())
     : [];
 
-  // 🟢 COUPE-FILTRE ABSOLU : Le SuperAdmin passe toujours toutes les barrières
-  const estAutorise = roleFormate === 'super_admin' || listeRolesAttendus.includes(roleFormate);
+  // Prise en compte de la double casquette enseignant
+  const estEnseignantMixte = 
+    (roleFormate === 'professeur' || roleFormate === 'prof_principal') && 
+    (listeRolesAttendus.includes('professeur') || listeRolesAttendus.includes('prof_principal'));
+
+  const estAutorise = roleFormate === 'super_admin' || estEnseignantMixte || listeRolesAttendus.includes(roleFormate);
 
   if (!estAutorise) {
     console.warn(`❌ Accès refusé : ${roleFormate}`, listeRolesAttendus);

@@ -3,6 +3,7 @@ import { db } from '../../../../services/api';
 // 🟢 ALIGNEMENT FIRESTORE : Opérateurs d'interception du Routeur Central notifications
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../../../../context/AuthContext';
+import Header from '../../../../pages/Header';
 
 const ReceptionProf = ({ currentSchool }) => {
   const { user } = useAuth();
@@ -55,6 +56,7 @@ const ReceptionProf = ({ currentSchool }) => {
 
   return (
     <div className="space-y-4 text-left font-sans text-gray-700">
+      <Header/>
       {messages.length === 0 ? (
         <p className="text-xs text-center text-gray-400 py-12 border rounded-2xl border-dashed italic bg-white font-medium">
           📥 Boîte de réception vide. Aucun message ou note de service reçu pour le moment.

@@ -124,8 +124,8 @@ const SignaturePadModal = ({ isOpen, onClose, forcedUserId }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl border shadow-xl max-w-md w-full p-6 text-left">
+    <div className="sign fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+      <div className="bg-white rounded-2xl  w-full p-6 text-left">
         <div className="border-b pb-2 mb-4">
           <h3 className="text-base font-black text-slate-900 uppercase">✍️ Zone de Dessin de la Signature</h3>
           <p className="text-[11px] text-gray-400 font-medium mt-0.5">Tracez votre signature ci-dessous à l'aide de votre souris ou de votre doigt.</p>
@@ -133,12 +133,12 @@ const SignaturePadModal = ({ isOpen, onClose, forcedUserId }) => {
         <div className="border-2 border-dashed border-slate-200 bg-white rounded-xl overflow-hidden mb-4">
           <canvas ref={canvasRef} width={400} height={150} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => setIsDrawing(false)} onMouseLeave={() => setIsDrawing(false)} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => setIsDrawing(false)} className="w-full h-[150px] bg-white cursor-crosshair block" />
         </div>
-        <div className="flex gap-2 text-xs font-black uppercase">
-          <button type="button" onClick={handleEffacer} className="bg-gray-100 hover:bg-gray-200 border text-gray-700 px-4 py-2.5 rounded-xl cursor-pointer">🗑️ Effacer</button>
+        <div className="lesbtn flex gap-2 text-xs font-black uppercase">
+          <button type="button" onClick={handleEffacer} className="btnsig bg-gray-100 hover:bg-gray-200 border text-gray-700 px-4 py-2.5 rounded-xl cursor-pointer">Effacer</button>
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="bg-gray-100 border text-gray-400 px-4 py-2.5 rounded-xl cursor-pointer">Fermer</button>
-          <button type="button" onClick={handleSauvegarderSignature} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl border-0 cursor-pointer font-black uppercase tracking-wide">
-            {saving ? "Transmission..." : "🔒 Valider mon Empreinte"}
+          <button type="button" onClick={onClose} className="btnsig1 bg-gray-100 border text-gray-400 px-4 py-2.5 rounded-xl cursor-pointer">Fermer</button>
+          <button type="button" onClick={handleSauvegarderSignature} disabled={saving} className="btnsig2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl border-0 cursor-pointer font-black uppercase tracking-wide">
+            {saving ? "Transmission..." : " Valider mon Empreinte"}
           </button>
         </div>
       </div>

@@ -1,49 +1,41 @@
 // src/features/educateur/pages/DashboardEducateur.jsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
+  addDoc
+} from 'firebase/firestore';
+import { useSearchParams, Link } from 'react-router-dom';
+
 import { useAuth } from '../../../context/AuthContext';
 import { db } from '../../../services/api';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
 
-// IMPORTATION DES SOUS-COMPOSANTS
+import ReceptionInstructionsAdmin from '../../admin/pages/messages/ReceptionAdmin';
 import ListePromotion from './ListePromotion';
-import ReceptionInstructionsAdmin from '../../admin/pages/messages/ReceptionAdmin'; 
+import Rectification from './Rectification';
+import GestionPaieVacations from './arbitrages/GestionPaieVacations';
+import SignaturePadModal from '../../../components/SignaturePadModal';
+import Header from '../../../pages/Header';
+import Messagerie from '../../../components/Messagerie';
+import EnvoyerMessageUnique from '../../../components/EnvoyerMessageUnique';
+import BoiteReceptionUnique from '../../../components/BoiteReceptionUnique';
+
 const DashboardEducateur = () => {
-  // ==========================================================
-  // 1. CONTEXTES ET UTILITAIRES GLOBAUX (TOUJOURS EN PREMIER)
-  // ==========================================================
   const { user, schoolId, logout } = useAuth();
   const navigate = useNavigate();
-  
-  // Variable de secours globale pour l'en-tête et les onglets
-  const schoolName = sessionStorage.getItem('sgs_school_name') || "Établissement Edulink";
 
   // ==========================================================
-  // 2. ÉTATS DE TRACABILITÉ ET RECONNAISSANCE UNIQUE
+  // IDENTITÉ / ÉTABLISSEMENT
   // ==========================================================
-  const [activeTab, setActiveTab] = useState('dashboard_global');
-  const [classeEducateur, setClasseEducateur] = useState(null); 
-  const [loadingClasse, setLoadingClasse] = useState(true);
-  const [loadingEleves, setLoadingEleves] = useState(true);
 
-  // Registres d'élèves, pointages et fiches d'appels d'origine
-  const [elevesPromo, setElevesPromo] = useState([]);
-  const [pointagesRaw, setPointagesRaw] = useState([]);
-  const [fichesAppels, setFichesAppels] = useState([]);
-
-  // États additionnels d'origine pour les conseils et circulaires
-  const [eleveSelectionneConseil, setEleveSelectionneConseil] = useState(null);
-  const [avisConduiteConseil, setAvisConduiteConseil] = useState('');
-  const [sujetCirculaire, setSujetCirculaire] = useState('');
-  const [corpsCirculaire, setCorpsCirculaire] = useState('');
-  const [sending, setSending] = useState(false);
-  const [msgStatus, setMsgStatus] = useState({ type: '', text: '' });
-
-  // ==========================================================
-  // 3. IDENTIFICATION ET MEMOÏSATION (DÉCLARÉES AVANT TOUT USAGE)
-  // ==========================================================
   const idEducateur = useMemo(() => {
-    return (
+    return String(
       user?.id ||
       user?.matricule ||
       user?.uid ||
@@ -53,169 +45,315 @@ const DashboardEducateur = () => {
   }, [user]);
 
   const currentSchool = useMemo(() => {
-    return (
+    return String(
       schoolId ||
       user?.schoolId ||
       sessionStorage.getItem('sgs_school_id') ||
-      ''
-    ).trim();
+      'lycee_saint_bernard'
+    )
+      .trim()
+      .toLowerCase();
   }, [schoolId, user]);
 
+  const schoolName =
+    user?.etablissementActuel ||
+    user?.schoolName ||
+    sessionStorage.getItem('sgs_school_name') ||
+    'Établissement Edulink';
+
+  const nomEducateur =
+    `${user?.prenoms || ''} ${user?.nom || ''}`.trim() ||
+    user?.name ||
+    'Éducateur';
+
   // ==========================================================
-  // 4. ÉTATS MAÎTRES POUR LA SÉLECTION POP-UP DU DÉLÉGUÉ
+  // ÉTATS
   // ==========================================================
+
+  const [activeTab, setActiveTab] = useState('dashboard_global');
+
+  const [listeClasses, setListeClasses] = useState([]);
+  const [elevesPromo, setElevesPromo] = useState([]);
+
+  const [fichesAppels, setFichesAppels] = useState([]);
+  const [pointagesProfesseurs, setPointagesProfesseurs] = useState([]);
+  const [emploisDuTemps, setEmploisDuTemps] = useState([]);
+
+  const [classeSelectionnee, setClasseSelectionnee] = useState('all');
+
+  const [loadingClasse, setLoadingClasse] = useState(true);
+  const [loadingEleves, setLoadingEleves] = useState(true);
+
+  const [maintenant, setMaintenant] = useState(new Date());
+
   const [isModalDelegueOpen, setIsModalDelegueOpen] = useState(false);
+  const [isPadOpen, setIsPadOpen] = useState(false);
+
   const [rechercheEleveDelegue, setRechercheEleveDelegue] = useState('');
   const [rechercheClasseDelegue, setRechercheClasseDelegue] = useState('');
-  const [listeElevesPourDelegue, setListeElevesPourDelegue] = useState([]);
+
+  const [eleveSelectionneConseil, setEleveSelectionneConseil] = useState(null);
+  const [avisConduiteConseil, setAvisConduiteConseil] = useState('');
+
+  const [sujetrCiculaire, setSujetCirculaire] = useState('');
+  const [corpsCirculaire, setCorpsCirculaire] = useState('');
+
+  const [sending, setSending] = useState(false);
+
+  const [msgStatus, setMsgStatus] = useState({
+    type: '',
+    text: ''
+  });
 
   // ==========================================================
-  // 5. 🟢 CALCUL DE LA PROMOTION REGLEMENTAIRE MENA
+  // HORLOGE LIVE
   // ==========================================================
-  const assignedPromotion = useMemo(() => {
-    const brute = 
-      user?.assigned_promotion || 
-      user?.assignedPromotion || 
-      classeEducateur?.promotion || 
-      classeEducateur?.nom || 
-      classeEducateur?.id || 
-      '';
-      
-    if (!brute) return 'Tle';
 
-    const premierTerme = brute.toString().trim().split(' ')[0].split('_')[0];
-    const format = premierTerme.toLowerCase();
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMaintenant(new Date());
+    }, 1000);
 
-    if (format.startsWith('tle') || format === 't' || format === 'terminale') return 'Tle';
-    if (format === '1ere') return '1ère';
-    if (format === '2nd' || format === '2nde') return '2nd';
-    if (format.endsWith('eme')) return format.replace('eme', 'ème');
+    return () => clearInterval(timer);
+  }, []);
 
-    return premierTerme.toUpperCase();
-  }, [user, classeEducateur]);
+  const dateAujourdhui = useMemo(
+    () => maintenant.toLocaleDateString('fr-FR'),
+    [maintenant]
+  );
+
+  const heureActuelle = useMemo(
+    () =>
+      maintenant.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+    [maintenant]
+  );
+
+  const jourActuel = useMemo(
+    () =>
+      maintenant
+        .toLocaleDateString('fr-FR', {
+          weekday: 'long'
+        })
+        .replace(/^./, (c) => c.toUpperCase()),
+    [maintenant]
+  );
 
   // ==========================================================
-  // 6. ACTION DE SCÈLLAGE ATOMIQUE EN LIVE SUR FIRESTORE
+  // NORMALISATION
   // ==========================================================
-  // 🟢 ENFIN DÉFINIE ET ALIGNÉE ICI : Plus aucun crash au clic à la ligne 602
-  const handleValiderChoixDelegue = async (idEleve, nomCompletEleve) => {
-    const classeIdCible = classeEducateur?.id || `${currentSchool}_${classeEducateur?.idBrute?.toLowerCase()}`;
 
-    if (!classeIdCible) {
-      alert("⚠️ Erreur : Impossible de localiser la structure de votre classe.");
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, "classes", classeIdCible.trim()), {
-        delegueId: idEleve, 
-        delegueName: nomCompletEleve, 
-        updatedAt: new Date().toISOString()
-      });
-      
-      alert(`✨ Sceau cloud validé ! Le délégué officiel de la promotion est désormais : ${nomCompletEleve}`);
-      setIsModalDelegueOpen(false);
-      setRechercheEleveDelegue('');
-      setRechercheClasseDelegue('');
-    } catch (err) {
-      console.error("Erreur lors de la désignation du délégué :", err);
-      alert("Erreur réseau lors du scellage du délégué.");
-    }
+  const normaliser = (valeur) => {
+    return String(valeur || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   };
 
+  const idsPossiblesEducateur = useMemo(() => {
+    return [
+      user?.id,
+      user?.uid,
+      user?.matricule,
+      idEducateur
+    ]
+      .filter(Boolean)
+      .map((id) => String(id).trim());
+  }, [user, idEducateur]);
+
   // ==========================================================
-  // 7. ÉCOUTEURS DYNAMIQUES FIRESTORE POUR LE POP-UP DÉLÉGUÉ
+  // CLASSES DE L'ÉDUCATEUR
   // ==========================================================
+
   useEffect(() => {
-    if (!currentSchool) return;
-    
-    const codePromotionCible = classeEducateur?.promotion || sessionStorage.getItem('sgs_user_promotion') || '';
-    if (!codePromotionCible) return;
-
-    const q = query(
-      collection(db, "users"), 
-      where("schoolId", "==", currentSchool.toLowerCase()),
-      where("role", "==", "eleve"),
-      where("promotion", "==", codePromotionCible)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setListeElevesPourDelegue(list);
-    }, (err) => {
-      console.error("Erreur de récupération des élèves pour délégué :", err);
-    });
-
-    return () => unsubscribe();
-  }, [currentSchool, classeEducateur?.promotion]);
-
-  // ==========================================================
-  // ⛔ FIN DE LA SECTION DÉCLARATIVE DES HOOKS ET DES ÉTATS UNIFIÉS
-  // ==========================================================
-  // ==========================================================
-  // 1. RECHERCHE EN TEMPS RÉEL DE LA CLASSE ASSIGNÉE
-  // ==========================================================
-  useEffect(() => {
-    if (!idEducateur || !currentSchool) {
+    if (!currentSchool || !idEducateur) {
+      setListeClasses([]);
       setLoadingClasse(false);
       return;
     }
 
+    setLoadingClasse(true);
+
     const q = query(
       collection(db, 'classes'),
-      where('schoolId', '==', currentSchool),
-      where('educateurId', '==', idEducateur)
+      where('schoolId', '==', currentSchool)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         const classes = [];
+
         snapshot.forEach((snap) => {
-          classes.push({
-            id: snap.id,
-            ...snap.data()
-          });
+          const data = snap.data();
+
+          const educateurIds = [
+            data.educateurId,
+            data.educateurID,
+            data.educateurUid,
+            data.educateurUID,
+            data.idEducateur,
+            data.educateur
+          ]
+            .filter(Boolean)
+            .map((id) => String(id).trim());
+
+          const listeEducateurs = Array.isArray(data.educateurs)
+            ? data.educateurs.map((id) => String(id).trim())
+            : [];
+
+          const estClasseEducateur =
+            idsPossiblesEducateur.some((id) =>
+              educateurIds.includes(id)
+            ) ||
+            idsPossiblesEducateur.some((id) =>
+              listeEducateurs.includes(id)
+            );
+
+          if (estClasseEducateur) {
+            classes.push({
+              id: snap.id,
+              ...data
+            });
+          }
         });
 
-        let classeTrouvee = null;
-        if (assignedPromotion) {
-          const normalise = (value) => (value || '').toLowerCase().replace(/[\s_-]/g, '');
-          const cible = normalise(assignedPromotion);
-
-          classeTrouvee = classes.find((classe) => {
-            return (
-              normalise(classe.id) === cible ||
-              normalise(classe.nom) === cible ||
-              normalise(classe.promotion) === cible
-            );
-          });
-        }
-
-        if (!classeTrouvee && classes.length === 1) {
-          classeTrouvee = classes[0];
-        }
-
-        setClasseEducateur(classeTrouvee || null);
+        setListeClasses(classes);
         setLoadingClasse(false);
       },
       (error) => {
-        console.error('❌ Erreur récupération classe éducateur:', error);
-        setClasseEducateur(null);
+        console.error(
+          '❌ Erreur récupération classes éducateur :',
+          error
+        );
+
+        setListeClasses([]);
         setLoadingClasse(false);
       }
     );
+
     return () => unsubscribe();
-  }, [idEducateur, currentSchool, assignedPromotion]);
+  }, [currentSchool, idEducateur, idsPossiblesEducateur]);
 
   // ==========================================================
-  // 2. 🟢 LIAISON REACTIVE DES ELEVES (CORRECTION DU FILTRAGE NOSQL)
+  // PROMOTION
   // ==========================================================
+
+  const promotionDynamique = useMemo(() => {
+    const valeur =
+      user?.assigned_promotion ||
+      user?.assignedPromotion ||
+      user?.promotion ||
+      listeClasses[0]?.promotion ||
+      '';
+
+    return String(valeur).trim();
+  }, [user, listeClasses]);
+
+  // ==========================================================
+  // CLASSES CIBLES
+  // ==========================================================
+
+  const classesCibles = useMemo(() => {
+    if (classeSelectionnee === 'all') {
+      return listeClasses;
+    }
+
+    return listeClasses.filter(
+      (classe) => classe.id === classeSelectionnee
+    );
+  }, [classeSelectionnee, listeClasses]);
+
+  const idsClassesCibles = useMemo(() => {
+    return classesCibles.map((classe) => String(classe.id));
+  }, [classesCibles]);
+
+  // ==========================================================
+  // EXTRACTION COEFFICIENT
+  // ==========================================================
+
+  const extraireCoefficient = (matiereConfig) => {
+    if (!matiereConfig || typeof matiereConfig !== 'object') {
+      return 0;
+    }
+
+    const coefficient =
+      matiereConfig.coefficientMatiere ??
+      matiereConfig.coefficient ??
+      matiereConfig.coefMatiere ??
+      matiereConfig.coef ??
+      0;
+
+    const nombre = Number(coefficient);
+
+    return Number.isFinite(nombre) ? nombre : 0;
+  };
+
+  // ==========================================================
+  // EXTRACTION MOYENNE MATIÈRE
+  // ==========================================================
+
+  const extraireMoyenneMatiere = (matiereConfig) => {
+    if (!matiereConfig || typeof matiereConfig !== 'object') {
+      return 0;
+    }
+
+    const moyenne =
+      matiereConfig.note ??
+      matiereConfig.moyenne ??
+      matiereConfig.moyenneTrimestrielle ??
+      matiereConfig.moyenneMatiere ??
+      0;
+
+    const nombre = Number(moyenne);
+
+    return Number.isFinite(nombre) ? nombre : 0;
+  };
+
+  // ==========================================================
+  // EXTRACTION MOYENNE PONDÉRÉE
+  // ==========================================================
+
+  const extraireMoyennePonderee = (
+    matiereConfig,
+    moyenne,
+    coefficient
+  ) => {
+    if (!matiereConfig || typeof matiereConfig !== 'object') {
+      return moyenne * coefficient;
+    }
+
+    const valeurExistante =
+      matiereConfig.moyennePonderee ??
+      matiereConfig.moyenneMatierePonderee ??
+      matiereConfig.moyenneTrimestriellePonderee ??
+      matiereConfig.moyennePondere ??
+      null;
+
+    if (
+      valeurExistante !== null &&
+      valeurExistante !== undefined &&
+      valeurExistante !== ''
+    ) {
+      const nombre = Number(valeurExistante);
+
+      if (Number.isFinite(nombre)) {
+        return nombre;
+      }
+    }
+
+    return moyenne * coefficient;
+  };
+
+  // ==========================================================
+  // RÉCUPÉRATION DES ÉLÈVES
+  // ==========================================================
+
   useEffect(() => {
-    if (!classeEducateur || !currentSchool) {
+    if (!currentSchool) {
       setElevesPromo([]);
       setLoadingEleves(false);
       return;
@@ -223,562 +361,2262 @@ const DashboardEducateur = () => {
 
     setLoadingEleves(true);
 
-    const classIdSysteme = (classeEducateur.id || '').toString().toLowerCase().trim();
-    const idBruteSysteme = (classeEducateur.idBrute || '').toString().toLowerCase().trim();
-    const nomSysteme = (classeEducateur.nom || '').toString().toLowerCase().trim().replace(/\s+/g, '_');
-
-    // Requête globale sur l'établissement pour intercepter tous les formats NoSQL de classeId
     const q = query(
       collection(db, 'users'),
-      where('role', '==', 'eleve'),
-      where('schoolId', '==', currentSchool)
+      where('schoolId', '==', currentSchool),
+      where('role', '==', 'eleve')
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const list = [];
+        const liste = [];
+
         snapshot.forEach((snap) => {
-          const d = snap.data();
-          const eleveClasseId = (d.classeId || '').toString().toLowerCase().trim();
+          const data = snap.data();
 
-          // Validation NoSQL croisée étanche
-          if (
-            eleveClasseId === classIdSysteme ||
-            eleveClasseId === idBruteSysteme ||
-            eleveClasseId === nomSysteme ||
-            classIdSysteme.includes(eleveClasseId)
-          ) {
-            let totalPointsCumules = 0;
-            const notes = d.notes || {};
+          const classeId = String(
+            data.classeId ||
+            data.classeID ||
+            ''
+          ).trim();
 
-            Object.values(notes).forEach((notesArray) => {
-              if (Array.isArray(notesArray)) {
-                notesArray.forEach((val) => {
-                  totalPointsCumules += parseFloat(val) || 0;
-                });
-              }
-            });
+          const appartientClasse =
+            classeSelectionnee === 'all'
+              ? idsClassesCibles.includes(classeId)
+              : classeId === classeSelectionnee;
 
-            list.push({
-              id: snap.id,
-              totalPointsCumules,
-              ...d
-            });
+          if (!appartientClasse) {
+            return;
           }
+
+          // ====================================================
+          // CALCUL DES POINTS PAR MATIÈRE
+          // ====================================================
+
+          const moyennesMatiere =
+            data.moyennes_matiere || {};
+
+          let totalPointsCumules = 0;
+          let totalMoyennesMatieres = 0;
+          let nombreMatieres = 0;
+
+          const detailsMatieres = [];
+
+          Object.entries(moyennesMatiere).forEach(
+            ([periode, periodeMap]) => {
+              if (
+                !periodeMap ||
+                typeof periodeMap !== 'object' ||
+                Array.isArray(periodeMap)
+              ) {
+                return;
+              }
+
+              Object.entries(periodeMap).forEach(
+                ([nomMatiere, matiereConfig]) => {
+                  if (
+                    !matiereConfig ||
+                    typeof matiereConfig !== 'object'
+                  ) {
+                    return;
+                  }
+
+                  const moyenne =
+                    extraireMoyenneMatiere(
+                      matiereConfig
+                    );
+
+                  const coefficient =
+                    extraireCoefficient(
+                      matiereConfig
+                    );
+
+                  const moyennePonderee =
+                    extraireMoyennePonderee(
+                      matiereConfig,
+                      moyenne,
+                      coefficient
+                    );
+
+                  if (moyenne > 0) {
+                    totalMoyennesMatieres += moyenne;
+                    nombreMatieres += 1;
+                  }
+
+                  // ==========================================
+                  // IMPORTANT :
+                  // LES POINTS = MOYENNE PONDÉRÉE
+                  // ==========================================
+
+                  if (moyennePonderee > 0) {
+                    totalPointsCumules += moyennePonderee;
+                  }
+
+                  detailsMatieres.push({
+                    periode,
+                    matiere: nomMatiere,
+                    moyenne,
+                    coefficient,
+                    moyennePonderee,
+                    appreciation:
+                      matiereConfig.appreciation || '',
+                    professeurName:
+                      matiereConfig.professeurName ||
+                      matiereConfig.professeur ||
+                      '',
+                    signature:
+                      matiereConfig.signatureProfesseur ||
+                      matiereConfig.signature ||
+                      matiereConfig.signet ||
+                      ''
+                  });
+                }
+              );
+            }
+          );
+
+          liste.push({
+            id: snap.id,
+            ...data,
+
+            totalPointsCumules,
+
+            moyenneGeneraleMatieres:
+              nombreMatieres > 0
+                ? totalMoyennesMatieres /
+                  nombreMatieres
+                : 0,
+
+            detailsMatieres
+          });
         });
 
-        setElevesPromo(list);
+        setElevesPromo(liste);
         setLoadingEleves(false);
       },
       (error) => {
-        console.error('❌ Erreur écoute élèves:', error);
+        console.error(
+          '❌ Erreur écoute élèves :',
+          error
+        );
+
         setElevesPromo([]);
         setLoadingEleves(false);
       }
     );
 
     return () => unsubscribe();
-  }, [classeEducateur, currentSchool]);
+  }, [
+    currentSchool,
+    classeSelectionnee,
+    idsClassesCibles
+  ]);
 
   // ==========================================================
-  // 3. POINTAGES PROFESSEURS DE L'ÉTABLISSEMENT
+  // REGISTRE APPELS
   // ==========================================================
+
   useEffect(() => {
-    if (!currentSchool) return;
+    if (!currentSchool) {
+      setFichesAppels([]);
+      return;
+    }
 
     const q = query(
-      collection(db, 'pointages_professeurs'),
+      collection(db, 'registre_appels'),
       where('schoolId', '==', currentSchool)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const list = [];
+        const liste = [];
+
         snapshot.forEach((snap) => {
-          const d = snap.data();
-          if (d.statut !== 'transmis') {
-            list.push({
+          const data = snap.data();
+
+          const classeId = String(
+            data.classeId || ''
+          ).trim();
+
+          if (idsClassesCibles.includes(classeId)) {
+            liste.push({
               id: snap.id,
-              ...d
+              ...data
             });
           }
         });
-        setPointagesRaw(list);
-           },
+
+        liste.sort((a, b) => {
+          const da = new Date(
+            a.updatedAt ||
+            a.createdAt ||
+            a.datePointage ||
+            0
+          ).getTime();
+
+          const dbb = new Date(
+            b.updatedAt ||
+            b.createdAt ||
+            b.datePointage ||
+            0
+          ).getTime();
+
+          return dbb - da;
+        });
+
+        setFichesAppels(liste);
+      },
       (error) => {
-        console.error('Erreur pointages:', error);
+        console.error(
+          '❌ Erreur registre appels :',
+          error
+        );
       }
     );
 
     return () => unsubscribe();
-  }, [currentSchool]);
+  }, [currentSchool, idsClassesCibles]);
 
   // ==========================================================
-  // 4. MAIN COURANTE
+  // POINTAGES ENSEIGNANTS
   // ==========================================================
+
   useEffect(() => {
-    if (!currentSchool || !classeEducateur) return;
-
-    const classeId = classeEducateur.id;
+    if (!currentSchool) {
+      setPointagesProfesseurs([]);
+      return;
+    }
 
     const q = query(
-      collection(db, 'registre_appels'),
-      where('schoolId', '==', currentSchool),
-      where('classeId', '==', classeId)
+      collection(db, 'registre_pointages'),
+      where('schoolId', '==', currentSchool)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const list = [];
+        const liste = [];
+
         snapshot.forEach((snap) => {
-          list.push({
-            id: snap.id,
-            ...snap.data()
-          });
+          const data = snap.data();
+
+          const classeId = String(
+            data.classeId || ''
+          ).trim();
+
+          if (
+            !classeId ||
+            idsClassesCibles.includes(classeId)
+          ) {
+            liste.push({
+              id: snap.id,
+              ...data
+            });
+          }
         });
 
-        list.sort(
-          (a, b) =>
-            new Date(b.createdAt || b.date || 0) -
-            new Date(a.createdAt || a.date || 0)
-        );
+        liste.sort((a, b) => {
+          return (
+            new Date(
+              b.datePointage ||
+              b.updatedAt ||
+              b.date ||
+              0
+            ).getTime() -
+            new Date(
+              a.datePointage ||
+              a.updatedAt ||
+              a.date ||
+              0
+            ).getTime()
+          );
+        });
 
-        setFichesAppels(list);
+        setPointagesProfesseurs(liste);
       },
       (error) => {
-        console.error('Erreur registre appels:', error);
+        console.error(
+          '❌ Erreur registre pointages :',
+          error
+        );
       }
     );
 
     return () => unsubscribe();
-  }, [currentSchool, classeEducateur]);
+  }, [currentSchool, idsClassesCibles]);
 
-  // Memoization du classement basé sur les points
-  const classement = useMemo(() => {
-    return [...elevesPromo].sort(
-      (a, b) => b.totalPointsCumules - a.totalPointsCumules
+  // ==========================================================
+  // EMPLOI DU TEMPS
+  // ==========================================================
+
+  useEffect(() => {
+    if (!currentSchool) {
+      setEmploisDuTemps([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'emplois_du_temps'),
+      where('schoolId', '==', currentSchool)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const liste = [];
+
+        snapshot.forEach((snap) => {
+          const data = snap.data();
+
+          const classeId = String(
+            data.classeId || ''
+          ).trim();
+
+          if (idsClassesCibles.includes(classeId)) {
+            liste.push({
+              id: snap.id,
+              ...data
+            });
+          }
+        });
+
+        setEmploisDuTemps(liste);
+      },
+      (error) => {
+        console.error(
+          '❌ Erreur emploi du temps :',
+          error
+        );
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentSchool, idsClassesCibles]);
+
+  // ==========================================================
+  // NORMALISATION EDT
+  // ==========================================================
+
+  const creneauxEDT = useMemo(() => {
+    const resultat = [];
+
+    emploisDuTemps.forEach((documentEDT) => {
+      const creneaux = Array.isArray(
+        documentEDT.creneaux
+      )
+        ? documentEDT.creneaux
+        : [];
+
+      creneaux.forEach((creneau) => {
+        resultat.push({
+          ...creneau,
+
+          classeId:
+            creneau.classeId ||
+            documentEDT.classeId,
+
+          nomClasse:
+            creneau.nomClasse ||
+            documentEDT.classeNom ||
+            documentEDT.nomClasse
+        });
+      });
+
+      if (
+        documentEDT.heureDebut &&
+        documentEDT.heureFin
+      ) {
+        resultat.push({
+          ...documentEDT
+        });
+      }
+    });
+
+    return resultat;
+  }, [emploisDuTemps]);
+
+  // ==========================================================
+  // UTILITAIRES HEURES
+  // ==========================================================
+
+  const minutesDepuisMinuit = (heure) => {
+    if (!heure) return null;
+
+    const match = String(heure).match(
+      /^(\d{1,2}):(\d{2})$/
+    );
+
+    if (!match) return null;
+
+    return (
+      Number(match[1]) * 60 +
+      Number(match[2])
+    );
+  };
+
+  const heureCouranteMinutes =
+    maintenant.getHours() * 60 +
+    maintenant.getMinutes();
+
+  // ==========================================================
+  // COURS EN COURS
+  // ==========================================================
+
+  const coursEnCours = useMemo(() => {
+    return creneauxEDT.filter((cours) => {
+      const jourCours = normaliser(cours.jour);
+      const jourNow = normaliser(jourActuel);
+
+      if (jourCours !== jourNow) {
+        return false;
+      }
+
+      const debut = minutesDepuisMinuit(
+        cours.heureDebut
+      );
+
+      const fin = minutesDepuisMinuit(
+        cours.heureFin
+      );
+
+      if (debut === null || fin === null) {
+        return false;
+      }
+
+      return (
+        heureCouranteMinutes >= debut &&
+        heureCouranteMinutes < fin
+      );
+    });
+  }, [
+    creneauxEDT,
+    jourActuel,
+    heureCouranteMinutes
+  ]);
+
+  // ==========================================================
+  // PROCHAINS COURS
+  // ==========================================================
+
+  const prochainsCours = useMemo(() => {
+    return creneauxEDT
+      .filter((cours) => {
+        const jourCours = normaliser(cours.jour);
+        const jourNow = normaliser(jourActuel);
+
+        if (jourCours !== jourNow) {
+          return false;
+        }
+
+        const debut = minutesDepuisMinuit(
+          cours.heureDebut
+        );
+
+        return (
+          debut !== null &&
+          debut > heureCouranteMinutes
+        );
+      })
+      .sort(
+        (a, b) =>
+          minutesDepuisMinuit(a.heureDebut) -
+          minutesDepuisMinuit(b.heureDebut)
+      );
+  }, [
+    creneauxEDT,
+    jourActuel,
+    heureCouranteMinutes
+  ]);
+
+  // ==========================================================
+  // POINTAGES EN COURS
+  // ==========================================================
+
+  const pointagesEnCours = useMemo(() => {
+    return pointagesProfesseurs.filter(
+      (pointage) =>
+        pointage.heureArrivee &&
+        !pointage.heureDepart
+    );
+  }, [pointagesProfesseurs]);
+
+  // ==========================================================
+  // APPELS DU JOUR
+  // ==========================================================
+
+  const appelsDuJour = useMemo(() => {
+    return fichesAppels.filter((appel) => {
+      return (
+        String(appel.date || '').trim() ===
+        dateAujourdhui
+      );
+    });
+  }, [fichesAppels, dateAujourdhui]);
+
+  // ==========================================================
+  // STATISTIQUES ASSIDUITÉ
+  // ==========================================================
+
+  const statistiquesAssiduite = useMemo(() => {
+    let absents = 0;
+    let retards = 0;
+    let presents = 0;
+
+    appelsDuJour.forEach((appel) => {
+      const absentsListe = Array.isArray(
+        appel.elevesAbsents
+      )
+        ? appel.elevesAbsents
+        : [];
+
+      const retardsListe = Array.isArray(
+        appel.elevesRetards
+      )
+        ? appel.elevesRetards
+        : [];
+
+      absents += absentsListe.length;
+      retards += retardsListe.length;
+
+      const totalEleves = elevesPromo.length;
+
+      if (totalEleves > 0) {
+        presents += Math.max(
+          0,
+          totalEleves -
+            absentsListe.length -
+            retardsListe.length
+        );
+      }
+    });
+
+    return {
+      absents,
+      retards,
+      presents
+    };
+  }, [
+    appelsDuJour,
+    elevesPromo.length
+  ]);
+
+  // ==========================================================
+  // STATISTIQUES PAR ÉLÈVE
+  // ==========================================================
+
+  const statistiquesEleves = useMemo(() => {
+    const stats = {};
+
+    elevesPromo.forEach((eleve) => {
+      stats[eleve.id] = {
+        presence: 0,
+        absence: 0,
+        retard: 0
+      };
+    });
+
+    fichesAppels.forEach((appel) => {
+      const absents = Array.isArray(
+        appel.elevesAbsents
+      )
+        ? appel.elevesAbsents
+        : [];
+
+      const retards = Array.isArray(
+        appel.elevesRetards
+      )
+        ? appel.elevesRetards
+        : [];
+
+      elevesPromo.forEach((eleve) => {
+        const nomEleve = `${eleve.nom || ''} ${
+          eleve.prenoms ||
+          eleve.prenom ||
+          ''
+        }`
+          .trim()
+          .toUpperCase();
+
+        if (!stats[eleve.id]) {
+          stats[eleve.id] = {
+            presence: 0,
+            absence: 0,
+            retard: 0
+          };
+        }
+
+        const estAbsent = absents.some(
+          (nom) =>
+            String(nom)
+              .trim()
+              .toUpperCase() === nomEleve
+        );
+
+        const estRetard = retards.some(
+          (nom) =>
+            String(nom)
+              .trim()
+              .toUpperCase() === nomEleve
+        );
+
+        if (estAbsent) {
+          stats[eleve.id].absence += 1;
+        } else if (estRetard) {
+          stats[eleve.id].retard += 1;
+        } else {
+          stats[eleve.id].presence += 1;
+        }
+      });
+    });
+
+    return stats;
+  }, [
+    elevesPromo,
+    fichesAppels
+  ]);
+
+  // ==========================================================
+  // TOTAL ABSENCES
+  // ==========================================================
+
+  const totalHeuresAbsence = useMemo(() => {
+    return elevesPromo.reduce(
+      (total, eleve) =>
+        total +
+        Number(eleve.absences || 0),
+      0
     );
   }, [elevesPromo]);
 
   // ==========================================================
-  // LOGIQUES D'APPRÉCIATIONS ET CIRCULAIRES
+  // CLASSEMENT PAR POINTS
   // ==========================================================
-  const handleEnregistrerAppreciationConseil = async (e) => {
-    e.preventDefault();
-    if (!eleveSelectionneConseil || !avisConduiteConseil.trim()) return;
 
-    try {
-      const appartient = elevesPromo.some(
-        (eleve) => eleve.id === eleveSelectionneConseil.id
+  const classement = useMemo(() => {
+    return [...elevesPromo].sort(
+      (a, b) =>
+        Number(
+          b.totalPointsCumules || 0
+        ) -
+        Number(
+          a.totalPointsCumules || 0
+        )
+    );
+  }, [elevesPromo]);
+
+  // ==========================================================
+  // RECHERCHE DÉLÉGUÉ
+  // ==========================================================
+
+  const elevesPourDelegue = useMemo(() => {
+    return elevesPromo.filter((eleve) => {
+      const civil = `${eleve.nom || ''} ${
+        eleve.prenoms ||
+        eleve.prenom ||
+        ''
+      }`.toLowerCase();
+
+      const classe = String(
+        eleve.classeNom ||
+        eleve.classeId ||
+        ''
+      ).toLowerCase();
+
+      return (
+        civil.includes(
+          rechercheEleveDelegue
+            .toLowerCase()
+            .trim()
+        ) &&
+        classe.includes(
+          rechercheClasseDelegue
+            .toLowerCase()
+            .trim()
+        )
       );
+    });
+  }, [
+    elevesPromo,
+    rechercheEleveDelegue,
+    rechercheClasseDelegue
+  ]);
 
-      if (!appartient) {
-        alert('❌ Cet élève n’appartient pas à votre classe.');
+  // ==========================================================
+  // SAUVEGARDE SIGNATURE
+  // ==========================================================
+
+  const handleSauvegarderSignatureDirecte =
+    async (base64Data) => {
+      if (!base64Data || !idEducateur) {
         return;
       }
 
-      await updateDoc(doc(db, 'users', eleveSelectionneConseil.id), {
-        appreciationConduiteEducateur: avisConduiteConseil.trim(),
-        appreciationConduiteEducateurUpdatedAt: new Date().toISOString(),
-        appreciationConduiteEducateurId: idEducateur
-      });
+      try {
+        const userRef = doc(
+          db,
+          'users',
+          idEducateur
+        );
 
-      setEleveSelectionneConseil(null);
-      setAvisConduiteConseil('');
-      alert('✅ Appréciation enregistrée !');
-    } catch (error) {
-      console.error("Erreur lors de la sauvegarde :", error);
-      alert("❌ Impossible d'enregistrer l'appréciation.");
+        await updateDoc(userRef, {
+          signatureDessinImage: base64Data,
+          updatedAtSignature:
+            new Date().toISOString()
+        });
+
+        const updatedUser = {
+          ...user,
+          signatureDessinImage: base64Data
+        };
+
+        sessionStorage.setItem(
+          'sgs_user',
+          JSON.stringify(updatedUser)
+        );
+
+        alert(
+          '📝 Votre signature numérique a été validée et enregistrée !'
+        );
+
+        setIsPadOpen(false);
+      } catch (error) {
+        console.error(
+          '❌ Erreur enregistrement signature :',
+          error
+        );
+
+        alert(
+          '❌ Une erreur technique a bloqué la sauvegarde.'
+        );
+      }
+    };
+
+  const handleSauvegarderSignatureEducateur =
+    async (base64Image) => {
+      await handleSauvegarderSignatureDirecte(
+        base64Image
+      );
+    };
+
+  // ==========================================================
+  // DÉLÉGUÉ
+  // ==========================================================
+
+  const handleValiderChoixDelegue = async (
+    idEleve,
+    nomCompletEleve,
+    classeId
+  ) => {
+    if (!classeId) {
+      alert(
+        '❌ Classe introuvable pour cet élève.'
+      );
+      return;
     }
-  };
 
-  const handleDiffuserCirculaireMails = async (e) => {
-    e.preventDefault();
-    if (!sujetCirculaire.trim() || !corpsCirculaire.trim()) return;
-
-    setSending(true);
     try {
-      await addDoc(collection(db, 'mails_direction'), {
-        sujet: sujetCirculaire.trim(),
-        message: corpsCirculaire.trim(),
-        schoolId: currentSchool,
-        role: 'parents',
-        promotion: classeEducateur?.promotion || '',
-        classeId: classeEducateur?.id || '',
-        educateurId: idEducateur,
-        createdAt: new Date().toISOString()
-      });
+      await updateDoc(
+        doc(db, 'classes', classeId),
+        {
+          delegueId: idEleve || '',
+          delegueName:
+            nomCompletEleve ||
+            'Non désigné',
+          updatedAt:
+            new Date().toISOString()
+        }
+      );
 
-      setMsgStatus({ type: 'success', text: '🚀 Circulaire diffusée avec succès.' });
-      setSujetCirculaire('');
-      setCorpsCirculaire('');
+      setIsModalDelegueOpen(false);
+      setRechercheEleveDelegue('');
+      setRechercheClasseDelegue('');
+
+      alert(
+        idEleve
+          ? `👑 Délégué désigné : ${nomCompletEleve}`
+          : '✅ Délégué destitué.'
+      );
     } catch (error) {
-      console.error(error);
-      setMsgStatus({ type: 'error', text: '❌ Échec de diffusion.' });
-    } finally {
-      setSending(false);
+      console.error(
+        '❌ Erreur délégué :',
+        error
+      );
+
+      alert(
+        '❌ Impossible de modifier le délégué.'
+      );
     }
   };
+
+  // ==========================================================
+  // AVIS DE CONDUITE
+  // ==========================================================
+
+  const handleEnregistrerAppreciationConseil =
+    async (event) => {
+      event.preventDefault();
+
+      if (
+        !eleveSelectionneConseil ||
+        !avisConduiteConseil.trim()
+      ) {
+        return;
+      }
+
+      try {
+        await updateDoc(
+          doc(
+            db,
+            'users',
+            eleveSelectionneConseil.id
+          ),
+          {
+            appreciationConduiteEducateur:
+              avisConduiteConseil.trim(),
+
+            appreciationConduiteEducateurId:
+              idEducateur,
+
+            appreciationConduiteEducateurUpdatedAt:
+              new Date().toISOString()
+          }
+        );
+
+        setEleveSelectionneConseil(null);
+        setAvisConduiteConseil('');
+
+        alert(
+          '✅ Appréciation enregistrée en direct.'
+        );
+      } catch (error) {
+        console.error(error);
+
+        alert(
+          "❌ Impossible d'enregistrer l'appréciation."
+        );
+      }
+    };
+
+  // ==========================================================
+  // CIRCULAIRE
+  // ==========================================================
+
+  const handleDiffuserCirculaire =
+    async (event) => {
+      event.preventDefault();
+
+      if (
+        !sujetCirculaire.trim() ||
+        !corpsCirculaire.trim()
+      ) {
+        alert(
+          '⚠️ Veuillez renseigner le sujet et le message.'
+        );
+        return;
+      }
+
+      setSending(true);
+
+      try {
+        await addDoc(
+          collection(db, 'notifications'),
+          {
+            schoolId: currentSchool,
+            expediteurId: idEducateur,
+            expediteurNom: nomEducateur,
+            expediteurRole: 'educateur',
+            promotion: promotionDynamique,
+
+            classeId:
+              classeSelectionnee === 'all'
+                ? ''
+                : classeSelectionnee,
+
+            cible:
+              classeSelectionnee === 'all'
+                ? `promotion_${promotionDynamique}`
+                : `classe_${classeSelectionnee}`,
+
+            titre:
+              sujetCirculaire.trim(),
+
+            message:
+              corpsCirculaire.trim(),
+
+            type: 'diffusion_interne',
+
+            createdAt:
+              new Date().toISOString()
+          }
+        );
+
+        await addDoc(
+          collection(db, 'mails_direction'),
+          {
+            schoolId: currentSchool,
+            educateurId: idEducateur,
+            promotion: promotionDynamique,
+
+            classeId:
+              classeSelectionnee === 'all'
+                ? ''
+                : classeSelectionnee,
+
+            sujet:
+              sujetCirculaire.trim(),
+
+            message:
+              corpsCirculaire.trim(),
+
+            role: 'parents',
+
+            createdAt:
+              new Date().toISOString()
+          }
+        );
+
+        setSujetCirculaire('');
+        setCorpsCirculaire('');
+
+        setMsgStatus({
+          type: 'success',
+          text:
+            '🚀 Circulaire enregistrée et synchronisée en direct.'
+        });
+      } catch (error) {
+        console.error(error);
+
+        setMsgStatus({
+          type: 'error',
+          text:
+            '❌ Échec de diffusion.'
+        });
+      } finally {
+        setSending(false);
+      }
+    };
+
+  // ==========================================================
+  // DÉCONNEXION
+  // ==========================================================
 
   const handleSessionLogout = async () => {
-    if (!window.confirm('🚪 Souhaitez-vous fermer votre session ?')) return;
+    if (
+      !window.confirm(
+        '🚪 Souhaitez-vous fermer votre session éducateur ?'
+      )
+    ) {
+      return;
+    }
+
     try {
-      if (logout) await logout();
-      sessionStorage.clear();
-      localStorage.removeItem('sgs_owner_root_key');
-      navigate('/');
+      if (logout) {
+        await logout();
+      }
     } catch (error) {
       console.error(error);
-      navigate('/');
+    } finally {
+      sessionStorage.clear();
+      navigate('/', {
+        replace: true
+      });
     }
   };
 
   // ==========================================================
-  // ÉTATS DE CHARGEMENT ET PROTECTION RENDER
+  // TEMPS RESTANT
   // ==========================================================
-  if (loadingClasse || loadingEleves) {
+
+  const calculerTempsRestant = (
+    heureFin
+  ) => {
+    const fin =
+      minutesDepuisMinuit(heureFin);
+
+    if (fin === null) return '';
+
+    const difference =
+      fin - heureCouranteMinutes;
+
+    if (difference <= 0) {
+      return 'Terminé';
+    }
+
+    const heures = Math.floor(
+      difference / 60
+    );
+
+    const minutes =
+      difference % 60;
+
+    if (heures > 0) {
+      return `${heures}h ${minutes}min restantes`;
+    }
+
+    return `${minutes} min restantes`;
+  };
+
+  // ==========================================================
+  // AFFICHAGE DES POINTS
+  // ==========================================================
+
+  const formatNombre = (nombre) => {
+    const valeur = Number(nombre || 0);
+
+    if (!Number.isFinite(valeur)) {
+      return '0';
+    }
+
+    return valeur.toFixed(2);
+  };
+
+  // ==========================================================
+  // CHARGEMENT
+  // ==========================================================
+
+  if (
+    loadingClasse ||
+    loadingEleves
+  ) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-3xl mb-3">👮</div>
-          <p className="text-xs font-black uppercase text-gray-400 animate-pulse">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+        <div className="bg-white rounded-2xl    p-8 text-center">
+          <div className="text-3xl mb-3">
+            👮
+          </div>
+
+          <p className="font-black text-slate-800">
             Connexion au bureau éducateur...
+          </p>
+
+          <p className="text-xs text-slate-400 mt-2">
+            Synchronisation Firestore en temps réel.
           </p>
         </div>
       </div>
     );
   }
 
-  if (!classeEducateur) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-xl mx-auto bg-white border rounded-2xl p-8 text-center">
-          <h2 className="text-sm font-black text-orange-500 uppercase tracking-wide mb-2">
-            👮 Promotion {assignedPromotion || 'NON RENSEIGNÉE'}
-          </h2>
-          <h1 className="text-lg font-black uppercase text-gray-900">Promotion non affectée</h1>
-          <p className="text-sm text-gray-500 mt-3">Votre compte éducateur ne possède aucune classe affectée.</p>
-          <div className="{assignedPromotion || 'NON RENSEIGNÉE'}">
-            <p><strong>Éducateur :</strong> {user?.name || `${user?.nom || ''} ${user?.prenoms || ''}`}</p>
-            <p><strong>ID :</strong> {idEducateur || 'INCONNU'}</p>
-            <p><strong>Établissement :</strong> {schoolName || currentSchool}</p>
-            <p><strong>Promotion affectée :</strong> {assignedPromotion || 'NON RENSEIGNÉE'}</p>
-          </div>
-          <button type="button" onClick={handleSessionLogout} className="mt-6 bg-red-600 text-white px-5 py-3 rounded-xl text-xs font-black uppercase">
-            🚪 Déconnexion
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // ==========================================================
+  // RENDU
+  // ==========================================================
 
-  // ==========================================================
-  // RENDU INTERFACE GRAPHIQUE (JSX)
-  // ==========================================================
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 font-sans">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* EN-TÊTE D'IDENTIFICATION PROFILE */}
-        <div className="bg-white rounded-2xl border p-5 mb-6">
-          <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-xl mx-auto bg-white border rounded-2xl p-8 text-center">
-          <h1 className="text-sm font-black text-orange-500 uppercase tracking-wide mb-2">
-            👮 Bureau Educateur de la Promotion {assignedPromotion || 'NON RENSEIGNÉE'}
-          </h1>
-          
-          <div className="{assignedPromotion || 'NON RENSEIGNÉE'}">
-            <p><strong>Éducateur :</strong> {user?.name || `${user?.nom || ''} ${user?.prenoms || ''}`}</p>
-            <p><strong>ID :</strong> {idEducateur || 'INCONNU'}</p>
-            <p><strong>Établissement :</strong> {schoolName || currentSchool}</p>
-            <p><strong>Promotion affectée :</strong> {assignedPromotion || 'NON RENSEIGNÉE'}</p>
-          </div>
-          <button type="button" onClick={handleSessionLogout} className="mt-6 bg-red-600 text-white px-5 py-3 rounded-xl text-xs font-black uppercase">
-            🚪 Déconnexion
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen w-full bg-white">
+      <Header />
+      <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        {/* ====================================================
+            EN-TÊTE
+        ==================================================== */}
 
-                   {/* MENU DES NAVIGATIONS ONGLET AVEC POP-UP DÉLÉGUÉ INTÉGRÉ */}
-          <div className="flex flex-wrap gap-1 bg-gray-50 p-1 rounded-xl mt-5 items-center justify-between">
-            <div className="flex flex-wrap gap-1">
-              <button type="button" onClick={() => setActiveTab('dashboard_global')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'dashboard_global' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>📊 Vue Globale</button>
-              <button type="button" onClick={() => setActiveTab('pointages_rh')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'pointages_rh' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>🕒 Suivi Heures</button>
-              <button type="button" onClick={() => setActiveTab('assiduite_classes')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'assiduite_classes' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>📝 Main-Courante</button>
-              <button type="button" onClick={() => setActiveTab('excellence_promo')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'excellence_promo' ? 'bg-slate-900 text-orange-400' : 'text-gray-400'}`}>🏆 Excellence</button>
-              <button type="button" onClick={() => setActiveTab('messages_sos')} className={`px-3 py-2 rounded-lg text-xs font-black cursor-pointer ${activeTab === 'messages_sos' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>📬 Circulaires & SOS</button>
+        <div className="bg-white  p-6  mb-6">
+
+          <div className="flex flex-col lg:flex-row justify-between gap-5">
+
+            <div>
+              <p className="bureau text-[10px] font-black uppercase tracking-widest text-purple-500">
+                Bureau Éducateur de la promotion
+              </p>
+
+              <h1 className="educateur text-2xl font-black text-slate-900 mt-1">
+                {nomEducateur}
+              </h1>
+
+              <p className="jour text-xs font-bold text-slate-400 mt-2">
+               Date:  {jourActuel} / {dateAujourdhui}   heure : {heureActuelle}
+              </p>
             </div>
 
-            {/* 🟢 ACTION MAÎTRESSE : Bouton d'ouverture du Pop-up pour l'Éducateur */}
+            <div className="flex flex-wrap items-center gap-2">
+
+              <select
+                value={classeSelectionnee}
+                onChange={(e) =>
+                  setClasseSelectionnee(
+                    e.target.value
+                  )
+                }
+                className="toutelesclass bg-white border boder-purple-200 text-purple-700  px-4 py-3 text-xs font-black outline-none cursor-pointer"
+              >
+                <option value="all">
+                  TOUTES MES CLASSES
+                </option>
+
+                {listeClasses.map(
+                  (classe) => (
+                    <option
+                      key={classe.id}
+                      value={classe.id}
+                    >
+                      {classe.nom ||
+                        classe.name ||
+                        classe.classeNom ||
+                        classe.id}
+                    </option>
+                  )
+                )}
+              </select>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setIsPadOpen(true)
+                }
+                className="signatureeducateur  hover:bg-blue-700  px-4 py-2  text-xs font-black transition cursor-pointer"
+              >
+                Enregistrer votre Signature dans la base de donnée
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  handleSessionLogout
+                }
+                className="signatureeducat bg-red-600 hover:bg-red-700  px-4 py-3  text-xs font-black transition cursor-pointer"
+              >
+                Déconnexion
+              </button>
+     {/* ======================================================
+          SIGNATURE
+      ====================================================== */}
+
+      {isPadOpen && (
+        <SignaturePadModal
+          isOpen={isPadOpen}
+          onClose={() =>
+            setIsPadOpen(false)
+          }
+          onSave={
+            handleSauvegarderSignatureEducateur
+          }
+          existingSignature={
+            user?.signatureDessinImage || ''
+          }
+        />
+      )}
+            </div>
+          </div>
+
+          {/* INFORMATIONS CLASSES */}
+
+          <div className="infoclasse grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+
+            <div className="bg-white  p-4">
+              <p className="text-[10px] font-black uppercase text-purple-400">
+                Classes totales de la promotion 
+              </p>
+
+              <p className="text-2xl text-danger font-black text-purple-700">
+                {listeClasses.length}
+              </p>
+            </div>
+
+            <div className="bg-white  p-4">
+              <p className="text-[10px] font-black uppercase text-blue-400">
+                 Effectif total de la promotion
+              </p>
+
+              <p className="text-2xl text-danger font-black text-blue-700">
+                {elevesPromo.length}
+              </p>
+            </div>
+
+            <div className="bg-white  p-4">
+              <p className="text-[10px] font-black uppercase text-orange-400">
+                Absences
+              </p>
+
+              <p className="text-2xl text-danger font-black text-orange-700">
+                {statistiquesAssiduite.absents}
+              </p>
+            </div>
+
+            <div className="bg-white  p-4">
+              <p className="text-[10px]  font-black uppercase text-emerald-400">
+                Points cumulés du premier de la promotion
+              </p>
+
+              <p className="text-2xl text-danger font-black text-emerald-700">
+                {formatNombre(
+                  elevesPromo.reduce(
+                    (total, eleve) =>
+                      total +
+                      Number(
+                        eleve.totalPointsCumules ||
+                        0
+                      ),
+                    0
+                  )
+                )}
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ====================================================
+            NAVIGATION
+        ==================================================== */}
+
+        <div className="bg-white   p-3  mb-6">
+
+          <div className=" flex flex-wrap gap-2">
+            <div className=" tableaubord flex flex-wrap gap-2">
+
+            {[
+              [
+                'dashboard_global',
+                'Tableau de bord'
+              ],
+              [
+                'assiduite_classes',
+                'Journal des appels'
+              ],
+              [
+                'pointages_rh',
+                'Pointages des professeur'
+              ],
+              [
+                'excellence_promo',
+                'Moyenne et classement de la promotion'
+              ],
+              
+              
+             
+              [
+                'instructions_admin',
+                'Boite de reception'
+              ]
+              
+            ].map(
+              ([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() =>
+                    setActiveTab(tab)
+                  }
+                  className={`px-4 py-3  text-xs font-black transition cursor-pointer ${
+                    activeTab === tab
+                      ? ' text-orange-400 '
+                      : ' text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            )}
+            </div>
+             <div className="com mb-4">
+                 <Link
+                   to="/components/communication"
+                   className=" px-4 py-3 bg-purple-600 hover:bg-purple-700   text-xs font-black cursor-pointer transition"
+                 >
+                    Commucation et inforamation
+                 </Link>
+               </div>
+          {/* ====================================================
+           Rectifications
+        ==================================================== */}
+
+          <div className="mt-6 bg-white   rounded-2xl p-6 ">
+
+            <div className="mise nmb-4">
+                 <Link
+                   to="/educateur/rectification"
+                   className=" px-4 py-3 bg-purple-600 hover:bg-purple-700   text-xs font-black cursor-pointer transition"
+                 >
+                  Mise ajour et Rectifications
+                 </Link>
+               </div>
+               </div>
+
+                {/* ====================================================
+           Rectifications
+        ==================================================== */}
+
+          <div className="mt-6 bg-white   rounded-2xl p-6 ">
+
+            <div className="vacation mb-4">
+                 <Link
+                   to="/educateur/arbitrages/paie-vacation"
+                   className="cursor-pointer transition"
+                 >
+                 Suivi Horaires des Vacations
+                 </Link>
+               </div>
+               </div>
+
+
+          {/* ====================================================
+            PROMOTION
+        ==================================================== */}
+
+          <div className="mt-6 bg-white   rounded-2xl p-6 ">
+
+            <div className="mb-4">
+                 <Link
+                   to="/educateur/promotions"
+                   className="gest px-4 py-3 bg-purple-600 hover:bg-purple-700   text-xs font-black cursor-pointer transition"
+                 >
+                   Gestion de la promotion
+                 </Link>
+               </div>
+               </div>
+
+               
+
+
             <button
               type="button"
-              onClick={() => setIsModalDelegueOpen(true)}
-              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-black uppercase tracking-wider transition shadow-sm border-0 cursor-pointer"
+              onClick={() =>
+                setIsModalDelegueOpen(true)
+              }
+              className="delegue  text-xs font-black cursor-pointer transition"
             >
-              👑 Assigner Délégué
+              Ajouter le Délégué élu a la classe
             </button>
           </div>
-
-                    {/* ================= 🪪 POP-UP MODAL : SÉLECTION DU DÉLÉGUÉ FILTRÉ ================= */}
-          {isModalDelegueOpen && (
-            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-[99999] flex items-center justify-center p-4 animate-fadeIn">
-              <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 space-y-4 text-left">
-                
-                <div className="border-b pb-2 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase">Délégué de Promotion ({classeEducateur?.promotion || 'En cours'})</h3>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Accès restreint à vos apprenants rattachés</p>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => { setIsModalDelegueOpen(false); setRechercheEleveDelegue(''); setRechercheClasseDelegue(''); }} 
-                    className="text-gray-400 hover:text-gray-600 border-0 bg-transparent text-sm font-black cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* 🔍 DOUBLE ZONE DE RECHERCHE : ÉLÈVE + CLASSE */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-gray-400 text-[9px] uppercase font-black mb-1">Nom ou Prénom</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: DOUBA..."
-                      value={rechercheEleveDelegue}
-                      onChange={(e) => setRechercheEleveDelegue(e.target.value)}
-                      className="w-full bg-gray-50 border p-2 rounded-xl outline-none text-xs font-bold text-gray-800 focus:ring-1 focus:ring-purple-500 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 text-[9px] uppercase font-black mb-1">Filtrer par Classe</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: 1ere_A_1..."
-                      value={rechercheClasseDelegue}
-                      onChange={(e) => setRechercheClasseDelegue(e.target.value)}
-                      className="w-full bg-gray-50 border p-2 rounded-xl outline-none text-xs font-bold text-gray-800 focus:ring-1 focus:ring-purple-500 bg-white font-mono lowercase"
-                    />
-                  </div>
-                </div>
-
-                {/* Liste déroulante des élèves filtrés */}
-                <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                  <button
-                    type="button"
-                    onClick={() => handleValiderChoixDelegue(null, "Non désigné")}
-                    className="w-full text-left p-2.5 rounded-xl border border-dashed border-red-200 text-red-600 hover:bg-red-50 text-xs font-black uppercase transition cursor-pointer flex justify-between items-center"
-                  >
-                    <span>❌ Destituer le délégué actuel</span>
-                    <span className="text-[9px] bg-red-100 px-2 py-0.5 rounded font-mono">Reset</span>
-                  </button>
-
-                  {/* MOTEUR DE DOUBLE COMPILATION CROISÉE */}
-                  {listeElevesPourDelegue
-                    .filter(el => {
-                      const civil = `${el.nom || ''} ${el.prenoms || el.prenom || ''}`.toLowerCase();
-                      const division = String(el.classeId || '').toLowerCase();
-                      
-                      const matcheNom = civil.includes(rechercheEleveDelegue.toLowerCase().trim());
-                      const matcheClasse = division.includes(rechercheClasseDelegue.toLowerCase().trim());
-                      
-                      return matcheNom && matcheClasse;
-                    })
-                    .map(el => (
-                      <button
-                        key={el.id}
-                        type="button"
-                        onClick={() => handleValiderChoixDelegue(el.id, `${el.nom} ${el.prenoms || el.prenom || ''}`.toUpperCase())}
-                        className="w-full text-left p-2.5 bg-gray-50 hover:bg-purple-50 hover:text-purple-700 rounded-xl transition text-xs font-bold flex justify-between items-center cursor-pointer border border-transparent hover:border-purple-200"
-                      >
-                        <span className="uppercase font-black truncate max-w-[200px]">{el.nom} {el.prenoms || el.prenom || ''}</span>
-                        <span className="text-[8px] font-mono bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded uppercase font-black">{el.classeId || 'N/A'}</span>
-                      </button>
-                    ))
-                  }
-                </div>
-
-                <div className="text-[10px] text-gray-400 font-medium text-center italic border-t pt-2">
-                  Seuls les apprenants de la promotion {classeEducateur?.promotion || ''} sont listés ici.
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
 
-        {/* COMPTEURS SYNTHÈSES DE L'ONGLET PRINCIPAL */}
+        {/* ====================================================
+            VUE GLOBALE
+        ==================================================== */}
+
         {activeTab === 'dashboard_global' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="bg-white rounded-2xl border p-5">
-                <p className="text-[10px] font-black uppercase text-gray-400">Effectif de ma classe</p>
-                <p className="text-3xl font-black text-gray-900 mt-2">{elevesPromo.length}</p>
+            <div className="courencour grid grid-cols-1 md:grid-cols-3 gap-4">
+
+             
+              <div className="bg-white   rounded-2xl p-6 ">
+                <p className="text-danger bold text-[10px] font-black uppercase text-slate-400">
+                  Prochains cours
+                </p>
+
+                <div className="mt-3 space-y-2">
+                  {prochainsCours
+                    .slice(0, 3)
+                    .map(
+                      (cours, index) => (
+                        <div
+                          key={index}
+                          className="bg-blue-50  p-3"
+                        >
+                          <p className="font-black text-sm text-blue-800">
+                            {cours.matiere ||
+                              'Cours'}
+                          </p>
+
+                          <p className="text-xs text-blue-600">
+                            {cours.heureDebut} —{' '}
+                            {cours.heureFin}
+                          </p>
+
+                          <p className="text-[10px] font-bold text-blue-500">
+                            {cours.nomClasse ||
+                              'Classe'}
+                          </p>
+                        </div>
+                      )
+                    )}
+
+                  {prochainsCours.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      Aucun prochain cours.
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="bg-white rounded-2xl border p-5">
-                <p className="text-[10px] font-black uppercase text-red-500">Absences</p>
-                <p className="text-3xl font-black text-red-600 mt-2">
-                  {elevesPromo.reduce((total, eleve) => total + (Number(eleve.absences) || 0), 0)} H
+
+               <div className="bg-white   rounded-2xl p-6 ">
+                <p className="text-danger bold font-black uppercase text-slate-400">
+                  Cours en cours
+                </p>
+
+                <p className="text-danger font-black text-emerald-600 mt-2">
+                  {coursEnCours.length}
+                </p>
+
+                {coursEnCours.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {coursEnCours.map(
+                      (cours, index) => (
+                        <div
+                          key={index}
+                          className="bg-emerald-50  p-3"
+                        >
+                          <p className="font-black text-sm text-emerald-800">
+                            {cours.matiere ||
+                              'Cours'}
+                          </p>
+
+                          <p className="text-xs text-emerald-600">
+                            {cours.heureDebut} —{' '}
+                            {cours.heureFin}
+                          </p>
+
+                          <p className="text-[10px] font-bold text-emerald-500 mt-1">
+                            {calculerTempsRestant(
+                              cours.heureFin
+                            )}
+                          </p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {coursEnCours.length === 0 && (
+                  <p className="bold text-xs text-slate-400 mt-2">
+                    Aucun cours actuellement.
+                  </p>
+                )}
+              </div>
+
+
+              <div className="bg-white   rounded-2xl p-6 ">
+                <p className="text-danger bold text-[10px] font-black uppercase text-slate-400">
+                  Pointages enseignants
+                </p>
+
+                <p className="text-3xl text-danger bold font-black text-orange-600 mt-2">
+                  {pointagesEnCours.length}
+                </p>
+
+                <p className="text-xs text-slate-400 mt-2">
+                  Enseignants actuellement pointés.
                 </p>
               </div>
-              <div className="bg-white rounded-2xl border p-5">
-                <p className="text-[10px] font-black uppercase text-purple-600">Classe affectée</p>
-                <p className="text-xl font-black text-purple-900 mt-2">{classeEducateur.nom}</p>
+
+            </div>
+            {/* RÉSUMÉ ASSIDUITÉ */}
+
+            <div className="assiparti    rounded-2xl p-6 ">
+
+              <div className="assinfo flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Assiduité du jour
+                  </p>
+
+                  <h2 className="text-lg font-black text-slate-900 mt-1">
+                    Situation des élèves
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveTab(
+                      'assiduite_classes'
+                    )
+                  }
+                  className="voirdetail text-xs font-black text-purple-600 hover:underline cursor-pointer"
+                >
+                  Voir le détail →
+                </button>
+              </div>
+
+              <div className="stact grid grid-cols-3 gap-3 mt-5">
+
+                <div className="bg-emerald-50  p-4 text-center">
+                  <p className="text-2xl text-danger font-black text-emerald-700">
+                    {statistiquesAssiduite.presents}
+                  </p>
+                  <p className="text-[10px] font-black uppercase text-emerald-500">
+                    Présents
+                  </p>
+                </div>
+
+                <div className="bg-red-50  p-4 text-center">
+                  <p className="text-2xl text-danger font-black text-red-700">
+                    {statistiquesAssiduite.absents}
+                  </p>
+                  <p className="text-[10px] font-black uppercase text-red-500">
+                    Absents
+                  </p>
+                </div>
+
+                <div className="bg-orange-50  p-4 text-center">
+                  <p className="text-2xl text-danger font-black text-orange-700">
+                    {statistiquesAssiduite.retards}
+                  </p>
+                  <p className="text-[10px] font-black uppercase text-orange-500">
+                    Retards
+                  </p>
+                </div>
+
               </div>
             </div>
 
-            {/* TABLEAU DES ÉLÈVES DE LA VUE GLOBALE */}
-            <div className="bg-white rounded-2xl border p-6">
-              <h3 className="text-xs font-black uppercase text-gray-700 mb-4">📋 Registre Alphabétique de la Classe</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                    <tr className="bg-gray-100 text-gray-700 uppercase font-bold border-b">
-                      <th className="p-3">Matricule</th>
-                      <th className="p-3">Nom & Prénoms</th>
-                      <th className="p-3 text-center">Genre</th>
-                      <th className="p-3 text-center">Absences</th>
+          </div>
+        )}
+
+        {/* ====================================================
+            ASSIDUITÉ
+        ==================================================== */}
+
+        {activeTab === 'assiduite_classes' && (
+          <div className="assi-group space-y-4">
+
+            <div className="bg-white   rounded-2xl p-6 ">
+              <h2 className="text-xl font-black text-slate-900">
+                📝 Assiduité des classes
+              </h2>
+
+              <p className="text-xs text-slate-400 mt-1">
+                Données récupérées en temps réel depuis le registre des appels.
+              </p>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden ">
+
+              <div className=" overflow-x-auto">
+
+                <table className="tab-group w-full text-sm">
+
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left p-4 text-[10px] font-black uppercase text-slate-400">
+                        Élève
+                      </th>
+
+                      <th className="text-center p-4 text-[10px] font-black uppercase text-slate-400">
+                        Présences
+                      </th>
+
+                      <th className="text-center p-4 text-[10px] font-black uppercase text-slate-400">
+                        Absences
+                      </th>
+
+                      <th className="text-center p-4 text-[10px] font-black uppercase text-slate-400">
+                        Retards
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {elevesPromo.map((el) => (
-                      <tr key={el.id} className="hover:bg-slate-50 transition">
-                        <td className="p-3 font-mono font-bold text-gray-600">{el.matricule || el.id}</td>
-                        <td className="p-3 font-bold text-gray-900 uppercase">{el.nom} {el.prenoms || el.prenom}</td>
-                        <td className="p-3 text-center font-semibold text-gray-500">{el.genre || 'M'}</td>
-                        <td className="p-3 text-center font-black text-red-600">{el.absences || 0} H</td>
-                      </tr>
-                    ))}
+
+                  <tbody>
+
+                    {elevesPromo.map(
+                      (eleve) => {
+                        const stats =
+                          statistiquesEleves[
+                            eleve.id
+                          ] || {
+                            presence: 0,
+                            absence: 0,
+                            retard: 0
+                          };
+
+                        return (
+                          <tr
+                            key={eleve.id}
+                            className="-t -slate-100"
+                          >
+                            <td className="p-4">
+                              <p className="font-black text-slate-800">
+                                {eleve.nom}{' '}
+                                {eleve.prenoms ||
+                                  eleve.prenom}
+                              </p>
+
+                              <p className="text-[10px] text-danger">
+                                {eleve.matricule ||
+                                  eleve.id}
+                              </p>
+                            </td>
+
+                            <td className="text-center font-black text-emerald-600">
+                              {stats.presence}
+                            </td>
+
+                            <td className="text-center font-black text-red-600">
+                              {stats.absence}
+                            </td>
+
+                            <td className="text-center font-black text-orange-600">
+                              {stats.retard}
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
+
                   </tbody>
                 </table>
+
               </div>
             </div>
+
           </div>
         )}
 
-        {/* =====================================================
-            EXCELLENCE / CLASSEMENT
-        ===================================================== */}
-        {activeTab === 'excellence_promo' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-2xl border p-6">
-              <div className="border-b pb-4 mb-4">
-                <h2 className="text-sm font-black uppercase text-gray-900">🏆 Classement général de la promotion</h2>
-                <p className="text-xs text-gray-400 mt-1">Classe : {classeEducateur.nom}</p>
-              </div>
+        {/* ====================================================
+            POINTAGES PROFS
+        ==================================================== */}
 
-              {classement.length === 0 ? (
-                <div className="py-12 text-center text-xs text-gray-400">Aucun élève dans cette classe.</div>
-              ) : (
-                <div className="space-y-2">
-                  {classement.map((eleve, index) => (
-                    <button key={eleve.id} type="button" onClick={() => { setEleveSelectionneConseil(eleve); setAvisConduiteConseil(eleve.appreciationConduiteEducateur || ''); }} className="w-full text-left bg-gray-50 hover:bg-purple-50 border rounded-xl p-4 transition flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-slate-900 text-orange-400 flex items-center justify-center font-black text-xs shrink-0">{index + 1}</div>
-                      <div className="flex-1">
-                        <p className="text-sm font-black uppercase text-gray-900">{eleve.nom} {eleve.prenoms || ''}</p>
-                        <p className="text-[10px] font-bold text-purple-600 uppercase">{eleve.classeId}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-black text-gray-900">{Number(eleve.totalPointsCumules).toFixed(2)}</p>
-                        <p className="text-[9px] uppercase text-gray-400 font-bold">points cumulés</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* APPRÉCIATION FORMULAIRE */}
-            <div className="bg-white rounded-2xl border p-5 h-fit">
-              <h3 className="text-xs font-black uppercase text-purple-700 border-b pb-3 mb-4">💬 Appréciation de conduite</h3>
-              {!eleveSelectionneConseil ? (
-                <p className="text-center text-xs text-gray-400 py-12 italic">Sélectionnez un élève pour renseigner son appréciation.</p>
-              ) : (
-                <form onSubmit={handleEnregistrerAppreciationConseil} className="space-y-4">
-                  <div className="bg-purple-50 rounded-xl p-4">
-                    <p className="text-sm font-black uppercase text-purple-950">{eleveSelectionneConseil.nom} {eleveSelectionneConseil.prenoms || ''}</p>
-                    <p className="text-[10px] font-bold text-purple-600 mt-1">{eleveSelectionneConseil.classeId}</p>
-                  </div>
-                  <textarea rows="5" value={avisConduiteConseil} onChange={(e) => setAvisConduiteConseil(e.target.value)} placeholder="Ex : Élève discipliné..." className="w-full border rounded-xl p-3 text-xs outline-none focus:ring-1 focus:ring-purple-500" required />
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => { setEleveSelectionneConseil(null); setAvisConduiteConseil(''); }} className="flex-1 bg-gray-100 py-3 rounded-xl text-[10px] font-black uppercase">Annuler</button>
-                    <button type="submit" className="flex-1 bg-purple-600 text-white py-3 rounded-xl text-[10px] font-black uppercase">Enregistrer</button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* =====================================================
-            MAIN COURANTE
-        ===================================================== */}
-        {activeTab === 'assiduite_classes' && (
-          <div className="bg-white rounded-2xl border p-6">
-            <h2 className="text-sm font-black uppercase border-b pb-3">📝 Main-Courante — {classeEducateur.nom}</h2>
-            <p className="text-xs text-gray-400 mt-3">{fichesAppels.length} enregistrement(s) pour votre classe.</p>
-            <div className="mt-4 space-y-2">
-              {fichesAppels.map(f => (
-                <div key={f.id} className="p-3 bg-gray-50 border rounded-xl text-xs flex justify-between">
-                  <div><strong>Plage horaire :</strong> {f.periode || 'N/A'} | <strong>Matière :</strong> {f.matiere || 'N/A'}</div>
-                  <div className="text-gray-400 font-mono">{f.date || 'Récemment'}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* =====================================================
-            POINTAGES RH
-        ===================================================== */}
         {activeTab === 'pointages_rh' && (
-          <div className="bg-white rounded-2xl border p-6">
-            <h2 className="text-sm font-black uppercase border-b pb-3">🕒 Suivi des Heures Enseignants</h2>
-            <p className="text-xs text-gray-400 mt-3">{pointagesRaw.length} session(s) enregistrée(s).</p>
-            <div className="mt-4 space-y-2">
-              {pointagesRaw.map(p => (
-                <div key={p.id} className="p-3 bg-gray-50 border rounded-xl text-xs flex justify-between">
-                  <div>👤 <strong>{p.professeurName}</strong> — Émersion horaire : <span className="font-bold text-orange-600">{p.heuresEffectuees || 2}H</span></div>
-                  <div className="font-mono text-gray-400">{p.date}</div>
-                </div>
-              ))}
+          <div className="space-y-4">
+
+            <div className="bg-white p-6 ">
+
+              <h2 className="pointage text-xl font-black text-slate-900">
+                🕒 Pointages des professeurs
+              </h2>
+
+              <p className="pointag text-xs text-slate-400 mt-1">
+                Suivi en temps réel des pointages enseignants.
+              </p>
+
             </div>
+
+            <div className="pointage-group">
+
+              <div className=" rounded-2xl p-5">
+                <p className="text-[10px] font-black uppercase text-emerald-500">
+                  Pointages ouverts
+                </p>
+
+                <p className="text-danger font-black text-emerald-700 mt-2">
+                  {pointagesEnCours.length}
+                </p>
+              </div>
+
+              <div className=" rounded-2xl p-5">
+                <p className="text-[10px] font-black uppercase text-blue-500">
+                  Cours aujourd'hui
+                </p>
+
+                <p className="text-danger font-black text-blue-700 mt-2">
+                  {creneauxEDT.filter(
+                    (cours) =>
+                      normaliser(
+                        cours.jour
+                      ) ===
+                      normaliser(
+                        jourActuel
+                      )
+                  ).length}
+                </p>
+              </div>
+
+              <div className=" rounded-2xl p-5">
+                <p className="text-[10px] font-black uppercase text-purple-500">
+                  Enregistrements
+                </p>
+
+                <p className="text-danger font-black text-purple-700 mt-2">
+                  {pointagesProfesseurs.length}
+                </p>
+              </div>
+
+            </div>
+
+            <div >
+
+              <div className="latable ">
+
+                <table className=" w-full py-1 text-sm">
+
+                  <thead >
+                    <tr>
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Professeur
+                      </th>
+
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Date
+                      </th>
+
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Arrivée
+                      </th>
+
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Départ
+                      </th>
+
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Statut
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+
+                    {pointagesProfesseurs
+                      .slice(0, 50)
+                      .map(
+                        (pointage) => (
+                          <tr
+                            key={pointage.id}
+                            className="-t -slate-100"
+                          >
+                            <td className="p-4 font-black">
+                              {pointage.professeurNom ||
+                                pointage.professeur ||
+                                pointage.nom ||
+                                'Professeur'}
+                            </td>
+
+                            <td className="p-4 text-xs text-slate-500">
+                              {pointage.datePointage ||
+                                pointage.date ||
+                                '—'}
+                            </td>
+
+                            <td className="p-4 text-emerald-600 font-black">
+                              {pointage.heureArrivee ||
+                                '—'}
+                            </td>
+
+                            <td className="p-4 text-orange-600 font-black">
+                              {pointage.heureDepart ||
+                                '—'}
+                            </td>
+
+                            <td className="p-4">
+                              <span
+                                className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                                  pointage.heureArrivee &&
+                                  !pointage.heureDepart
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {pointage.heureArrivee &&
+                                !pointage.heureDepart
+                                  ? 'EN COURS'
+                                  : 'FERMÉ'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      )}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+            </div>
+
           </div>
         )}
 
-        {/* =====================================================
-            CIRCULAIRES & MESSAGERIE
-        ===================================================== */}
-        {activeTab === 'messages_sos' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-2xl border p-5">
-              <h3 className="text-xs font-black uppercase border-b pb-3 mb-4">✉️ Circulaire de promotion</h3>
-              {msgStatus.text && (
-                <div className={`border rounded-xl p-3 text-xs mb-4 ${msgStatus.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                  {msgStatus.text}
+        {/* ====================================================
+            POINTS / CLASSEMENT
+        ==================================================== */}
+
+        {activeTab === 'excellence_promo' && (
+          <div className="space-y-4">
+
+            <div className="bg-white   rounded-2xl p-6 ">
+
+              <h2 className="pointage-1 text-xl font-black text-slate-900">
+                🏆 Points et classement
+              </h2>
+
+              <p className="text-xs text-slate-400 mt-1">
+                Les points correspondent aux moyennes pondérées des matières enregistrées par les professeurs.
+              </p>
+
+            </div>
+
+            <div className="bg-white   rounded-2xl overflow-hidden ">
+
+              <div className="overflow-x-auto">
+
+                <table className="w-full text-sm">
+
+                  <thead className="bg-slate-50">
+
+                    <tr>
+                      <th className="p-4 text-center text-[10px] font-black uppercase text-slate-400">
+                        #
+                      </th>
+
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Élève
+                      </th>
+
+                      <th className="p-4 text-left text-[10px] font-black uppercase text-slate-400">
+                        Classe
+                      </th>
+
+                      <th className="p-4 text-center text-[10px] font-black uppercase text-slate-400">
+                        Moyennes matières
+                      </th>
+
+                      <th className="p-4 text-center text-[10px] font-black uppercase text-slate-400">
+                        Points pondérés
+                      </th>
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {classement.map(
+                      (eleve, index) => (
+                        <tr
+                          key={eleve.id}
+                          className="-t -slate-100 hover:bg-slate-50"
+                        >
+
+                          <td className="p-4 text-center">
+                            <span
+                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-black ${
+                                index === 0
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : index === 1
+                                  ? 'bg text-slate-700'
+                                  : index === 2
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-slate-50 text-slate-500'
+                              }`}
+                            >
+                              {index + 1}
+                            </span>
+                          </td>
+
+                          <td className="p-4">
+                            <p className="font-black text-slate-800">
+                              {eleve.nom}{' '}
+                              {eleve.prenoms ||
+                                eleve.prenom}
+                            </p>
+
+                            <p className="text-[10px] text-slate-400">
+                              {eleve.matricule ||
+                                eleve.id}
+                            </p>
+                          </td>
+
+                          <td className="p-4 text-xs font-bold text-slate-500">
+                            {eleve.classeNom ||
+                              eleve.classe ||
+                              eleve.classeId ||
+                              '—'}
+                          </td>
+
+                          <td className="p-4 text-center">
+                            <span className="font-black text-blue-600">
+                              {formatNombre(
+                                eleve.moyenneGeneraleMatieres
+                              )}
+                            </span>
+                          </td>
+
+                          <td className="p-4 text-center">
+                            <span className="inline-flex px-4 py-2 bg-purple-100 text-purple-700  font-black">
+                              {formatNombre(
+                                eleve.totalPointsCumules
+                              )}
+                            </span>
+                          </td>
+
+                        </tr>
+                      )
+                    )}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+            </div>
+
+            {/* DÉTAIL DES MATIÈRES */}
+
+            {classement.length > 0 && (
+              <div className="bg-white   rounded-2xl p-6 ">
+
+                <h3 className="text-danger font-black text-slate-900">
+                  📚 Détail des moyennes matières
+                </h3>
+
+                <p className="text-xs text-slate-400 mt-1">
+                  Moyenne × coefficient = moyenne pondérée = points.
+                </p>
+
+                <div className="mt-5 space-y-4">
+
+                  {classement
+                    .slice(0, 10)
+                    .map((eleve) => (
+                      <div
+                        key={eleve.id}
+                        className=" -slate-100 rounded-2xl p-4"
+                      >
+
+                        <div className="flex justify-between items-center mb-3">
+                          <p className="font-black text-slate-800">
+                            {eleve.nom}{' '}
+                            {eleve.prenoms ||
+                              eleve.prenom}
+                          </p>
+
+                          <span className="text-xs font-black text-purple-600">
+                            {formatNombre(
+                              eleve.totalPointsCumules
+                            )}{' '}
+                            points
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+
+                          {(eleve.detailsMatieres ||
+                            [])
+                            .slice(-12)
+                            .map(
+                              (
+                                matiere,
+                                index
+                              ) => (
+                                <div
+                                  key={`${matiere.periode}-${matiere.matiere}-${index}`}
+                                  className="bg-slate-50  p-3"
+                                >
+
+                                  <p className="text-xs font-black text-slate-700">
+                                    {matiere.matiere}
+                                  </p>
+
+                                  <p className="text-[10px] text-slate-400">
+                                    {matiere.periode}
+                                  </p>
+
+                                  <div className="flex justify-between mt-2 text-xs">
+                                    <span>
+                                      Moyenne :{' '}
+                                      <strong>
+                                        {formatNombre(
+                                          matiere.moyenne
+                                        )}
+                                      </strong>
+                                    </span>
+
+                                    <span>
+                                      Coef :{' '}
+                                      <strong>
+                                        {formatNombre(
+                                          matiere.coefficient
+                                        )}
+                                      </strong>
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-2 bg-purple-100 text-purple-700 rounded-lg px-2 py-1 text-center text-xs font-black">
+                                    {formatNombre(
+                                      matiere.moyennePonderee
+                                    )}{' '}
+                                    points
+                                  </div>
+
+                                </div>
+                              )
+                            )}
+
+                        </div>
+                      </div>
+                    ))}
+
                 </div>
-              )}
-              <form onSubmit={handleDiffuserCirculaireMails} className="space-y-3">
-                <input value={sujetCirculaire} onChange={(e) => setSujetCirculaire(e.target.value)} placeholder="Sujet" className="w-full border rounded-xl p-3 text-xs outline-none" required />
-                <textarea rows="6" value={corpsCirculaire} onChange={(e) => setCorpsCirculaire(e.target.value)} placeholder="Message..." className="w-full border rounded-xl p-3 text-xs outline-none" required />
-                <button type="submit" disabled={sending} className="w-full bg-purple-600 text-white py-3 rounded-xl text-xs font-black uppercase disabled:opacity-50 transition">
-                  {sending ? 'Envoi en cours...' : '✉️ Diffuser aux parents'}
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ====================================================
+            CIRCULAIRES
+        ==================================================== */}
+         {/*  {activeTab === 'messages_sos' && (
+          <div className="bg-white   rounded-2xl  overflow-hidden">
+
+            <EnvoyerMessageUnique
+              schoolId={currentSchool}
+               schoolId={currentSchool}
+              user={user}
+              role="educateur"
+            />
+
+          </div>
+        )} */}
+
+          
+       
+        
+
+        {/* ====================================================
+            INSTRUCTIONS ADMIN
+        ==================================================== */}
+
+        {activeTab === 'instructions_admin' && (
+          <div className="bg-white   rounded-2xl  overflow-hidden">
+
+            <BoiteReceptionUnique
+              schoolId={currentSchool}
+              user={user}
+              role="educateur"
+            />
+
+          </div>
+        )}
+
+        {/* ====================================================
+            AVIS DE CONDUITE
+        ==================================================== */}
+
+        {eleveSelectionneConseil && (
+          <div className="fixed inset-0 z-[99991] bg-white backdrop-blur-sm flex items-center justify-center p-4">
+
+            <form
+              onSubmit={
+                handleEnregistrerAppreciationConseil
+              }
+              className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl"
+            >
+
+              <div className="flex justify-between items-center mb-4">
+
+                <div>
+                  <h3 className="font-black text-slate-900">
+                    📝 Avis de conduite
+                  </h3>
+
+                  <p className="text-xs text-slate-400">
+                    {eleveSelectionneConseil.nom}{' '}
+                    {eleveSelectionneConseil.prenoms ||
+                      eleveSelectionneConseil.prenom}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEleveSelectionneConseil(
+                      null
+                    );
+                    setAvisConduiteConseil('');
+                  }}
+                  className="text-slate-400 font-black cursor-pointer"
+                >
+                  ✕
                 </button>
-              </form>
-            </div>
-            <div className="lg:col-span-2 bg-white rounded-2xl border p-5">
-              <h3 className="text-xs font-black uppercase border-b pb-3 mb-4">📥 Instructions de la direction</h3>
-              <ReceptionInstructionsAdmin currentSchool={currentSchool} idEducateurLogge={idEducateur} />
+
+              </div>
+
+              <textarea
+                value={avisConduiteConseil}
+                onChange={(e) =>
+                  setAvisConduiteConseil(
+                    e.target.value
+                  )
+                }
+                rows={6}
+                placeholder="Saisissez votre appréciation..."
+                className="w-full    p-4 text-sm outline-none resize-none focus:ring-2 focus:ring-purple-200"
+              />
+
+              <button
+                type="submit"
+                className="w-full mt-4 bg-purple-600 hover:bg-purple-700   py-3 text-xs font-black cursor-pointer"
+              >
+                💾 ENREGISTRER L'APPRÉCIATION
+              </button>
+
+            </form>
+          </div>
+        )}
+      </main>
+           {/* ====================================================
+            MODAL DÉLÉGUÉ
+        ==================================================== */}
+
+        {isModalDelegueOpen && (
+          <div className="rech-group fixed inset-0 z-[99990]  backdrop-blur-sm flex items-center justify-center p-4">
+            <select
+                value={classeSelectionnee}
+                onChange={(e) =>
+                  setClasseSelectionnee(
+                    e.target.value
+                  )
+                }
+                className="toutelesclass2 bg-white border boder-purple-200 text-purple-700  px-4 py-3 text-xs font-black outline-none cursor-pointer"
+              >
+                <option value="all">
+                  CHOISIR LA CLASSE CONCERNEE
+                </option>
+
+                {listeClasses.map(
+                  (classe) => (
+                    <option
+                      key={classe.id}
+                      value={classe.id}
+                    >
+                      {classe.nom ||
+                        classe.name ||
+                        classe.classeNom ||
+                        classe.id}
+                    </option>
+                  )
+                )}
+              </select>
+            <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl">
+
+              <div className="flex justify-between items-center mb-5">
+
+                <div>
+                  <h3 className="text-delegue text-lg  font-black text-slate-900">
+                     Désignation du délégué
+                  </h3>
+
+                  <p className="text-xs text-slate-400">
+                    Sélection en direct parmi vos effectifs.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalDelegueOpen(
+                      false
+                    );
+
+                    setRechercheEleveDelegue(
+                      ''
+                    );
+
+                    setRechercheClasseDelegue(
+                      ''
+                    );
+                  }}
+                  className="text-slate-400 hover:text-slate-700 text-xl font-black cursor-pointer"
+                >
+                  ✕
+                </button>
+
+              </div>
+
+              <div className=" grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+
+                <input
+                  value={
+                    rechercheEleveDelegue
+                  }
+                  onChange={(e) =>
+                    setRechercheEleveDelegue(
+                      e.target.value
+                    )
+                  }
+                  placeholder="🔎 Rechercher un élève..."
+                  className=" bg-slate-50  p-3 text-xs font-bold outline-none focus:ring-2 focus:ring-purple-200"
+                />
+
+                <input
+                  value={
+                    rechercheClasseDelegue
+                  }
+                  onChange={(e) =>
+                    setRechercheClasseDelegue(
+                      e.target.value
+                    )
+                  }
+                  placeholder="🔎 Rechercher une classe..."
+                  className=" bg-slate-50  p-3 text-xs font-bold outline-none focus:ring-2 focus:ring-purple-200"
+                />
+
+              </div>
+
+              <div className="space-y-2">
+
+                {listeClasses.map(
+                  (classe) => (
+                    <button
+                      key={`reset-${classe.id}`}
+                      type="button"
+                      onClick={() =>
+                        handleValiderChoixDelegue(
+                          null,
+                          'Non désigné',
+                          classe.id
+                        )
+                      }
+                      className="w-full p-3 bg-red-50 hover:bg-red-100  -red-100 text-red-700  text-left text-xs font-black cursor-pointer"
+                    >
+                      ❌ Destituer le délégué de{' '}
+                      {classe.nom ||
+                        classe.id}
+                    </button>
+                  )
+                )}
+
+              </div>
+
+              <div className="mt-4 space-y-2">
+
+                {elevesPourDelegue.map(
+                  (eleve) => (
+                    <button
+                      key={eleve.id}
+                      type="button"
+                      onClick={() =>
+                        handleValiderChoixDelegue(
+                          eleve.id,
+                          `${eleve.nom || ''} ${
+                            eleve.prenoms ||
+                            eleve.prenom ||
+                            ''
+                          }`
+                            .trim()
+                            .toUpperCase(),
+                          eleve.classeId
+                        )
+                      }
+                      className="w-full p-4 bg-slate-50 hover:bg-purple-50    flex justify-between items-center text-left transition cursor-pointer"
+                    >
+
+                      <div>
+                        <p className="font-black text-slate-800">
+                          {eleve.nom}{' '}
+                          {eleve.prenoms ||
+                            eleve.prenom}
+                        </p>
+
+                        <p className="text-[10px] text-slate-400">
+                          {eleve.classeNom ||
+                            eleve.classeId ||
+                            'Classe inconnue'}
+                        </p>
+                      </div>
+
+                      <strong className="text-danger text-purple-600">
+                        CHOISIR
+                      </strong>
+
+                    </button>
+                  )
+                )}
+
+                {elevesPourDelegue.length ===
+                  0 && (
+                  <p className="text-center text-xs text-slate-400 py-8">
+                    Aucun apprenant ne correspond à vos filtres.
+                  </p>
+                )}
+
+              </div>
+
             </div>
           </div>
         )}
-
-      </div>
     </div>
   );
 };
 
-export default DashboardEducateur; 
+export default DashboardEducateur;

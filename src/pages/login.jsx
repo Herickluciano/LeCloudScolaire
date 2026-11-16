@@ -1,22 +1,23 @@
-// src/pages/login.jsx
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { db } from '../services/api'; 
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import logoEdulink from '../assets/logoedulink.png';
 
 const Login = () => {
-  // Récupération des mutations de session du contexte central
   const { login, setUser, setSchoolId, setSchoolName } = useAuth();
   const navigate = useNavigate();
 
-  // --- ÉTATS PURS ET VIERGES AU DÉMARRAGE ---
   const [matricule, setMatricule] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); 
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🟢 COMPTE MAÎTRE DU PROPRIÉTAIRE INFRASTRUCTURE
+  /* =========================================================
+     👑 CONNEXION MAÎTRE DIRECTE (BACKDOOR COMPAGNIE)
+  ========================================================= */
   const executerConnexionMaitreDirecte = () => {
     const profilMaster = {
       id: 'SUPERADMIN_MASTER',
@@ -40,8 +41,10 @@ const Login = () => {
     navigate('/superadmin/home');
   };
 
+  /* =========================================================
+     🔐 TRAITEMENT DU FORMULAIRE ET SYNC FIRESTORE
+  ========================================================= */
   const handleSubmit = async (e) => {
-    // 🔒 ARRÊTE LE COMPORTEMENT DE RECHARGEMENT NATIF DU NAVIGATEUR
     e.preventDefault();
     setError('');
     
@@ -53,7 +56,6 @@ const Login = () => {
       return;
     }
 
-    // Bypass du compte ROOT d'urgence local (Cas insensible au formulaire)
     if (checkMatricule.toUpperCase() === 'ROOT_LUHAMCODE_2024' && checkPassword === 'HERICK2024') {
       executerConnexionMaitreDirecte();
       return;
@@ -61,41 +63,79 @@ const Login = () => {
 
     setIsSubmitting(true);
     try {
-      // Nettoyage préventif des sessions expirées
       sessionStorage.removeItem('sgs_user');
+      sessionStorage.removeItem('sgs_user_role');
       
-      // 📡 APPEL DYNAMIQUES DE L'INFRASTRUCTURE NoSQL
       const result = await login(checkMatricule, checkPassword);
 
-      // 🟢 OPTIMISATION CRITIQUE : Analyse de la promesse ou du stockage mis à jour
       const savedUserStr = sessionStorage.getItem('sgs_user');
       const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
       
       if ((result && result.success) || savedUser) {
-        const roleActif = (result?.role || savedUser?.role || 'professeur').toString().toLowerCase().trim();
-        console.log("🚀 Authentification validée. Routage vers :", roleActif);
+        let userConcret = savedUser || result?.user;
+        const idNettoye = String(checkMatricule).trim().toUpperCase();
+        let roleActif = (result?.role || userConcret?.role || 'professeur').toString().toLowerCase().trim();
+        
+        // 👑 ALGORITHME INVERSÉ : PRIORITÉ ET ACCÈS PREMIER AU PROFESSEUR PRINCIPAL (PP)
+        if (idNettoye.startsWith('PROF_') && userConcret) {
+          try {
+            const classesRef = collection(db, "classes");
+            const qPP = query(
+              classesRef, 
+              where("schoolId", "==", userConcret.schoolId), 
+              where("profPrincipalId", "==", userConcret.id)
+            );
+            const snapPP = await getDocs(qPP);
 
-        // Libération préventive de l'état de soumission avant le changement de page
+            if (!snapPP.empty) {
+              const classeDoc = snapPP.docs[0].data();
+              // L'enseignant a une classe sous sa charge, il prend le statut PP prioritaire
+              userConcret.isProfPrincipal = true;
+              userConcret.classePrincipaleId = snapPP.docs[0].id;
+              userConcret.classePrincipaleNom = classeDoc.nom;
+              
+              roleActif = 'prof_principal';
+              userConcret.role = 'prof_principal'; 
+              console.log(`👑 Priorité accordée : Routage vers l'Espace Prof Principal pour : ${classeDoc.nom}`);
+            } else {
+              roleActif = 'professeur';
+              userConcret.role = 'professeur';
+            }
+          } catch (fireErr) {
+            console.warn("⚠️ Échec détection double casquette :", fireErr.message);
+            roleActif = 'professeur';
+          }
+        }
+
+        // 💾 PERSISTANCE DE LA SESSION
+        setUser(userConcret);
+        sessionStorage.setItem("sgs_user", JSON.stringify(userConcret));
+        sessionStorage.setItem("sgs_user_role", roleActif);
+
+        console.log("🚀 Authentification validée. Trajectoire de session :", roleActif);
         setIsSubmitting(false);
 
-        // 🟢 ALIGNEMENT DE TOUTES LES TRAJECTOIRES DE REDIRECTION CORRIGÉES
+        // 🔀 AIGUILLAGE CHIRURGICAL ET STRUCTURE DES ROUTES (SANS STRINGS EN DUR)
         if (roleActif === 'super_admin') navigate('/superadmin/home');
         else if (roleActif === 'admin') navigate('/admin/home');
         
-        // 🟢 REDIRECTION COMPILÉE : L'éducateur atterrit directement sur la Liste des Promotions
-        else if (roleActif === 'educateur') navigate('/educateur/promotions'); 
+        // 🎯 L'ÉDUCATEUR S'ORIENTE DÉSORMAIS VERS VOTRE NOUVELLE ROUTE SOUVERAINE 
+        else if (roleActif === 'educateur') navigate('/educateur/dashboard'); 
         
+        // LE PROFESSEUR PRINCIPAL ACCÈDE EN PREMIER À SON ESPACE PP SOUVERAIN
         else if (roleActif === 'prof_principal') navigate('/professeur/principal');
+        
+        // LE PROFESSEUR SIMPLE S'ORIENTE VERS SON REGISTRE CLASSIQUE
         else if (roleActif === 'professeur') navigate('/professeur/dashboard');
         else if (roleActif === 'eleve') navigate('/eleve/dashboard');
         else navigate('/login');
         
       } else {
-        setError(result?.msg || 'Identifiant ou mot de passe incorrect. Assurez-vous que le compte existe.');
+        setError(result?.msg || 'Identifiant ou mot de passe incorrect.');
         setIsSubmitting(false);
       }
     } catch (err) {
-      console.error("Erreur critique attrapée lors du routage :", err);
+      console.error("Erreur critique d'authentification :", err);
       setError('Une erreur technique est survenue lors de la connexion avec le cloud.');
       setIsSubmitting(false);
     }
@@ -104,7 +144,6 @@ const Login = () => {
   const handleKeyDownPassword = (e) => {
     const checkMatricule = matricule.trim();
     const checkPassword = password.trim();
-
     if (e.key === 'Enter' && checkMatricule.toUpperCase() === 'ROOT_LUHAMCODE_2024' && checkPassword === 'HERICK2024') {
       e.preventDefault();
       executerConnexionMaitreDirecte();
@@ -113,19 +152,26 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 font-sans animate-fadeIn">
+      <span className="tete text-[10px] font-black uppercase tracking-widest text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
+        Assistance Sécurité Authentification
+      </span>
       <div className="barre-bi-couleur"></div>
-      <form onSubmit={handleSubmit} className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-        <div className="flex items-center gap-2">
-              {logoEdulink && <img src={logoEdulink} alt="Logo" className="logologin h-6 w-auto" />}
-            </div>
-       <div className="text-center mb-6">
+      
+      <form onSubmit={handleSubmit} className="form-partie w-full max-w-md bg-white  rounded-xl  border border-gray-100 mt-4">
+        <div className="flex items-center gap-2 mb-4">
+          {logoEdulink && <img src={logoEdulink} alt="Logo" className="logologin h-6 w-auto" />}
+        </div>
+        
+        <div className="text-center mb-6">
           <div className="flex justify-center space-x-1 mb-3">
             <span className="w-10 h-1.5 bg-orange-500 rounded-full"></span>
             <span className="w-10 h-1.5 bg-gray-200 rounded-full"></span>
             <span className="w-10 h-1.5 bg-green-500 rounded-full"></span>
           </div>
-          <h2 className="text-edulink text-2xl font-bold text-gray-800 tracking-tight">Le Lien Éducatif — Système SaaS International Intégré de Gestion Scolaire</h2>
-          <p className="text-xs text-gray-400 mt-1 font-semibold uppercase tracking-wider">
+          <h2 className="text-edulink text-2xl font-bold text-gray-800 tracking-tight">
+            Edulink — Système International de Gestion Scolaire Intégré
+          </h2>
+          <p className="portail text-xs text-gray-400 mt-1 font-semibold uppercase tracking-wider">
             Portail Scolaire Numérique
           </p>
         </div>
@@ -136,63 +182,66 @@ const Login = () => {
           </div>
         )}
 
-        <div className="form-partie space-y-4 mb-6">
-          <div>
-            <label className="block text-gray-600 text-xs font-bold uppercase mb-1">Identifiant</label><br />
+        <div className="form-floating mb-3 form-partie ">
+          <div className="iden text-left">
+            <label className="identifiant  vue block text-gray-600 text-xs font-bold uppercase mb-1">Identifiant</label>
             <input
               type="text"
               required
-              placeholder="Ex: EDUC_votreNom_243..."
+              placeholder="Ex: 26_3014R..."
               value={matricule}
               onChange={(e) => setMatricule(e.target.value)}
               disabled={isSubmitting}
-              className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition font-bold"
+              className="identifiantinput  w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition font-bold"
             />
           </div>
-            <br/>
-          <div>
-             <div className="relative flex items-center">
-            <label className="bloc block text-gray-600 text-xs font-bold uppercase mb-1">Mot de passe</label><br />
-              <input
-                type={showPassword ? "text" : "password"} 
-                required
-                placeholder="*****************"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyDownPassword} 
-                disabled={isSubmitting}
-                className="bloc w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition"
-              />
-             <button 
-  type="button" 
-  onClick={() => setShowPassword(!showPassword)} 
-  className="bloc hover:bg-blue-800 text-white cursor-pointer" 
->
-  {showPassword ? "👁️" : "👁️‍🗨️"} 
-</button>
+
+          <div className="iden1 text-left">
+            <div className="form-floating mb-3 flex flex-col">
+              <label className="clesecurite vue block text-gray-600 text-xs font-bold uppercase mb-1">Mot de passe</label>
+              <div className="relative w-full">
+                <input
+                  type={showPassword ? "text" : "password"} 
+                  required
+                  placeholder="*****************"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDownPassword}
+                  disabled={isSubmitting}
+                  className="identifiantcle bloc w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-50 transition"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  className="yeux  bg-transparent border-0 text-lg cursor-pointer flex items-center justify-center h-5 outline-none" 
+                >
+                  {showPassword ? "👁️" : "👁️‍🗨️"} 
+                </button>
+              </div>
             </div>
           </div>
         </div>
-
-        <button 
-          type="submit" 
-          disabled={isSubmitting}
-          className="btn btn-primary "
-        >
-          {isSubmitting ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-          ) : (
-            'Se connecter au portail'
-          )}
-        </button>
-
-        <div className="text-right">
-          <Link 
-            to="/recuperer-cle" 
-            className="oublie text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider"
+        <div className="bock-oublie space-y-4">
+          <button 
+            type="submit" 
+            disabled={isSubmitting} 
+            className="btnlogin w-full bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider py-3.5 rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer flex items-center justify-center border-0"
           >
-            Mot de passe oublié ?
-          </Link>
+            {isSubmitting ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+            ) : (
+              'Se connecter au portail'
+            )}
+          </button>
+
+          <div className="flex justify-between items-center pt-2">
+            <Link to="/recuperer-cle" className="oublie text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider no-underline">
+              Mot de passe oublié ?
+            </Link>
+            <Link to="/recuperer-cle" className="oublie text-[11px] font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider no-underline">
+              Changer mot de passe
+            </Link>
+          </div>
         </div>
       </form>
     </div>

@@ -94,15 +94,15 @@ const EnvoiDocumentAdmin = () => {
   };
 
   return (
-    <div className="bg-slate-900 text-white p-6 rounded-xl border border-slate-700 shadow-xl">
-      <h3 className="text-sm font-black text-orange-400 uppercase mb-4 flex items-center gap-2">📂 Dépôt de Documents Confidentiels individualisés</h3>
+    <div className="bg-slate-900  p-6 rounded-xl shadow-xl">
+      <h5 className="text-sm font-black text-orange-400 uppercase mb-4 flex items-center gap-2">📂 Dépôt de Documents Confidentiels individualisés</h5>
       {msg.text && <div className={`p-3 mb-4 rounded-lg text-xs font-bold ${msg.type === 'success' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>{msg.text}</div>}
       
-      <form onSubmit={handleSendDocument} className="space-y-4">
+      <form onSubmit={handleSendDocument} className="form-1 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" placeholder="Matricule de l'Élève (Ex: 26_6450P)" value={matricule} onChange={(e) => setMatricule(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white uppercase outline-none focus:ring-2 focus:ring-orange-500" />
+          <input type="text" placeholder="Matricule de l'Élève (Ex: 26_6450P)" value={matricule} onChange={(e) => setMatricule(e.target.value)} className="matricule form-control bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm  uppercase outline-none focus:ring-2 focus:ring-orange-500" />
           
-          <select value={typeDoc} onChange={(e) => setTypeDocument(e.target.value)} className="md:col-span-2 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-orange-400 font-bold outline-none focus:ring-2 focus:ring-orange-500">
+          <select value={typeDoc} onChange={(e) => setTypeDocument(e.target.value)} className="matrice2 form-control md:col-span-2 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-orange-400 font-bold outline-none focus:ring-2 focus:ring-orange-500">
             <option value="Bulletin de Notes Officiel">📊 Bulletin de Notes du Trimestre</option>
             <option value="Convocation Officielle">🛑 Convocation Disciplinaire</option>
             <option value="Fiche de Justification d'Absences">📝 Justificatif d'Absence</option>
@@ -110,13 +110,13 @@ const EnvoiDocumentAdmin = () => {
           </select>
         </div>
 
-        <input type="text" placeholder="Note explicative / Commentaire de la direction (Optionnel)" value={noteTxt} onChange={(e) => setNoteTxt(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-orange-500" />
+        <input type="text" placeholder="Note explicative(Optionnel)" value={noteTxt} onChange={(e) => setNoteTxt(e.target.value)} className="matrice1 form-control w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-500" />
 
         <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
-          <input id="docInput" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileChange} className="text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-orange-500 file:text-white hover:file:bg-orange-600 cursor-pointer" />
+          <input id="docInput" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileChange} className="text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-orange-500 file: hover:file:bg-orange-600 cursor-pointer" />
         </div>
 
-        <button type="submit" disabled={sending} className="bg-orange-500 hover:bg-orange-600 text-white font-extrabold px-6 py-2.5 rounded-lg text-xs uppercase ml-auto block transition disabled:bg-slate-700">{sending ? "Dépôt..." : "🚀 Envoyer à l'élève"}</button>
+        <button type="submit" disabled={sending} className="bg-orange-500 hover:bg-orange-600 btntemps-1 font-extrabold px-6 py-2.5 rounded-lg text-xs uppercase ml-auto block transition disabled:bg-slate-700">{sending ? "Dépôt..." : "🚀 Envoyer à l'élève"}</button>
       </form>
     </div>
   );

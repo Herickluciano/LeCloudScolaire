@@ -1,6 +1,5 @@
 // src/context/AuthContext.jsx
-import { createContext, useContext, useState, useEffect, useMemo } from 'react'; // 🟢 useMemo est maintenant déclaré !
-
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import api, { db } from '../services/api';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -23,6 +22,31 @@ export const AuthProvider = ({ children }) => {
     return saved ? (JSON.parse(saved)?.matricule || JSON.parse(saved)?.id || null) : null;
   }, [user?.matricule, user?.id]);
 
+  // 🔄 FONCTION COMMUNE DE VÉRIFICATION DU STATUT DE PROFESSEUR PRINCIPAL
+  const determinerRoleEtClassePP = async (firestoreInstance, matricule, roleInitial, classeIdInitial) => {
+    let roleDetermine = roleInitial || 'professeur';
+    let classeAssigneeOfficielle = classeIdInitial || '';
+
+    if (roleDetermine === 'professeur' || roleDetermine === 'prof_principal') {
+      try {
+        const qClasseCheck = query(
+          collection(firestoreInstance, "classes"),
+          where("profPrincipalId", "==", matricule)
+        );
+        const classSnapshot = await getDocs(qClasseCheck);
+        
+        if (!classSnapshot.empty && classSnapshot.docs.length > 0) {
+          roleDetermine = 'prof_principal'; 
+          const classeDoc = classSnapshot.docs[0].data();
+          classeAssigneeOfficielle = classeDoc.idBrute || classeDoc.id || ''; 
+        }
+      } catch (err) {
+        console.error("Erreur lors de la vérification croisée PP:", err);
+      }
+    }
+    return { roleDetermine, classeAssigneeOfficielle };
+  };
+
   // 🔄 ÉCOUTEUR ET RAFRAÎCHISSEMENT SÉCURISÉ SANS BOUCLE INFINIE
   useEffect(() => {
     const refreshUserStatus = async () => {
@@ -43,23 +67,14 @@ export const AuthProvider = ({ children }) => {
 
         if (snap.exists()) {
           const cloudData = snap.data();
-          let classeAssigneeOfficielle = cloudData.classeId || '';
-          let roleDetermine = cloudData.role || 'professeur';
-
-          // Vérification croisée pour l'attribution automatique du statut PP
-          if (roleDetermine === 'professeur' || roleDetermine === 'prof_principal') {
-            const qClasseCheck = query(
-              collection(firestoreInstance, "classes"),
-              where("profPrincipalId", "==", matriculeFige)
-            );
-            const classSnapshot = await getDocs(qClasseCheck);
-            
-            if (!classSnapshot.empty && classSnapshot.docs.length > 0) {
-              roleDetermine = 'prof_principal'; 
-              const classeDoc = classSnapshot.docs[0].data();
-              classeAssigneeOfficielle = classeDoc.idBrute || classeDoc.id || ''; 
-            }
-          }
+          
+          // Détection dynamique et unifiée du rôle Enseignant / PP
+          const { roleDetermine, classeAssigneeOfficielle } = await determinerRoleEtClassePP(
+            firestoreInstance, 
+            matriculeFige, 
+            cloudData.role, 
+            cloudData.classeId
+          );
 
           // Construction du profil rafraîchi
           const updatedUser = {
@@ -72,8 +87,8 @@ export const AuthProvider = ({ children }) => {
             schoolId: cloudData.schoolId || 'lycee_saint_bernard',
             matiereEnseignee: cloudData.matiereEnseignee || '',
             classeId: classeAssigneeOfficielle, 
-            promotion: cloudData.promotion || cloudData.assigned_promotion || '', // 🟢 GREFFAGE SÉCURISÉ ÉDUCATEUR
-            grade: cloudData.grade || cloudData.grade || 'A3',
+            promotion: cloudData.promotion || cloudData.assigned_promotion || '',
+            grade: cloudData.grade || 'A3',
             experience: cloudData.anneesExperience || cloudData.experience || "0", 
             absences: cloudData.absences || 0,
             retards: cloudData.retards || 0
@@ -84,6 +99,7 @@ export const AuthProvider = ({ children }) => {
           if (!savedStr || savedStr !== JSON.stringify(updatedUser)) {
             setUser(updatedUser);
             sessionStorage.setItem("sgs_user", JSON.stringify(updatedUser));
+            sessionStorage.setItem("sgs_user_role", roleDetermine);
           }
           
           if (cloudData.schoolId) {
@@ -99,29 +115,52 @@ export const AuthProvider = ({ children }) => {
     };
 
     refreshUserStatus();
-  }, [matriculeFige]); // 🟢 CORRECTIF : Dépendance sur la clé figée uniquement pour tuer la boucle infinie
+  }, [matriculeFige]);
 
+  // 🚀 ACTION DE CONNEXION INITIALE SÉCURISÉE
   const login = async (matriculeInput, passwordInput) => {
     setLoading(true);
     try {
-      const authService = api?.verifyUserOnCloud || verifyUserOnCloud;
+      const authService = api?.verifyUserOnCloud;
+      if (!authService) {
+        throw new Error("Service d'authentification indisponible sur l'API.");
+      }
+
       const res = await authService(matriculeInput, passwordInput);
 
       if (res && res.success && res.user) {
         const u = res.user;
-        setUser(u);
-        setSchoolId(u.schoolId || 'lycee_saint_bernard');
-        setSchoolName(u.schoolName || 'Lycée Saint Bernard');
+        const firestoreInstance = db || api?.db;
+
+        // 🟢 CORRECTION INJECTÉE : On force la détection PP dès la soumission pour éviter le décalage de rôle
+        const { roleDetermine, classeAssigneeOfficielle } = await determinerRoleEtClassePP(
+          firestoreInstance,
+          u.id || u.matricule,
+          u.role,
+          u.classeId
+        );
+
+        // On fusionne le rôle mis à jour avant la mise en cache
+        const finalUser = {
+          ...u,
+          role: roleDetermine,
+          classeId: classeAssigneeOfficielle
+        };
+
+        setUser(finalUser);
+        setSchoolId(finalUser.schoolId || 'lycee_saint_bernard');
+        setSchoolName(finalUser.schoolName || 'Lycée Saint Bernard');
         
-        sessionStorage.setItem("sgs_user", JSON.stringify(u));
-        sessionStorage.setItem("sgs_school_id", u.schoolId || "lycee_saint_bernard");
-        sessionStorage.setItem("sgs_school_name", u.schoolName || "Lycée Saint Bernard");
-        sessionStorage.setItem("sgs_user_role", u.role || "professeur");
+        sessionStorage.setItem("sgs_user", JSON.stringify(finalUser));
+        sessionStorage.setItem("sgs_school_id", finalUser.schoolId || "lycee_saint_bernard");
+        sessionStorage.setItem("sgs_school_name", finalUser.schoolName || "Lycée Saint Bernard");
+        sessionStorage.setItem("sgs_user_role", roleDetermine);
         
-        return { success: true, role: u.role };
+        return { success: true, role: roleDetermine };
       }
       return { success: false, msg: res?.msg || "Identifiant ou mot de passe incorrect." };
     } catch (err) {
+      console.error("Erreur lors du login :", err);
       return { success: false, msg: "Erreur technique de liaison avec le Cloud." };
     } finally {
       setLoading(false);

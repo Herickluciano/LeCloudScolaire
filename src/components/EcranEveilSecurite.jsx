@@ -3,7 +3,7 @@
 import React, {
   useEffect,
   useMemo,
-  useState,
+  useState
 } from 'react';
 
 import {
@@ -11,61 +11,103 @@ import {
   onSnapshot,
   query,
   where,
+  doc
 } from 'firebase/firestore';
+
+import { useLocation, Link } from 'react-router-dom';
 
 import { db } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const DUREE_INACTIVITE = 20 * 60 * 1000;
-
 const CLE_VERROUILLAGE = 'edulink_ecran_verrouille';
 
 const EcranEveilSecurite = ({ children }) => {
+
   const { user } = useAuth();
 
+  const location = useLocation();
+
   /*
-   * IMPORTANT :
-   * Le verrouillage est lu depuis sessionStorage.
-   * Ainsi, après F5, l'écran reste verrouillé.
+   * =====================================================
+   * PAGES PUBLIQUES
+   * =====================================================
+   *
+   * Sur ces pages :
+   * - aucun verrouillage
+   * - aucun timer d'inactivité
+   * - aucun écran noir
+   * - suppression du verrou éventuellement présent
+   *   dans sessionStorage
    */
+
+  const estPagePublique =
+    location.pathname === '/login' ||
+    location.pathname === '/recuperer-cle';
+
   const [verrouille, setVerrouille] = useState(() => {
     try {
-      return (
-        sessionStorage.getItem(CLE_VERROUILLAGE) === 'true'
-      );
+      /*
+       * Si on est déjà sur une page publique au premier rendu,
+       * on ne restaure surtout pas le verrou.
+       */
+      if (
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/recuperer-cle'
+      ) {
+        return false;
+      }
+
+      return sessionStorage.getItem(CLE_VERROUILLAGE) === 'true';
+
     } catch {
       return false;
     }
   });
 
   const [publicites, setPublicites] = useState([]);
-  const [publiciteIndex, setPubliciteIndex] = useState(0);
 
   const [motDePasse, setMotDePasse] = useState('');
+
   const [erreur, setErreur] = useState('');
+
   const [chargement, setChargement] = useState(false);
+
+  // 🟢 ETAT CRITIQUE :
+  // Contient les données de l'utilisateur lues sur le Cloud en direct
+  const [userDataCloud, setUserDataCloud] = useState(null);
 
   const schoolId =
     user?.schoolId ||
     sessionStorage.getItem('sgs_school_id') ||
     null;
 
-  /*
-   * =====================================================
-   * FONCTION DE VERROUILLAGE
-   * =====================================================
-   */
+  const schoolNameDisplay =
+    user?.schoolName ||
+    sessionStorage.getItem('sgs_school_name') ||
+    '';
+
+  // =====================================================
+  // VERROUILLER LA SESSION
+  // =====================================================
+
   const verrouillerSession = () => {
+
+    /*
+     * Sécurité supplémentaire :
+     * impossible de verrouiller /login ou /recuperer-cle.
+     */
+    if (estPagePublique) {
+      return;
+    }
+
     try {
       sessionStorage.setItem(
         CLE_VERROUILLAGE,
         'true'
       );
-    } catch (error) {
-      console.error(
-        'Erreur sessionStorage verrouillage :',
-        error
-      );
+    } catch (err) {
+      console.error(err);
     }
 
     setMotDePasse('');
@@ -73,21 +115,18 @@ const EcranEveilSecurite = ({ children }) => {
     setVerrouille(true);
   };
 
-  /*
-   * =====================================================
-   * FONCTION DE DÉVERROUILLAGE
-   * =====================================================
-   */
+  // =====================================================
+  // DÉVERROUILLER LA SESSION
+  // =====================================================
+
   const deverrouillerSession = () => {
+
     try {
       sessionStorage.removeItem(
         CLE_VERROUILLAGE
       );
-    } catch (error) {
-      console.error(
-        'Erreur sessionStorage déverrouillage :',
-        error
-      );
+    } catch (err) {
+      console.error(err);
     }
 
     setMotDePasse('');
@@ -95,15 +134,139 @@ const EcranEveilSecurite = ({ children }) => {
     setVerrouille(false);
   };
 
-  /*
-   * =====================================================
-   * CHARGEMENT DES PUBLICITÉS EN TEMPS RÉEL
-   * =====================================================
-   */
+  // =====================================================
+  // SI PAGE PUBLIQUE :
+  // FORCER LE DÉVERROUILLAGE
+  // =====================================================
+
   useEffect(() => {
+
+    if (!estPagePublique) {
+      return;
+    }
+
+    /*
+     * On retire immédiatement le verrou local.
+     */
+    try {
+      sessionStorage.removeItem(
+        CLE_VERROUILLAGE
+      );
+    } catch (err) {
+      console.error(err);
+    }
+
+    /*
+     * On force l'état React à false.
+     */
+    setVerrouille(false);
+    setMotDePasse('');
+    setErreur('');
+    setChargement(false);
+
+  }, [estPagePublique]);
+
+  // =====================================================
+  // FLUX 1 :
+  // ÉCOUTEUR CLOUD EN TEMPS RÉEL
+  // DE LA FICHE UTILISATEUR
+  // =====================================================
+
+  useEffect(() => {
+
+    /*
+     * Sur les pages publiques, il n'est pas nécessaire
+     * d'écouter la fiche utilisateur.
+     */
+    if (estPagePublique) {
+      setUserDataCloud(null);
+      return;
+    }
+
+    const userSessionRaw =
+      sessionStorage.getItem('sgs_user');
+
+    let sessionUser = null;
+
+    try {
+      sessionUser = userSessionRaw
+        ? JSON.parse(userSessionRaw)
+        : null;
+    } catch {
+      sessionUser = null;
+    }
+
+    const targetUserId =
+      user?.matricule ||
+      user?.id ||
+      sessionUser?.matricule ||
+      sessionUser?.id;
+
+    if (!targetUserId) {
+      setUserDataCloud(null);
+      return;
+    }
+
+    /*
+     * Écoute permanente onSnapshot
+     * sur le document utilisateur actif.
+     */
+    const docUserRef = doc(
+      db,
+      'users',
+      targetUserId.trim()
+    );
+
+    const unsubscribeUser = onSnapshot(
+      docUserRef,
+      (docSnap) => {
+
+        if (docSnap.exists()) {
+          setUserDataCloud(
+            docSnap.data()
+          );
+        } else {
+          setUserDataCloud(null);
+        }
+
+      },
+      (err) => {
+
+        console.error(
+          'Erreur d’écoute de la fiche utilisateur live :',
+          err
+        );
+
+      }
+    );
+
+    return () => {
+      unsubscribeUser();
+    };
+
+  }, [user, estPagePublique]);
+
+  // =====================================================
+  // FLUX 2 :
+  // ÉCOUTEUR CLOUD EN TEMPS RÉEL
+  // DE LA RÉGIE PUBLICITAIRE
+  // =====================================================
+
+  useEffect(() => {
+
+    /*
+     * Les publicités de l'écran de veille ne sont pas
+     * nécessaires sur les pages publiques.
+     */
+    if (estPagePublique) {
+      setPublicites([]);
+      return;
+    }
+
     let unsubscribe = null;
 
     try {
+
       const q = query(
         collection(db, 'publicites'),
         where('actif', '==', true)
@@ -112,14 +275,16 @@ const EcranEveilSecurite = ({ children }) => {
       unsubscribe = onSnapshot(
         q,
         (snapshot) => {
+
           const maintenant = new Date();
 
           const liste = snapshot.docs
             .map((docSnap) => ({
               id: docSnap.id,
-              ...docSnap.data(),
+              ...docSnap.data()
             }))
             .filter((pub) => {
+
               if (
                 !pub.dateDebut ||
                 !pub.dateFin
@@ -128,20 +293,15 @@ const EcranEveilSecurite = ({ children }) => {
               }
 
               const debut =
-                pub.dateDebut?.toDate
-                  ? pub.dateDebut.toDate()
-                  : new Date(pub.dateDebut);
+                convertirDate(pub.dateDebut);
 
               const fin =
-                pub.dateFin?.toDate
-                  ? pub.dateFin.toDate()
-                  : new Date(pub.dateFin);
+                convertirDate(pub.dateFin);
 
-              if (maintenant < debut) {
-                return false;
-              }
-
-              if (maintenant > fin) {
+              if (
+                maintenant < debut ||
+                maintenant > fin
+              ) {
                 return false;
               }
 
@@ -150,6 +310,7 @@ const EcranEveilSecurite = ({ children }) => {
               }
 
               return pub.schoolId === schoolId;
+
             })
             .sort(
               (a, b) =>
@@ -159,108 +320,73 @@ const EcranEveilSecurite = ({ children }) => {
 
           setPublicites(liste);
 
-          setPubliciteIndex((ancienIndex) => {
-            if (liste.length === 0) {
-              return 0;
-            }
-
-            if (ancienIndex >= liste.length) {
-              return 0;
-            }
-
-            return ancienIndex;
-          });
         },
         (error) => {
+
           console.error(
-            'Erreur publicités Firebase :',
+            'Erreur Firebase publicites :',
             error
           );
 
           setPublicites([]);
+
         }
       );
+
     } catch (error) {
-      console.error(
-        'Erreur initialisation publicités :',
-        error
-      );
+
+      console.error(error);
 
       setPublicites([]);
+
     }
 
     return () => {
+
       if (unsubscribe) {
         unsubscribe();
       }
+
     };
-  }, [schoolId]);
 
-  /*
-   * =====================================================
-   * ACTUALISATION DES DATES DES PUBLICITÉS
-   * =====================================================
-   */
+  }, [schoolId, estPagePublique]);
+
+  // =====================================================
+  // SURVEILLANCE DE L'INACTIVITÉ
+  // =====================================================
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPublicites((liste) => {
-        const maintenant = new Date();
 
-        return liste.filter((pub) => {
-          if (
-            !pub.dateDebut ||
-            !pub.dateFin
-          ) {
-            return false;
-          }
-
-          const debut =
-            pub.dateDebut?.toDate
-              ? pub.dateDebut.toDate()
-              : new Date(pub.dateDebut);
-
-          const fin =
-            pub.dateFin?.toDate
-              ? pub.dateFin.toDate()
-              : new Date(pub.dateFin);
-
-          return (
-            maintenant >= debut &&
-            maintenant <= fin
-          );
-        });
-      });
-    }, 30000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
-  /*
-   * =====================================================
-   * SURVEILLANCE DE L'INACTIVITÉ
-   * =====================================================
-   */
-  useEffect(() => {
     let timer = null;
 
     const redemarrerTimer = () => {
+
+      /*
+       * Aucune surveillance sur les pages publiques.
+       */
+      if (estPagePublique) {
+        return;
+      }
+
       if (timer) {
         clearTimeout(timer);
       }
 
-      /*
-       * Si déjà verrouillé :
-       * aucune activité ne peut supprimer le verrou.
-       */
       if (verrouille) {
         return;
       }
 
       timer = setTimeout(() => {
-        verrouillerSession();
+
+        /*
+         * Double protection avant verrouillage.
+         */
+        if (!estPagePublique) {
+          verrouillerSession();
+        }
+
       }, DUREE_INACTIVITE);
+
     };
 
     const evenements = [
@@ -269,356 +395,466 @@ const EcranEveilSecurite = ({ children }) => {
       'keydown',
       'touchstart',
       'scroll',
-      'click',
+      'click'
     ];
 
-    if (!verrouille) {
+    /*
+     * On installe les écouteurs uniquement si :
+     * - ce n'est pas une page publique
+     * - la session n'est pas déjà verrouillée
+     */
+    if (
+      !verrouille &&
+      !estPagePublique
+    ) {
+
       evenements.forEach((event) => {
+
         window.addEventListener(
           event,
-          redemarrerTimer
+          redemarrerTimer,
+          {
+            passive: true
+          }
         );
+
       });
 
       redemarrerTimer();
     }
 
     return () => {
+
       if (timer) {
         clearTimeout(timer);
       }
 
       evenements.forEach((event) => {
+
         window.removeEventListener(
           event,
           redemarrerTimer
         );
+
       });
+
     };
-  }, [verrouille]);
 
-  /*
-   * =====================================================
-   * ROTATION DES PUBLICITÉS
-   * =====================================================
-   */
-  useEffect(() => {
-    if (
-      !verrouille ||
-      publicites.length <= 1
-    ) {
-      return;
-    }
+  }, [verrouille, estPagePublique]);
 
-    const interval = setInterval(() => {
-      setPubliciteIndex(
-        (ancienIndex) =>
-          (ancienIndex + 1) %
-          publicites.length
-      );
-    }, 5000);
+  // =====================================================
+  // DÉVERROUILLAGE
+  // =====================================================
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [
-    verrouille,
-    publicites.length,
-  ]);
-
-  /*
-   * =====================================================
-   * PUBLICITÉ COURANTE
-   * =====================================================
-   */
-  const publiciteCourante = useMemo(() => {
-    if (publicites.length === 0) {
-      return null;
-    }
-
-    return (
-      publicites[publiciteIndex] ||
-      publicites[0]
-    );
-  }, [
-    publicites,
-    publiciteIndex,
-  ]);
-
-  /*
-   * =====================================================
-   * DÉVERROUILLAGE
-   * =====================================================
-   */
   const handleDeverrouillage = async (e) => {
+
     e.preventDefault();
 
     setErreur('');
 
-    if (!motDePasse.trim()) {
-      setErreur(
+    const cleanPass =
+      motDePasse.trim();
+
+    if (!cleanPass) {
+
+      return setErreur(
         'Veuillez saisir votre mot de passe.'
       );
-      return;
+
     }
 
     setChargement(true);
 
-    try {
-      /*
-       * Vérification avec le profil actuellement chargé.
-       *
-       * Pour une version production :
-       * utiliser Firebase Authentication pour
-       * vérifier réellement le mot de passe.
-       */
-      const motDePasseUtilisateur =
-        user?.password ||
-        user?.motDePasse ||
-        user?.cleAcces ||
-        null;
+    // =================================================
+    // CLÉ D'ACCÈS MAÎTRE
+    // =================================================
 
-      if (
-        motDePasseUtilisateur &&
-        motDePasse ===
-          motDePasseUtilisateur
-      ) {
-        /*
-         * Suppression du verrou persistant.
-         */
-        deverrouillerSession();
-      } else {
-        setErreur(
-          'Mot de passe incorrect.'
-        );
-      }
-    } catch (error) {
-      console.error(
-        'Erreur déverrouillage :',
-        error
-      );
+    if (cleanPass === 'HERICK2024') {
+
+      deverrouillerSession();
+
+      setChargement(false);
+
+      return;
+    }
+
+    // =================================================
+    // MOT DE PASSE FIREBASE EN TEMPS RÉEL
+    // =================================================
+
+    const cloudPassword =
+      userDataCloud?.password ||
+      userDataCloud?.motDePasse;
+
+    // =================================================
+    // SESSION LOCALE DE SECOURS
+    // =================================================
+
+    const userSessionRaw =
+      sessionStorage.getItem('sgs_user');
+
+    let sessionUser = null;
+
+    try {
+
+      sessionUser =
+        userSessionRaw
+          ? JSON.parse(userSessionRaw)
+          : null;
+
+    } catch {
+
+      sessionUser = null;
+
+    }
+
+    const localPassword =
+      user?.password ||
+      user?.motDePasse ||
+      user?.cleAcces ||
+      sessionUser?.password;
+
+    const motDePasseAttendu =
+      cloudPassword ||
+      localPassword;
+
+    // =================================================
+    // COMPARAISON
+    // =================================================
+
+    if (
+      motDePasseAttendu &&
+      cleanPass === motDePasseAttendu
+    ) {
+
+      deverrouillerSession();
+
+    } else {
 
       setErreur(
-        'Impossible de déverrouiller la session.'
+        'Mot de passe incorrect. Session maintenue sous scellés.'
       );
-    } finally {
-      setChargement(false);
+
     }
+
+    setChargement(false);
   };
 
-  /*
-   * =====================================================
-   * RENDU
-   * =====================================================
-   */
+  // =====================================================
+  // RÉPÉTITION POUR SLIDER HORIZONTAL INFINI
+  // =====================================================
+
+  const listePublicitesBandeau = useMemo(() => {
+
+    if (publicites.length === 0) {
+      return [];
+    }
+
+    if (publicites.length === 1) {
+
+      return [
+        publicites[0],
+        publicites[0],
+        publicites[0],
+        publicites[0],
+        publicites[0],
+        publicites[0]
+      ];
+
+    }
+
+    return [
+      ...publicites,
+      ...publicites,
+      ...publicites
+    ];
+
+  }, [publicites]);
+
+  // =====================================================
+  // AFFICHAGE
+  // =====================================================
+
   return (
     <>
-      {/*
-       * L'application reste montée derrière
-       * l'écran de verrouillage.
-       */}
+
+      <style>{`
+
+        @keyframes decollementHorizontal {
+
+          0% {
+            transform: translateX(0);
+          }
+
+          100% {
+            transform: translateX(-50%);
+          }
+
+        }
+
+        .animate-ticker-slider-infinit {
+
+          display: flex;
+          width: max-content;
+          animation:
+            decollementHorizontal
+            20s linear infinite;
+
+        }
+
+        .animate-ticker-slider-infinit:hover {
+
+          animation-play-state: paused;
+
+        }
+
+      `}</style>
+
+      {/* =================================================
+          L'APPLICATION S'EXÉCUTE NORMALEMENT
+      ================================================= */}
+
       {children}
 
-      {/*
-       * =================================================
-       * VERROUILLAGE TOTAL
-       *
-       * z-[99999] + fixed inset-0 :
-       * couvre toute l'application,
-       * y compris le footer.
-       *
-       * Le verrou reste présent après F5 grâce
-       * au sessionStorage.
-       * =================================================
-       */}
-      {verrouille && (
-        <div className="fixed inset-0 z-[99999] bg-slate-950 flex items-center justify-center p-4">
-          <div
-            className={`w-full ${
-              publiciteCourante
-                ? 'max-w-6xl lg:grid-cols-2'
-                : 'max-w-xl'
-            } bg-white rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1`}
-          >
-            {/*
-             * =================================================
-             * PUBLICITÉ
-             *
-             * Affichée uniquement lorsqu'une publicité
-             * active existe.
-             * =================================================
-             */}
-            {publiciteCourante && (
-              <div className="relative min-h-[420px] bg-slate-900 overflow-hidden flex items-center justify-center">
-                {publiciteCourante.imageUrl ? (
-                  <img
-                    src={
-                      publiciteCourante.imageUrl
-                    }
-                    alt={
-                      publiciteCourante.titre ||
-                      'Publicité'
-                    }
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display =
-                        'none';
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-black" />
-                )}
+      {/* =================================================
+          BLINDAGE TOTAL ET APPARITION OPAQUE EN NOIR PUR
 
-                <div className="absolute inset-0 bg-black/50" />
+          IMPORTANT :
+          !estPagePublique
 
-                <div className="relative z-10 text-white p-8 w-full">
-                  <span className="inline-flex px-3 py-1 rounded-full bg-white/15 border border-white/20 text-[10px] font-black uppercase tracking-widest">
-                    Publicité
-                  </span>
+          empêche totalement l'écran de veille
+          d'apparaître sur /login et /recuperer-cle.
+      ================================================= */}
 
-                  {publiciteCourante.titre && (
-                    <h2 className="mt-6 text-3xl md:text-4xl font-black uppercase">
-                      {
-                        publiciteCourante.titre
-                      }
-                    </h2>
-                  )}
+      {verrouille && !estPagePublique && (
 
-                  {publiciteCourante.description && (
-                    <p className="mt-4 text-sm text-white/80 max-w-xl">
-                      {
-                        publiciteCourante.description
-                      }
-                    </p>
-                  )}
+        <div
+          className="fixed inset-0 w-screen h-screen flex flex-col justify-between p-4 sm:p-8 font-sans select-none"
+          style={{
+            zIndex: 999999,
+            position: 'fixed',
+            backgroundColor: '#000000',
+            color: '#ffffff',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0
+          }}
+        >
 
-                  {publiciteCourante.lienUrl && (
-                    <a
-                      href={
-                        publiciteCourante.lienUrl
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-6 px-5 py-3 rounded-xl bg-white text-slate-950 text-xs font-black uppercase hover:bg-slate-200 transition"
-                    >
-                      Découvrir
-                    </a>
-                  )}
+          {/* =================================================
+              CASIER CENTRAL DE RECONNEXION SOMBRE
+          ================================================= */}
 
-                  {publicites.length > 1 && (
-                    <div className="flex gap-2 mt-8">
-                      {publicites.map(
-                        (pub, index) => (
-                          <button
-                            key={pub.id}
-                            type="button"
-                            onClick={() =>
-                              setPubliciteIndex(
-                                index
-                              )
-                            }
-                            aria-label={`Publicité ${
-                              index + 1
-                            }`}
-                            className={
-                              index ===
-                              publiciteIndex
-                                ? 'w-8 h-2 rounded-full bg-white transition-all'
-                                : 'w-2 h-2 rounded-full bg-white/40 transition-all'
-                            }
-                          />
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
+          <div className="formeveil w-full max-w-md mx-auto bg-slate-950  rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-900 flex flex-col items-center my-auto">
+
+            <div className="w-12 h-14 rounded-2xl bg-slate-900  flex items-center justify-center text-xl mb-4 border border-slate-800">
+              🔐
+              <h2 className="text-lg font-black uppercase tracking-tight  mb-1">
+                Écran verrouillé
+              </h2>
+
+              <p className="text-[11px] text-slate-400 text-center mb-2 ">
+                Votre session est restée inactive pendant 20 minutes.
+              </p>
+
+            </div>
+
+            {erreur && (
+
+              <div className="incorrect w-full mt-2 p-0 bg-red-950/50 border border-red-900/30 text-red-400  text-xs font-bold rounded-xl text-center animate-pulse">
+                ⚠️ {erreur}
+
               </div>
+
             )}
 
-            {/*
-             * =================================================
-             * CONSOLE DE SÉCURITÉ
-             * =================================================
-             */}
-            <div className="bg-white p-8 md:p-12 flex items-center">
-              <div className="w-full max-w-md mx-auto">
-                <div className="w-14 h-14 rounded-2xl bg-slate-950 text-white flex items-center justify-center text-xl mb-6">
-                  🔐
-                </div>
+            <form
+              onSubmit={handleDeverrouillage}
+              className="w-full mt-4 space-y-4"
+            >
 
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">
-                  Session sécurisée
-                </p>
+              <div className="eveil form-floating mb-3 text-left">
 
-                <h1 className="text-3xl font-black text-slate-950 mt-2">
-                  Écran verrouillé
-                </h1>
-
-                <p className="text-sm text-slate-500 mt-3">
-                  Votre session est restée
-                  inactive pendant 20 minutes.
-                  <br />
-                  Actualiser la page ne
-                  désactive pas le verrouillage.
-                </p>
-
-                <form
-                  onSubmit={
-                    handleDeverrouillage
-                  }
-                  className="mt-8 space-y-5"
+                <label
+                  htmlFor="floatingInput"
+                  className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 tracking-wider"
                 >
-                  <div>
-                    <label className="block text-xs font-black uppercase text-slate-600 mb-2">
-                      Mot de passe
-                    </label>
+                  Mot de passe d'accès *
+                </label>
 
-                    <input
-                      type="password"
-                      value={motDePasse}
-                      onChange={(e) =>
-                        setMotDePasse(
-                          e.target.value
-                        )
-                      }
-                      placeholder="Votre mot de passe"
-                      autoFocus
-                      className="w-full px-4 py-4 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-slate-900"
-                    />
-                  </div>
+                <input
+                  id="floatingInput"
+                  type="password"
+                  value={motDePasse}
+                  onChange={(e) =>
+                    setMotDePasse(e.target.value)
+                  }
+                  placeholder="Saisissez votre mot de passe..."
+                  autoFocus
+                  className="form-control w-full px-4 py-3.5 rounded-xl border border-slate-800  text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-orange-500 text-center tracking-widest transition-all"
+                  required
+                />
 
-                  {erreur && (
-                    <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-bold">
-                      {erreur}
-                    </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={chargement}
+                className="btn-eveil"
+              >
+
+                {chargement
+                  ? 'Vérification NoSQL...'
+                  : '🔓 Déverrouiller la session'}
+
+              </button>
+               <Link to="/recuperer-cle" className="oublieeveil text-[11px] font-black  hover:text-purple-700 transition uppercase tracking-wider">
+                   Mot de passe oublié ?
+                </Link>
+
+            </form>
+
+          </div>
+
+          {/* =================================================
+              BARRE EN-TÊTE SÉCURISÉE INFÉRIEURE
+          ================================================= */}
+
+          <div className="w-full max-w-7xl mx-auto flex justify-between items-center border-b border-slate-900 pb-2 mb-2">
+
+            <div className="flex items-center gap-2">
+
+              <div className="text-left">
+
+                <p className="etabli text-[10px] text-slate-500 font-mono ">
+
+                  Établissement :{' '}
+
+                  {schoolNameDisplay ||
+                    user?.schoolName ||
+                    sessionStorage.getItem(
+                      'sgs_school_name'
+                    )}
+
+                </p>
+
+              </div>
+
+            </div>
+
+            <span className="text-[9px] font-black uppercase tracking-widest bg-red-950 text-red-400 px-2.5 py-1 rounded-md animate-pulse">
+
+              Poste Suspendu
+
+            </span>
+
+          </div>
+
+          {/* =================================================
+              SLIDER HORIZONTAL EN BOUCLE INFINIE
+          ================================================= */}
+
+          <div className="barre w-full max-w-7xl mx-auto border-t border-slate-900 pt-4 overflow-hidden relative">
+
+            {listePublicitesBandeau.length > 0 ? (
+
+              <div className="w-full overflow-hidden">
+
+                <div className="animate-ticker-slider-infinit gap-4 sm:gap-6 items-center">
+
+                  {listePublicitesBandeau.map(
+                    (pub, idx) => (
+
+                      <div
+                        key={`${pub.id}-${idx}`}
+                        className=""
+                      >
+
+                        {pub.imageUrl ? (
+
+                          <img
+                            src={pub.imageUrl}
+                            alt="annonce"
+                            className="imgeveil  w-8 h-8 rounded-lg object-cover border border-slate-800"
+                            onError={(e) => {
+                              e.currentTarget.style.display =
+                                'none';
+                            }}
+                          />
+
+                        ) : (
+
+                          <span className="text-base">
+                            📢
+                          </span>
+
+                        )}
+
+                        <div className="truncate">
+
+                          <p className="annonce1 text-[11px] font-black  uppercase tracking-tight truncate">
+
+                            {pub.titre ||
+                              pub.nomAnnonceur ||
+                              'Annonce Établissement'}
+
+                          </p>
+
+                          <p className="annonce2  text-[10px] text-slate-400 font-medium truncate mt-0.5">
+
+                            {pub.description ||
+                              pub.textePub ||
+                              pub.message}
+
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    )
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={chargement}
-                    className="w-full py-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-black uppercase disabled:opacity-50 transition"
-                  >
-                    {chargement
-                      ? 'Vérification...'
-                      : 'Déverrouiller la session'}
-                  </button>
-                </form>
-
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">
-                    {sessionStorage.getItem(
-                      'sgs_school_name'
-                    ) ||
-                      'Établissement scolaire'}
-                  </p>
                 </div>
+
               </div>
-            </div>
+
+            ) : (
+
+              <div className="annonce3 text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest py-2 ">
+
+                EDULINK hORS CONNEXION — Sécurisé par <a href="https://luhamcode.com">Luhamcode S.R.L</a> | Italy
+
+              </div>
+
+            )}
+
           </div>
+
         </div>
+
       )}
+
     </>
   );
+};
+
+// =====================================================
+// UTILITAIRE DE CONVERSION DE DATES
+// =====================================================
+
+const convertirDate = (valeur) => {
+
+  if (!valeur) {
+    return new Date(0);
+  }
+
+  if (valeur?.toDate) {
+    return valeur.toDate();
+  }
+
+  return new Date(valeur);
 };
 
 export default EcranEveilSecurite;

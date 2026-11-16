@@ -1,14 +1,15 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { AuthProvider } from './context/AuthContext' 
-import './index.css'
-import App from './App'
+// src/main.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { AuthProvider } from './context/AuthContext'; // 🟢 Ajustez le chemin vers votre contexte réel
+import './index.css'; // Vos styles globaux
 
-// Le '!' a été retiré car nous sommes en JavaScript (.jsx) et non en TypeScript (.tsx)
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    {/* 👑 LE VERROU CENTRAL : Enveloppe toute l'application pour distribuer la session */}
     <AuthProvider>
       <App />
     </AuthProvider>
-  </StrictMode>,
-)
+  </React.StrictMode>
+);

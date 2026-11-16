@@ -1,94 +1,128 @@
-import { useState, useEffect } from 'react';
+// src/features/professeur/pages/classes/MesClasses.jsx
+import React, { useState, useEffect } from 'react';
 import { db } from '../../../../services/api';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../../../context/AuthContext';
 import { Link } from 'react-router-dom';
+import Header from '../../../../pages/Header';
 
 const MesClasses = () => {
   const { user, schoolId } = useAuth();
-  const currentSchool = schoolId || 'lycee_Moderne_Gagnoa';
+  
+  // 🎯 ZERO VALEUR EN DUR : Extraction dynamique des identifiants cloud de l'établissement
+  const currentSchool = (user?.schoolId || schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_saint_bernard').trim().toLowerCase();
+  const monIdProf = user?.id || user?.matricule || 'PROF_FORGIE_491';
+  const disciplineProf = user?.matiereEnseignee || user?.matiere || 'Anglais';
 
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔄 ÉCOUTEUR CLOUD : Récupérer les classes de l'établissement
+  // 🔄 ÉCOUTEUR CLOUD FILTRÉ PAR L'EMPLOI DU TEMPS INDIVIDUEL (SÉCURITÉ STRICTE)
   useEffect(() => {
-    if (!currentSchool) return;
+    if (!currentSchool || !monIdProf) {
+      setLoading(false);
+      return;
+    }
 
-    // Dans un modèle SaaS avancé, on filtre les classes où ce prof est assigné
-    const q = query(collection(db, "classes"), where("schoolId", "==", currentSchool));
+    const qEDT = query(collection(db, 'emplois_du_temps'), where('schoolId', '==', currentSchool));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = [];
+    const unsubscribe = onSnapshot(qEDT, (snapshot) => {
+      const mapClassesFiltrees = {};
+
       snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data();
+        
+        if (Array.isArray(data.creneaux)) {
+          data.creneaux.forEach((c) => {
+            // Seules les classes de l'emploi du temps de cet enseignant sont collectées
+            if (String(c.professeurId).trim().toLowerCase() === monIdProf.trim().toLowerCase()) {
+              const targetClassId = c.classeId || data.classeId;
+              const targetClassName = c.nomClasse || data.classeNom || "Division";
+              
+              if (targetClassId) {
+                mapClassesFiltrees[targetClassId] = {
+                  id: targetClassId,
+                  nom: targetClassName,
+                  niveau: data.promotion || c.nomClasse || 'Secondaire',
+                  elevesCount: data.elevesCount || 0
+                };
+              }
+            }
+          });
+        }
       });
-      setClasses(list);
+
+      const listFinal = Object.values(mapClassesFiltrees).sort((a, b) => a.nom.localeCompare(b.nom));
+      setClasses(listFinal);
+      setLoading(false);
+    }, (err) => {
+      console.error("Erreur filtrage des classes par l'EDT :", err);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [currentSchool]);
+  }, [currentSchool, monIdProf]);
 
-  if (loading) return <div className="p-8 text-center text-xs font-bold text-purple-600 animate-pulse">Chargement de vos attributions...</div>;
+  if (loading) {
+    return <div className="p-8 text-center text-xs font-bold text-purple-600 animate-pulse uppercase">Chargement de vos attributions réelles...</div>;
+  }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 font-sans">
-      
-      {/* Fil d'Ariane / Retour */}
+    <div className="max-w-6xl mx-auto sm:p-6 font-sans text-gray-700 text-left bg-white min-h-screen animate-fadeIn">
+      <Header/>
+      {/* BOUTON RETOUR BUREAU UNIFIE */}
       <div className="mb-4">
-        <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition">
-          ⬅️ Bureau Virtuel
+        <Link to="/professeur/dashboard" className="bgvalidbnt  inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs no-underline">
+          ⬅️ Bureau Enseignant
         </Link>
       </div>
 
-      {/* En-tête */}
+      {/* EN-TÊTE D'AFFICHAGE */}
       <div className="border-b pb-4 mb-6">
-        <h2 className="text-xl font-black text-gray-800 tracking-tight">📚 Mes Classes & Divisions Pédagogiques</h2>
-        <p className="text-xs text-gray-500 font-medium mt-0.5">Cliquez sur une classe pour gérer le cahier de textes, faire l'appel ou ouvrir le carnet de notes.</p>
+        <h2 className="bgvalidtexte text-xl font-black text-gray-800 tracking-tight">Mes Classes & Divisions Pédagogiques Autorisées</h2>
+        <p className="bgvalidtexta text-xs text-gray-500 font-medium mt-0.5">
+          Sélectionnez une division de votre grille horaire pour ouvrir les modules d'émargement ou de relevés de notes.
+        </p>
       </div>
 
-      {/* Grid des cartes de classes */}
+      {/* GRILLE DES CARTES DE CLASSES RESTREINTES */}
       {classes.length === 0 ? (
-        <div className="p-8 text-center text-xs font-bold text-gray-400 border border-dashed rounded-xl">
-          Aucune classe ne vous a encore été attribuée par la Direction.
+        <div className="p-12 text-center text-xs font-bold text-gray-400 border border-dashed rounded-2xl bg-white">
+          Aucune classe d'intervention n'est actuellement planifiée à votre nom dans l'emploi du temps.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {classes.map((c) => {
-            const classCleanName = c.id.replace(`${currentSchool}_`, '').toUpperCase();
-            return (
-              <div key={c.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start">
-                    <span className="text-2xl">🏫</span>
-                    <span className="text-[10px] font-black bg-purple-50 text-purple-700 px-2.5 py-0.5 rounded-md">
-                      {c.elevesCount || 0} / 50 ÉLÈVES
-                    </span>
-                  </div>
-                  
-                  <h3 className="text-lg font-black text-gray-900 mt-3">Classe : {classCleanName}</h3>
-                  <p className="text-[11px] text-gray-400 font-bold uppercase mt-0.5">Niveau : {c.niveau || 'Secondaire'}</p>
+          {classes.map((c) => (
+            <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start">
+                  <span className="text-2xl">🏫</span>
+                  <span className="text-[10px] font-black bg-purple-50 text-purple-700 px-2.5 py-0.5 rounded-md">
+                    STRUCTURE COMPLÈTE
+                  </span>
                 </div>
-
-                {/* Boutons d'actions rapides par classe */}
-                <div className="grid grid-cols-2 gap-2 mt-6 border-t border-gray-50 pt-4">
-                  <Link 
-                    to="/prof/saisie-notes" 
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] text-center py-2 rounded-lg transition"
-                  >
-                    📝 Noter
-                  </Link>
-                  <Link 
-                    to="/prof/saisie-notes" // Sera redirigé vers FaireAppel.jsx à l'étape suivante
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[11px] text-center py-2 rounded-lg transition"
-                  >
-                    🛑 Faire l'Appel
-                  </Link>
-                </div>
+                
+                <h3 className="text-lg font-black text-gray-900 mt-3">Classe : {String(c.nom).toUpperCase()}</h3>
+                <p className="text-[11px] text-gray-400 font-bold uppercase mt-0.5">Discipline : {disciplineProf}</p>
               </div>
-            );
-          })}
+
+              {/* INTERCONNEXION DIRECTE DES BOUTONS VIA LE PARAMÈTRE CLASSEID SÉCURISÉ */}
+              <div className="grid grid-cols-2 gap-2 mt-6 border-t border-gray-100 pt-4">
+                <Link 
+                  to={`/professeur/notes?classeId=${c.id}`} 
+                  className="bg-purple-600 hover:bg-purple-700 font-black text-[11px] text-center py-2.5 rounded-xl transition no-underline shadow-2xs"
+                >
+                  📊 Enregistré Notes
+                </Link>
+                <Link 
+                  to={`/professeur/appel?classeId=${c.id}`} 
+                  className="bg-slate-900 hover:bg-slate-800 text-orange-400 font-black text-[11px] text-center py-2.5 rounded-xl transition no-underline shadow-2xs"
+                >
+                  📝 Faire l'Appel du jour
+                </Link>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

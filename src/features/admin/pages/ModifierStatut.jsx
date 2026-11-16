@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../../../services/api';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import Header from '../../../pages/Header';
 
 export default function ModifierStatut() {
   const navigate = useNavigate();
@@ -121,7 +122,8 @@ export default function ModifierStatut() {
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md my-6 font-sans">
-      <h2 className="text-2xl font-bold text-gray-800 border-b pb-4 mb-6">⚙️ Gestion RH : Mise à jour de Statut</h2>
+      <Header/>
+      <h2 className=" text-2xl font-bold text-gray-800 border-b pb-4 mb-6">⚙️ Gestion RH : Mise à jour de Statut</h2>
 
       {message.text && (
         <div className={`p-4 mb-6 rounded-md text-sm font-semibold ${
@@ -132,22 +134,23 @@ export default function ModifierStatut() {
       )}
 
       {/* BARRE DE RECHERCHE INITIALE */}
-      <form onSubmit={handleSearch} className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row gap-3 items-end mb-6">
-        <div className="flex-1">
-          <label className="block text-gray-700 text-xs font-bold uppercase mb-1">Entrer le Matricule RH de l'agent</label>
+      <form onSubmit={handleSearch} className=" bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row gap-3 items-end mb-6">
+        <div className=" form-floating mb-3 flex-1">
+          <label htmlFor="floatingInput" className="block text-gray-700 text-xs font-bold uppercase mb-1">Entrer le Matricule RH de l'agent</label>
           <input 
             type="text" 
+            id="floatingInput"
             placeholder="Ex: RH_KOUASSI_4821" 
             value={matriculeRecherche}
             onChange={(e) => setMatriculeRecherche(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md uppercase outline-none font-mono tracking-wider text-sm"
+            className="form-control w-full px-3 py-2 border rounded-md uppercase outline-none font-mono tracking-wider text-sm"
             disabled={loading || isSubmitting}
           />
         </div>
         <button 
           type="submit"
           disabled={loading || isSubmitting}
-          className="w-full sm:w-auto px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white text-sm font-bold rounded-md transition"
+          className="btn w-full sm:w-auto px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white text-sm font-bold rounded-md transition"
         >
           {loading ? 'Recherche...' : '🔍 Trouver la fiche'}
         </button>
@@ -192,6 +195,11 @@ export default function ModifierStatut() {
                   <option value="Histoire-Géo">Histoire-Géographie</option>
                   <option value="Philosophie">Philosophie</option>
                   <option value="EDHC">EDHC</option>
+                  <option value="ART">Arts Plastiques</option>
+                  <option value="Educ">Éducation Musicale</option>
+                  <option value="TICE">Information et Communication à l'École</option>
+                  <option value="Espagnol"> Espagnol</option>
+                  <option value="Allemand"> Allemand</option>
                   <option value="EPS">EPS (Éducation Physique et Sportive)</option>
                 </select>
               </div>
@@ -214,15 +222,15 @@ export default function ModifierStatut() {
             <button 
               type="button" 
               onClick={() => navigate(-1)} 
-              className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border rounded-lg transition duration-200"
+              className=" w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border rounded-lg transition duration-200"
             >
               ↩️ Annuler / Retour
             </button>
             
-                        <button 
+              <button 
               type="submit" 
               disabled={isSubmitting}
-              className="w-full sm:w-auto px-6 py-2.5 text-sm font-extrabold text-white bg-orange-500 hover:bg-orange-600 rounded-lg shadow-md hover:shadow transition duration-200 flex justify-center items-center disabled:bg-orange-300"
+              className="btn w-full sm:w-auto px-6 py-2.5 text-sm font-extrabold text-white bg-orange-500 hover:bg-orange-600 rounded-lg shadow-md hover:shadow transition duration-200 flex justify-center items-center disabled:bg-orange-300"
             >
               {isSubmitting ? 'Mise à jour Cloud...' : '🔄 Mettre à jour le statut'}
             </button>

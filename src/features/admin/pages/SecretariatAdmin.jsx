@@ -1,19 +1,15 @@
-import { useState, useEffect } from 'react';
+// src/features/admin/pages/SecretariatAdmin.jsx
+import React, { useState, useEffect } from 'react';
 import { db } from '../../../services/api';
-import { collection, query, onSnapshot, doc, setDoc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, getDocs, updateDoc, addDoc, where, limit } from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
-import ListeDesClasse from './listeDesClasse';
-import EnvoieAdmin from './messages/EnvoieAdmin';
-import EmploiDuTempsClasse from './EmploiDuTempsClasse';
-import ReceptionAdmin from './messages/ReceptionAdmin';
 import { Link } from 'react-router-dom'; 
-import ModifierStatut from './ModifierStatut';
-import RechercheEleveAdmin from './RechercheEleveAdmin';
+import Header from '../../../pages/Header';
+
 const SecretariatAdmin = () => {
   const { schoolId, schoolName } = useAuth();
   
-  // 🟢 CORRECTIF CASSE : On garde la version brute et on gère la tolérance dans le snapshot
-  const schoolIdRaw = schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_Moderne_Gagnoa';
+  const schoolIdRaw = schoolId || sessionStorage.getItem('sgs_school_id') || 'lycee_saint_bernard';
   const currentSchool = schoolIdRaw.trim();
 
   // --- ÉTATS DES DONNÉES EN TEMPS RÉEL ---
@@ -21,7 +17,7 @@ const SecretariatAdmin = () => {
   const [listeEducateurs, setListeEducateurs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [modeSecours, setModeSecours] = useState(false);
+  const [sendingAlert, setSendingAlert] = useState(false);
 
   // --- ÉTATS DU FORMULAIRE D'OUVERTURE DE CLASSE ---
   const [formPromotion, setFormPromotion] = useState('6eme');
@@ -34,16 +30,19 @@ const SecretariatAdmin = () => {
   const [docMatricule, setFormMatricule] = useState('');
   const [docType, setDocType] = useState('Bulletin Trimestriel');
   const [docCommentaire, setDocCommentaire] = useState('');
+  
+  // 🟢 ÉTATS STOCKAGE BINAIRE POUR LA PIÈCE JOINTE
+  const [fichierJointBinaire, setFichierJointBinaire] = useState(null);
+  const [nomFichierJoint, setNomFichierJoint] = useState('');
 
-  // 🔄 ÉCOUTEUR RÉACTIF ET INSENSIBLE À LA CASSE (onSnapshot Infaillible)
+  // 🔄 ÉCOUTEUR RÉACTIF OPTIMISÉ POUR LE PERSONNEL
   useEffect(() => {
     if (!currentSchool) {
       setLoading(false);
       return;
     }
 
-    // On écoute globalement les utilisateurs de l'école
-    const qStaff = query(collection(db, "users"));
+    const qStaff = query(collection(db, "users"), where("schoolId", "==", currentSchool));
 
     const unsubscribe = onSnapshot(qStaff, (snapshot) => {
       let profs = [];
@@ -51,26 +50,19 @@ const SecretariatAdmin = () => {
 
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        const uSchoolClean = data.schoolId ? data.schoolId.trim().toLowerCase() : '';
-        const targetSchoolClean = currentSchool.toLowerCase();
         const roleClean = data.role ? data.role.trim().toLowerCase() : '';
         const item = { id: docSnap.id, ...data };
 
-        // 🎯 COMPARATEUR TOLÉRANT : Valide l'entrée si les chaînes converties en minuscules matchent
-        if (uSchoolClean === targetSchoolClean) {
-          if (roleClean === 'professeur' || roleClean === 'prof_principal') {
-            profs.push(item);
-          } else if (roleClean === 'educateur') {
-            educs.push(item);
-          }
+        if (roleClean === 'professeur' || roleClean === 'prof_principal') {
+          profs.push(item);
+        } else if (roleClean === 'educateur') {
+          educs.push(item);
         }
       });
 
       setListeProfesseurs(profs);
       setListeEducateurs(educs);
-      setModeSecours(false);
 
-      // Pré-sélection sécurisée des premiers ID de la liste pour éviter les selects vides
       if (profs.length > 0 && !selectedProfPrincipalId) setSelectedProfPrincipalId(profs[0].id);
       if (educs.length > 0 && !selectedEducateurId) setSelectedEducateurId(educs[0].id);
       
@@ -83,7 +75,7 @@ const SecretariatAdmin = () => {
     return () => unsubscribe();
   }, [currentSchool, selectedProfPrincipalId, selectedEducateurId]);
 
-  // 📥 SOUMISSION A : CRÉATION DE CLASSE PHYSIQUE AVEC PROMOTION D'ÉDUCATEUR
+  // 📥 SOUMISSION A : CRÉATION DE CLASSE PHYSIQUE
   const handleCreateClassePhysique = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
@@ -103,7 +95,6 @@ const SecretariatAdmin = () => {
 
       const nomAffichagePropre = idBruteCalculee.toUpperCase().replace(/_/g, ' ');
 
-      // 1. Écriture de la classe physique
       await setDoc(doc(db, "classes", documentClasseId), {
         id: documentClasseId,
         idBrute: idBruteCalculee,
@@ -119,7 +110,6 @@ const SecretariatAdmin = () => {
         createdAt: new Date().toISOString()
       });
 
-      // 2. Promotion automatique de l'enseignant affecté en Prof Principal
       if (selectedProfPrincipalId && selectedProfPrincipalId !== 'Aucun') {
         await updateDoc(doc(db, "users", selectedProfPrincipalId), {
           role: 'prof_principal',
@@ -127,7 +117,6 @@ const SecretariatAdmin = () => {
         });
       }
 
-      // 3. Liaison de la promotion de l'éducateur sur sa fiche personnel (Ex: assigned_promotion = "5eme")
       if (selectedEducateurId && selectedEducateurId !== 'Aucun') {
         const promoRacine = formPromotion.includes('_') ? formPromotion.split('_')[0] : formPromotion;
         await updateDoc(doc(db, "users", selectedEducateurId), {
@@ -135,7 +124,7 @@ const SecretariatAdmin = () => {
         });
       }
 
-      setMessage({ type: 'success', text: `🏛️ Structure ${nomAffichagePropre} déployée avec succès. Équipe pédagogique liée !` });
+      setMessage({ type: 'success', text: `🏛️ Structure ${nomAffichagePropre} déployée avec succès !` });
       setFormExtension('');
       setFormDelegue('');
       setTimeout(() => setMessage({ type: '', text: '' }), 4000);
@@ -145,54 +134,119 @@ const SecretariatAdmin = () => {
     }
   };
 
-  // 🚀 SOUMISSION B : EXPÉDITION ALERTES DOCUMENTS
+  // 🟢 CAPTURE ET CONVERSION DU FICHIER EN STR BASE64 COMPATIBLE SMTP
+  const handleChangementFichierBulletin = (e) => {
+    const fichierSelectionne = e.target.files[0];
+    if (!fichierSelectionne) return;
+
+    setNomFichierJoint(fichierSelectionne.name);
+
+    const lecteur = new FileReader();
+    lecteur.onloadend = () => {
+      // Stocke le contenu binaire pur converti en Base64
+      setFichierJointBinaire(lecteur.result);
+    };
+    lecteur.readAsDataURL(fichierSelectionne);
+  };
+
+  // 🚀 SOUMISSION B : EXPÉDITION D'ALERTE ET INJECTION RÉELLE DE LA PIÈCE JOINTE DANS LE MAIL
   const handleSendDocumentAlert = async (e) => {
     e.preventDefault();
+    if (sendingAlert) return;
+    
     setMessage({ type: '', text: '' });
+    setSendingAlert(true);
 
     const matriculeNettoye = docMatricule.trim().toUpperCase();
 
     try {
-      const qCheck = query(collection(db, "users"), where("role", "==", "eleve"), where("matricule", "==", matriculeNettoye));
+      const qCheck = query(
+        collection(db, "users"), 
+        where("schoolId", "==", currentSchool),
+        where("role", "==", "eleve"), 
+        where("matricule", "==", matriculeNettoye),
+        limit(1)
+      );
+      
       const querySnapshot = await getDocs(qCheck);
 
       if (querySnapshot.empty) {
         setMessage({ type: 'error', text: `❌ Le matricule (${matriculeNettoye}) n'existe pas dans le système.` });
+        setSendingAlert(false);
         return;
       }
 
-      const eleveData = querySnapshot.docs[0].data();
+      const premierDocSnap = querySnapshot.docs[0];
+      const eleveData = premierDocSnap.data();
 
       if (!eleveData.emailParent) {
-        setMessage({ type: 'error', text: `🛑 Annulation : Aucun e-mail parental associé au dossier de ${eleveData.nom}.` });
+        setMessage({ type: 'error', text: `🛑 Annulation : Aucun e-mail parental associé au dossier de ${eleveData.nom || 'cet élève'}.` });
+        setSendingAlert(false);
         return;
       }
 
-      await fetch("http://localhost:10000/api/send-document-alert", {
+      const emailParentCible = eleveData.emailParent.trim();
+      const nomCompletEleve = `${String(eleveData.nom || '').toUpperCase()} ${eleveData.prenoms || eleveData.prenom || ''}`.trim();
+      const classeEffectiveEleve = eleveData.classeNom || eleveData.classe || "Non assignée";
+      const matriculeOfficiel = eleveData.matricule || premierDocSnap.id;
+      
+      const noteAdditionnelle = docCommentaire.trim() || "Une pièce officielle a été émise et mise à votre disposition par le Secrétariat Général.";
+
+      // 1. Sauvegarde de la notification Firestore
+      await addDoc(collection(db, "notifications"), {
+        schoolId: currentSchool,
+        type: "ALERTE_ADMINISTRATIVE",
+        titre: `🚨 Alerte Document : ${docType}`,
+        message: `Notification concernant l'élève ${nomCompletEleve}. Document : ${docType}.`,
+        destinataireId: premierDocSnap.id,
+        createdAt: new Date().toISOString()
+      });
+
+      // Détermination si une pièce jointe doit être injectée
+      const aUnFichierActif = docType === 'Bulletin Trimestriel' && fichierJointBinaire !== null;
+
+     // 2. 📧 ENVOI RÉSEAU AVEC INJECTION DU FICHIER EN PIÈCE JOINTE NODEMAILER
+      await fetch("http://localhost:10000/api/send-notification-email", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to_email: eleveData.emailParent.trim(),
-          to_name: `${eleveData.prenoms || ''} ${eleveData.nom || ''}`.toUpperCase(),
-          school_name: schoolName || currentSchool.toUpperCase(),
-          type_document: docType,
-          sender_title: "Le Secrétariat Général"
+          recipients: [emailParentCible],
+          schoolName: schoolName || currentSchool.toUpperCase(),
+          schoolId: currentSchool,
+          title: `⚠️ ALERTE SECRETARIAT \n\n${docType.toUpperCase()}`,
+          
+          message: `Bonjour chers Parents,\n\nMessage officiel du secrétariat Scolaire:\n\n📌 NATURE DU DOCUMENT : ${docType}\nELEVE : ${nomCompletEleve}\n\nCLASSE : ${classeEffectiveEleve}\n\nMATRICULE : ${matriculeOfficiel}\n\n💬 OBSERVATION DE LA DIRECTION :\n\n${noteAdditionnelle}.\n\nVotre Espace Parent Edulink_Le lien scolaire.\n\nCordialement,\n\nLe Secrétariat Général.`,
+          
+          /* footer: `Votre Espace Parent Edulink_Le lien scolaire.\n\nCordialement,\n\nLe Secrétariat Général.`,
+          senderName: "SECRETARIAT GENERAL", */
+          type: "alerte", 
+          typeMessage: "alerte",
+          appUrl: window.location.origin,
+          
+          // 🔗 TRANSMISSION DES COMPOSANTS FLUIDES DU FICHIER À NODEMAILER
+          hasAttachment: aUnFichierActif,
+          fileName: aUnFichierActif ? nomFichierJoint : '',
+          fileData: aUnFichierActif ? fichierJointBinaire : null,
+          attachmentData: aUnFichierActif ? fichierJointBinaire : null
         })
       });
-
-      setMessage({ type: 'success', text: `🎯 Alerte pour "${docType}" notifiée en direct au parent !` });
+      setMessage({ type: 'success', text: `🎯 Alerte pour "${docType}" envoyée avec succès au parent de l'élève ${nomCompletEleve} !` });
       setFormMatricule('');
       setDocCommentaire('');
+      setFichierJointBinaire(null);
+      setNomFichierJoint('');
       setTimeout(() => setMessage({ type: '', text: '' }), 4000);
     } catch (err) {
-      console.error(err);
+      console.error("Erreur distribution alerte :", err);
       setMessage({ type: 'error', text: '❌ Erreur réseau lors de la distribution.' });
+    } finally {
+      setSendingAlert(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center font-sans bg-white p-8 shadow rounded-xl max-w-7xl mx-auto mt-12">
+      <div className="flex h-64 flex-col items-center justify-center font-sans bg-white p-8 shadow rounded-xl max-w-7xl mx-auto mt-12 text-left">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent mb-3"></div>
         <p className="text-gray-500 text-xs font-bold animate-pulse">Ouverture des liaisons temps réel...</p>
       </div>
@@ -200,82 +254,125 @@ const SecretariatAdmin = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen relative">
-      
+    <div className="bg-white min-h-screen p- sm:p-6 lg:p-8 font-sans text-gray-700 text-left">
+       <h2 className="tirecl text-lg font-black text-gray-900 uppercase">
+        Recrutement & Gestion des Équipes RH
+      </h2>
       {/* POP-UP TOAST FLOTTANT */}
       {message.text && (
-        <div className={`fixed top-6 right-6 z-50 p-4 rounded-xl shadow-2xl border-l-4 flex items-center justify-between gap-4 max-w-sm w-full animate-fadeIn text-xs font-bold bg-slate-900 ${
-          message.type === 'success' ? 'border-emerald-500 text-emerald-400' : 'border-red-500 text-red-400'
+        <div className={` fixed top-6 right-6 z-50 p-4 rounded-xl shadow-2xl  flex items-center justify-between gap-4 max-w-sm w-full animate-fadeIn text-xs font-bold bg-slate-900 ${ 
+          message.type === 'success' ? ' text-emerald-400' : ' text-red-400' 
         }`}>
           <div className="flex items-center gap-2">
             <span className="text-sm">{message.type === 'success' ? '🎯' : '🛑'}</span>
             <p className="leading-relaxed whitespace-pre-line text-left">{message.text}</p>
           </div>
-          <button type="button" onClick={() => setMessage({ type: '', text: '' })} className="text-slate-500 hover:text-white transition text-sm cursor-pointer">✕</button>
+          <button type="button" onClick={() => setMessage({ type: '', text: '' })} className="text-slate-500 hover: transition text-sm cursor-pointer bg-transparent border-0">✕</button>
         </div>
       )}
 
       {/* EN-TÊTE ACCUEIL */}
-      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white  p-5 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-3xs">
         <div>
-          <h1 className="text-xl md:text-2xl font-black">🏛️ Secrétariat Général {schoolName || "Établissement Scolaire Partenaire"}</h1>
-          <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">
-            Pilotage Académique Live — <span className="text-orange-400 font-black">{schoolName || currentSchool.toUpperCase()}</span>
+          <h1 className="tirecl-text text-xl md:text-2xl font-black text-slate-900 uppercase">Secrétariat Général</h1>
+          <p className="tirecl-text2 text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">
+            Pilotage Académique Live — <span className="text-orange-500 font-black">{schoolName || currentSchool.toUpperCase()}</span>
           </p>
         </div>
       </div>
-        {/* 🟢 CARTE 0 AJOUTÉE : REDIRECTION VERS LE DASHBOARD DE PILOTAGE GLOBAL */}
-        <div className="bg-purple-900 text-purple-100 p-6 rounded-2xl shadow-md border border-purple-950 flex flex-col justify-between">
-          <div>
-            <div className="h-10 w-10 bg-purple-950 text-orange-400 rounded-xl flex items-center justify-center text-lg font-bold">📈</div>
-           
-            <p className="text-xs text-purple-200 mt-1 leading-relaxed font-medium">
-              Base de donnee centralisée de toute l'etablisement.
-            </p>
-          </div>
-          <Link 
-            to="/admin/base-centralise" 
-            className="w-full text-center bg-orange-500 hover:bg-orange-600 font-black text-xs uppercase tracking-wider py-2.5 rounded-xl shadow-md transition mt-6 block cursor-pointer"
-          >
-            📈 Liste de tout l'effectifs 
-          </Link>
+
+      {/* PANNEAU CENTRAL DE NAVIGATION MAÎTRE */}
+      <div className="bg-white text-purple-100 p-6 rounded-2xl shadow-sm  flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="space-y-1">
+          <span className="bg-purple-800 text-orange-400 text-[10px] font-black uppercase px-2 py-0.5 "></span>
+          <h3 className="text-base font-black uppercase"></h3>
+          <p className="tirecl-text3 text-xs text-purple-200 leading-relaxed font-medium">Basculez entre les registres pour auditer les dossiers scolaires de tout l'établissement.</p>
         </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-       <RechercheEleveAdmin/>
-        {/* COMPARTIMENT 2 : EXPÉDITION DE DOCUMENTS */}
-        <div className="bg-white rounded-2xl border p-5 shadow-sm h-fit">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">🚨 Expédition et Alertes de Documents Personnels</h3>
+        <div className="menutext flex flex-wrap gap-2 w-full md:w-auto">
+          <Link to="/admin/base-centralise" className="px-3 py-2 text-[10px] font-black uppercase  bg-white rounded-xl hover:bg-purple-700 transition no-underline border text-center">Gestion centralisée de l'établissement</Link>
+          <Link to="/admin/modifier-un-statut" className="px-3 py-2 text-[10px] font-black uppercase  bg-purple-800 rounded-xl hover:bg-purple-700 transition no-underline border text-center">Mise à jour de Statut</Link>
+          <Link to="/admin/message-reçu" className="px-3 py-2 text-[10px] font-black uppercase  bg-purple-800 rounded-xl hover:bg-purple-700 transition no-underline border text-center">Boite de Réception</Link>
+          <Link to="/admin/gestion-des-profil" className="px-3 py-2 text-[10px] font-black uppercase  bg-purple-800 rounded-xl hover:bg-purple-700 transition no-underline border text-center">Fiches &modification de  Profils</Link>
+          <Link to="/admin/gestion-des-statut" className="px-3 py-2 text-[10px] font-black uppercase  bg-purple-800 rounded-xl hover:bg-purple-700 transition no-underline border text-center">Bulletins & Impressions</Link>
+          <Link to="/admin/Rechercher-un-eleve" className="px-3 py-2 text-[10px] font-black uppercase  bg-purple-800 rounded-xl hover:bg-purple-700 transition no-underline border text-center">Rechercher un Élève</Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        {/* COMPARTIMENT 2 : EXPÉDITION DE DOCUMENTS OUTIL RAPIDE SANS LATENCE */}
+        <div className="bg-white p-5 ">
+          <h3 className="expe text-xs font-black text-gray-400 uppercase tracking-wider border-b pb-3 mb-4">Expédition et Alertes de Documents Personnels</h3>
           
-          <form onSubmit={handleSendDocumentAlert} className="space-y-4 text-xs font-bold text-gray-700">
-            <div>
-              <label className="block text-gray-400 uppercase mb-1">Matricule MENA Cible de l'Élève *</label>
-              <input type="text" placeholder="Ex: 26_8631W" value={docMatricule} onChange={(e) => setFormMatricule(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 font-mono tracking-wide outline-none uppercase focus:ring-2 focus:ring-orange-500" required />
+            <form onSubmit={handleSendDocumentAlert} className="space-y-4 text-xs font-bold text-gray-700">
+           <div className='nomfami form-floating mb-3'>
+              <label htmlFor="floatingInput" className="block text-gray-700 text-xs font-bold uppercase mb-1">Matricule MENA Cible de l'Élève *</label>
+              <input 
+                type="text"
+                id="floatingInput"
+                name="nom" 
+                placeholder="Ex: 26_6615G" 
+                value={docMatricule} 
+                onChange={(e) => setFormMatricule(e.target.value)} 
+                className="form-control w-full bg-gray-50 border rounded-lg p-2.5 font-mono tracking-wide outline-none uppercase focus:ring-2 focus:ring-orange-500" 
+                required 
+              />
             </div>
 
-            <div>
+            <div className='genres form-floating mb-3'>
               <label className="block text-gray-400 uppercase mb-1">Nature de la pièce déposée</label>
-              <select value={docType} onChange={(e) => setDocType(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer">
-                <option value="Bulletin Trimestriel">📊 Bulletin Civil Trimestriel (Relevé Officiel)</option>
+              <select 
+              name="genre"
+                value={docType} 
+                onChange={(e) => setDocType(e.target.value)} 
+                 required
+                className="form-select w-full bg-gray-50 border rounded-lg p-2.5 outline-none bg-white cursor-pointer"
+              >
+                <option selected value="Bulletin Trimestriel">📊 Bulletin Civil Trimestriel (Relevé Officiel)</option>
                 <option value="Billet de Convocation">⚠️ Billet de Convocation Parent d'Élève</option>
                 <option value="Avis d'Exclusion Provisoire">🛑 Avis de Sanction Pédagogique / Exclusion</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-gray-400 uppercase mb-1">Note explicative / Commentaire de la direction (Optionnel)</label>
-              <textarea rows="3" placeholder="Ex: Le bulletin est disponible..." value={docCommentaire} onChange={(e) => setDocCommentaire(e.target.value)} className="w-full bg-gray-50 border rounded-lg p-2.5 outline-none font-medium text-gray-600"></textarea>
+            {/* 🟢 BLOC INTERACTIF AUTOMATIQUE : Intégration conditionnelle de l'uploader */}
+            {docType === 'Bulletin Trimestriel' && (
+              <div className="fichier p-3 bg-orange-50/50 border border-dashed border-orange-200 rounded-xl space-y-1.5 animate-fadeIn">
+                <label className="block text-orange-800 uppercase text-[10px] font-black">📁 Téléverser le Fichier Bulletin Joint (.PDF, .PNG) *</label>
+                <input 
+                  type="file" 
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={handleChangementFichierBulletin}
+                  className="w-full bg-white border border-gray-200 p-2 rounded-lg text-[11px] font-bold text-gray-500 cursor-pointer"
+                  required
+                />
+                {nomFichierJoint && <p className="text-[9px] text-emerald-600 font-bold">✔️ Document chargé : {nomFichierJoint}</p>}
+              </div>
+            )}
+
+           <div className='divisionpedamsg form-floating mb-3'>
+              <label htmlFor='exampleFormControlTextarea1' className="textar form-label block text-gray-700 text-xs font-bold uppercase mb-1">Note explicative / Commentaire de la direction (Optionnel)</label>
+              <textarea 
+                rows="3"
+            type="text"
+            placeholder="Tapez votre message complet ici..."
+            id="exampleFormControlTextarea1"
+                placeholder="Ex: Le bulletin est disponible..." 
+                value={docCommentaire} 
+                onChange={(e) => setDocCommentaire(e.target.value)} 
+                className="form-control textaremsg w-full bg-gray-50 border rounded-lg p-2.5 outline-none font-medium text-gray-600"
+              />
             </div>
 
-            <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-orange-400 font-black py-2.5 rounded-xl uppercase tracking-wider transition shadow-xs cursor-pointer">
-              🚀 Émettre l'Alerte Courriel Instantanée
+            <button 
+              type="submit" 
+              disabled={sendingAlert}
+               className="btnmsg-1  w-full bg-orange-500 hover:bg-orange-600 font-black py-3 rounded-xl uppercase tracking-wider transition cursor-pointer border-0 disabled:bg-slate-800 disabled:cursor-not-allowed"
+            >
+              {sendingAlert ? "⚡ Routage Réseau en Cours..." : "🚀 Émettre l'Alerte Courriel Instantanée"}
             </button>
           </form>
         </div>
-        <EmploiDuTempsClasse/>
-        <ListeDesClasse/>
-        <EnvoieAdmin/>
-         <ReceptionAdmin/>
       </div>
+
     </div>
   );
 };

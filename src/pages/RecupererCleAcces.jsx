@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { db } from '../services/api';
 import { doc, getDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
+import logoEdulink from '../assets/logoedulink.png';
 
 const RecupererCleAcces = () => {
   const [matriculeSaisi, setMatriculeSaisi] = useState('');
@@ -55,17 +56,20 @@ const RecupererCleAcces = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col justify-center items-center p-4 font-sans text-left text-gray-700 select-none">
-      
+    <div className=" min-h-screen bg-gray-900 flex flex-col justify-center items-center p-4 font-sans text-left text-gray-700 select-none">
+      <span className="tete text-[10px] font-black uppercase tracking-widest text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
+            Assistance Sécurité Authentification
+          </span>
+       <div className="barre-bi-couleur"></div>
       <div className="w-full max-w-md bg-white p-6 sm:p-8 rounded-2xl border border-gray-100 shadow-2xl animate-fadeIn">
         
         {/* EN-TÊTE DE LA MARQUE */}
         <div className="text-center mb-6">
-          <span className="text-[10px] font-black uppercase tracking-widest text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
-            Assistance Sécurité Authentification
-          </span>
-          <h2 className="text-xl font-black text-gray-900 uppercase mt-3">Oubli de Mot de Passe</h2>
-          <p className="text-xs text-gray-400 font-medium mt-1">Récupérez instantanément votre clé d'accès réseau à l'aide de votre matricule unique.</p>
+          
+           <div className="flex items-center gap-2 mb-4 justify-center">
+                    {logoEdulink && <img src={logoEdulink} alt="Logo Edulink" className="logologin h-8 w-auto object-contain" />}
+                  </div>
+          <h2 className="recup text-xl font-black text-gray-900 uppercase mt-3">Entrez votre matricule de connexion *</h2>
         </div>
 
         {erreur && (
@@ -94,15 +98,14 @@ const RecupererCleAcces = () => {
         )}
 
         {/* FORMULAIRE DE REQUÊTE DE SÉCURITÉ */}
-        <form onSubmit={handleExtraireCleUrgence} className="space-y-4 text-xs font-bold">
+        <form onSubmit={handleExtraireCleUrgence} className="form-recup space-y-4 text-xs font-bold">
           <div>
-            <label className="block text-gray-400 uppercase mb-1">Entrez votre matricule de connexion *</label>
             <input 
               type="text" 
-              placeholder="Ex: PROF_BLEGUY_978, 26_3159M..." 
+              placeholder="Ex: PROF_XXXX_978, 26_3159M..." 
               value={matriculeSaisi}
               onChange={(e) => setMatriculeSaisi(e.target.value)}
-              className="w-full bg-gray-50 border p-3 rounded-xl outline-none text-xs font-bold text-gray-900 uppercase font-mono tracking-wide focus:ring-2 focus:ring-purple-600 bg-white"
+              className="identifiantinpu w-full bg-gray-50 border p-3 rounded-xl outline-none text-xs font-bold text-gray-900 uppercase font-mono tracking-wide focus:ring-2 focus:ring-purple-600 bg-white"
               disabled={loading}
               required 
             />
@@ -111,15 +114,15 @@ const RecupererCleAcces = () => {
           <button 
             type="submit" 
             disabled={loading || !matriculeSaisi.trim()} 
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition cursor-pointer disabled:bg-gray-100 shadow-md"
+            className="btn-recup w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition cursor-pointer disabled:bg-gray-100 shadow-md"
           >
-            {loading ? "Recherche cloud..." : "⚡ Récupérer mon mot de passe"}
+            {loading ? "Recherche cloud..." : "⚡ Récupérer password"}
           </button>
         </form>
 
         {/* LIEN LIEN RETOUR LOGIN */}
         <div className="mt-6 pt-4 border-t text-center">
-          <Link to="/login" className="text-xs font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider">
+          <Link to="/login" className="retour text-xs font-black text-purple-600 hover:text-purple-700 transition uppercase tracking-wider">
             ⬅️ Retour à l'écran de connexion
           </Link>
         </div>

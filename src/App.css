@@ -8,7 +8,3150 @@
   border: none !important;
   outline: none !important;
   border-width: 0px !important;
+  text-align: center;
 }
+.recrut {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -120px!important;
+}
+.changerMotDePasse {
+   font-family: "Inter", sans-serif;
+  position: relative;
+  font-weight: bold;
+  font-style:italic;
+  float: left;
+  left: 250px!important;
+  top: -170px!important;
+  font-size: 16px;
+   color: red!important;
+}
+.pointage {
+   font-family: "Inter", sans-serif;
+  position: relative;
+  font-weight: bold;
+  float: left;
+  left: 500px!important;
+  top: -80px!important;
+   color: red!important;
+}
+.pointage-1 {
+   font-family: "Inter", sans-serif;
+  position: relative;
+  font-weight: bold;
+  float: left;
+  left: 560px!important;
+  top: -60px!important;
+   color: red!important;
+}
+.pointag {
+   font-family: "Inter", sans-serif;
+  position: relative;
+  font-weight: bold;
+  float: left;
+  left:150px!important;
+  top: -40px!important;
+}
+.pointage-group {
+  font-family: "Inter", sans-serif;
+  position: absolute;
+  font-weight: bold;
+  display:flex;
+  left:330px;
+  top:560px;
+  flex-direction:row;
+}
+.latable {
+  font-family: "Inter", sans-serif;
+  left:-30px;
+  top:50px;
+    position: relative;
+}
+.changerMotDePass {
+   font-family: "Inter", sans-serif;
+  position: relative;
+  font-weight: bold;
+  float: left;
+  left: -70px!important;
+  top: -130px!important;
+  font-size: 16px;
+}
+.Registredesclasses {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -50px!important;
+  font-style:italic;
+  font-weight:bold;
+}
+.etablissement {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -50px!important;
+  font-style:italic;
+  font-weight:bold;
+  color:hsl(0, 91%, 50%)
+}
+.administration {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -60px!important;
+  font-style:italic;
+  font-weight:bold;
+}
+.administration-1 {
+ font-family: "Inter", sans-serif;
+ font-size: 23px;
+  position: relative;
+  font-style:italic;
+  top: -70px!important;
+  font-style:italic;
+  font-weight:bold;
+  color: #f70838;
+}
+.administration-2 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -100px!important;
+  font-style:italic;
+}
+.etablissement {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -50px!important;
+  font-style:italic;
+  font-weight:bold;
+}
+.synchronisation {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -30px!important;
+  left: 488px;
+  float:left;
+}
+.recrute {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  font-style:italic;
+  top: -57px!important;
+  left: 110px;
+}
+
+.statut {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -100px!important;
+  left: -470px;
+  color:hsl(0, 91%, 50%);
+}
+.spécifications {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  float:left;
+  top: -300px!important;
+  left: 750px;
+  color:hsl(0, 91%, 50%);
+}
+@keyframes clignoter-jaune {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(1.04);
+    
+  }
+}
+
+.bouton-emargement-depart {
+  animation: clignoter-jaune 1s infinite;
+  position: relative;
+  width: 180px;
+  height: 20px!important;
+  font-size: 12px;
+  font-weight: bolder;
+  float: left;
+  top: -287px;
+  left: 520px;
+  background-color:hsla(61, 98%, 51%, 0.91);
+}
+.courencour {
+  position: relative;
+  font-size: 12px;
+  font-weight: bolder;
+  top: -407px!important;
+   left: 587px!important;
+}
+.courenclass {
+  position: relative;
+  font-size: 12px;
+  font-weight: bolder;
+  top: -532px!important;
+   left: -27px!important;
+   float: left;
+   color: #f70838;
+}
+.courenheur {
+  position: relative;
+  font-size: 12px;
+  font-weight: bolder;
+  top: -522px!important;
+   left: 47px!important;
+   float: left;
+   color: #f70838;
+}
+.poste {
+  position: relative;
+  font-size: 12px;
+  font-weight: bolder;
+  top: -477px!important;
+   left: 327px!important;
+   float: left;
+}
+.tab {
+  position: relative;
+  font-weight: bolder;
+  top: -277px!important;
+   left: -227px!important;
+}
+.taber {
+  position: relative;
+  font-weight: bolder;
+  font-size: 13px;
+  top: -27px!important;
+   left: 437px!important;
+}
+.taber-1 {
+  position: relative;
+  font-weight: bolder;
+  font-size: 13px;
+  top: -27px!important;
+   left: 407px!important;
+}
+.poste-1 {
+  position: relative;
+  font-size: 12px;
+  font-weight: bolder;
+  top: 167px!important;
+   left: 427px!important;
+}
+.poste-1-text {
+  position: absolute;
+  font-size: 11px;
+  font-weight: bolder;
+  color: #f70838;
+  width: 200px;
+  top: 107px!important;
+   left: 687px!important;
+}
+.textx {
+  position: relative;
+  font-size: 18px;
+  font-weight: bolder;
+  color: hsl(351, 78%, 2%);
+  top: -57px!important;
+}
+.enseig {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  color: hwb(353 2% 16%);
+  top: -57px!important;
+}
+.enseig-1 {
+  position: relative;
+  font-size: 13px;
+  float: left;
+  font-weight: bolder;
+  color: lab(0.6% 2.75 0.54);
+  top: -57px!important;
+  left: 550px;
+}
+.conf {
+  position: relative;
+  font-size: 13px;
+  float: left;
+  font-weight: bolder;
+  color: lab(0.6% 2.75 0.54);
+  top: -57px!important;
+  left: 580px;
+}
+.conf-1 {
+  position: relative;
+  font-size: 13px;
+  float: left;
+  font-weight: bolder;
+  color: lch(50.36% 94.35 35.92);
+  top: -37px!important;
+  left: 410px;
+}
+.gridgroup {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  color: lch(50.36% 94.35 35.92);
+  top: -7px!important;
+  left: -170px;
+}
+.pon {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  top: 2px!important;
+}
+.pon-r {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  top: -2px!important;
+  left: 27px;
+  width: 200px;
+}
+.bglate {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  color: lab(0.6% 2.75 0.54);
+  left: -130px;
+}
+.bglate-2 {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  color: lch(97.45% 1.06 18.86);
+  left: -110px;
+  background-color: #130101;
+}
+.bglate-3 {
+  position: relative;
+  font-size: 13px;
+  font-weight: bolder;
+  color: lch(97.45% 1.06 18.86);
+  left: 110px;
+  top: -7px;
+  background-color: #130101;
+}
+.magri {
+  position: relative;
+  font-size: 18px;
+  font-weight: bolder;
+  left: 50px;
+  color: #f70838;
+}
+.bouton-emargement-depart-dash {
+  animation: clignoter-jaune 1s infinite;
+  position: relative;
+  font-size: 14px;
+  padding: 15px;
+  font-weight: bolder;
+  border-radius: 5%;
+   top: -180px;
+   left: -435px;
+   color: #f0efec;
+  text-align: justify;
+  background-color:lab(49.61% 74.79 60.56 / 0.91);
+}
+ /* admin debut */
+.homeAdmin {
+  border: none !important;
+  outline: none !important;
+  border-width: 0px !important;
+  background-color: #ffffff;
+  padding-bottom: 440px!important;
+  height: 725px!important;
+  position: relative;
+  top: -25px;
+}
+.lyce {
+  font-family: "Inter", sans-serif;
+  position: relative;
+ top: -35px;
+ font-weight: bold;
+ font-size: 45px;
+}
+
+.manager {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: 40px;
+ left: -41px;
+ font-weight: bold;
+ font-size: 45px;
+}
+
+.lyceheader {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: -20px;
+ font-weight: bold;
+ font-size: 30px;
+}
+.matricule {
+  position: relative;
+  float: left;
+  width: 350px;
+  left: 120px;
+ top: 12px;
+}
+.matrice1 {
+  position: relative;
+  float: left;
+  width: 350px;
+  left: 120px;
+  margin: 15px;
+}
+.matrice2 {
+  position: relative;
+  float: left;
+  width: 350px;
+  left: 120px;
+  margin: 15px;
+}
+.blockrh {
+font-family: "Inter", sans-serif;
+  position: absolute;
+ display: flex;
+ flex-direction: row-reverse;
+}
+.etatcivil {
+font-family: "Inter", sans-serif;
+  position: relative;
+ display: flex;
+ flex-direction: row;
+ top: -55px;
+}
+.etatcivil-1 {
+font-family: "Inter", sans-serif;
+  position: relative;
+ display: flex;
+ flex-direction: row;
+ top: -55px;
+}
+.etatcivilprovenance {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ display: flex;
+ float: left;
+ flex-direction: row;
+ top: -85px;
+ left: 310px;
+} 
+.partiprovenance {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ display: flex;
+ flex-direction: row;
+ top: 7px;
+  left: -10px;
+}
+.formecorect1 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: -120px;
+ left: 45px;
+}
+.formgauche {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+ top: 350px;
+ left: 775px;
+  float:left;
+}
+.seance {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: 5px!important;
+
+}
+.formdroite {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: -50px;
+ left: 335px;
+ font-size:small;
+ width:360px;
+ text-align:justify;
+}
+.formecorect2 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: -274px;
+ left: 330px;
+}
+.formecobjet {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ float: left;
+ left: 429px;
+ top: -50px;
+}
+.mgseance {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: 345px;
+  left: 490px;
+  width: 400px;
+  height: 400px!important;
+}
+.titreseance {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  float: right;
+  top: 420px!important;
+  left: 940px;
+}
+.devoirseance {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: 345px;
+  left: 930px;
+}
+.nomfamille {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: -95px;
+  left: 340px;
+}
+.principal {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: 20px;
+  left: -140px;
+  width: 250px;
+}
+.principal-1 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: 90px;
+  left: -370px;
+  width: 310px;
+}
+.principal-2 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left:-374px;
+}
+.principal-3 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left:-424px;
+}
+.bass {
+ font-family: "Inter", sans-serif;
+  position: relative;
+top:-3px!important;
+}
+.textdanger {
+ font-family: "Inter", sans-serif;
+ font-weight: bold;
+ color:rgb(3, 114, 49);
+}
+.nomfami {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: 295px;
+  left: 200px;
+}
+.partieStatut {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -30px;
+}
+.btnfamille {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 200px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:50px;
+   left:22px;
+  }
+  .signatureeducateur {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 250px;
+   height: 50px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:-160px;
+   left:-72px;
+  }
+  .signatureeducat {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 140px;
+   height: 50px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-160px;
+   left:322px;
+  }
+  .signretour {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:20px;
+   left:-123px;
+  }
+   .signretou {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 170px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-220px;
+   left:-123px;
+  }
+  .bgvalid {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   width: 270px;
+   height: 30px;
+    top:10px;
+  }
+   .bgvalido {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   width: 280px;
+   height: 30px;
+    top:-4px;
+    left: 139px;
+  }
+  .bgvalida {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   width: 280px;
+   height: 30px;
+   float: left;
+    top:-290px;
+    left: 119px;
+  }
+   .bgvalidbnt {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   height: 30px;
+    top:-90px;
+    left: -126px;
+    float: right;
+  }
+  .bgvalidtext {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+   height: 30px;
+    top:-105px;
+    float: left;
+    left: 126px;
+  }
+  .bgvalidtexta {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   position: relative;
+   height: 30px;
+   width: 300px;
+    top:-105px;
+    float: left;
+    left: -296px;
+  }
+  .bgvalidtexte {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+   height: 30px;
+    top:-75px;
+    float: left;
+    left: 516px;
+  }
+   .assi {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+    top:-65px;
+  }
+  .assi-1 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+    top:-65px;
+    color: #f70838;
+  }
+  .assi-2 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+    top:-165px;
+    left: -395px;
+    color: #f70838;
+  }
+   .assi-3 {
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+   text-align:justify;
+   position: relative;
+   float: left;
+    top:-165px;
+    left: 115px;
+    display: flex;
+    flex-direction: row;
+  }
+   .rappel {
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+   text-align:justify;
+   position: relative;
+   top:-325px;
+   float: right;
+   left: -64px;
+   width: 230px;
+  }
+  .Terminal {
+   position: relative;
+    left: 32px;
+  }
+   .bgvalidtext-1 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+    top:-65px;
+    left: -56px;
+  }
+   .intervention {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+    top:-265px;
+    left: 356px;
+  }
+   .bgvalidtext-btn {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   font-weight: bold;
+   position: relative;
+    top:-45px;
+    left: -106px;
+  }
+  .cla {
+   position: relative;
+    left: -6px;
+  }
+  .claform {
+   position: relative;
+    left: 236px;
+  }
+   .siemg {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   top: 58px;
+  }
+  .btndepart {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   font-weight: bolder;
+   width: 200px;
+   height: 10px!important;
+   position: relative;
+   top: 58px;
+   float: left;
+  }
+  .btndepart-2 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   font-weight: bolder;
+   width: 200px;
+   height: 20px!important;
+   background-color: #f70838;
+   position: absolute;
+   top: 178px;
+   float: left;
+   left: 800px;
+  }
+   .btndepart-3 {
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: hsl(214, 100%, 1%)!important;
+   position: absolute;
+   top: -578px;
+   float: left;
+   left: 370px;
+  }
+  .siemg-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+  }
+   .signret {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 170px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-20px;
+  }
+   .signret-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 170px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-20px;
+    left: -120px!important;
+  }
+   .signretou-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: left;
+    top:-260px;
+   left:113px;
+  }
+   .signretour-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-30px;
+   left:-123px;
+  }
+  .signretour-2 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-30px;
+  }
+  .signretour-3 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+    top:-20px;
+  }
+  .flexgap {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   position:absolute;
+   float:left;
+   left:324px;
+  }
+  .grouprec {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+    top:-30px;
+  }
+  .horaire {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:-80px!important;
+  float: left;
+  left: 553px;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+  }
+   .cahier {
+  font-size: 24px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:90px!important;
+  float: left;
+  left: 583px;
+   font-weight: bolder;
+   position:absolute;
+   font-weight:bold;
+  }
+   .horaire-1 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:-50px!important;
+  left: 235px;
+  float: left;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+   color: hsl(0, 94%, 50%);
+  }
+    .horaire-2 {
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:170px!important;
+  left: 465px;
+   font-weight: bolder;
+   position:absolute;
+   float: left;
+   font-weight:bold;
+   color: hwb(0 0% 98%);
+  }
+   .horaire-3 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:5px!important;
+  left: -20px;
+  float: left;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+   color: hsl(0, 94%, 50%);
+  }
+    .presence {
+    position: relative;
+    left: -15px;
+    background-color: hwb(340 51% 48%);
+  }
+   .absent {
+    position: relative;
+    background-color: hwb(340 51% 48%);
+  }
+  .retard {
+    position: relative;
+    left: 15px;
+    background-color: hwb(340 51% 48%);
+  }
+   .appeltab {
+    position: relative;
+    left: 225px;
+  }
+  .emailparent {
+    position: relative;
+    left: 5px;
+  }
+  .bureau {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:-90px!important;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+  }
+   .bureau-1 {
+  font-size: 24px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:-110px!important;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+  }
+   .bureau-2 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:120px!important;
+  left:540px;
+   font-weight: bolder;
+   position:absolute;
+   font-weight:bold;
+  }
+  .bureau-3 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:160px!important;
+  left:240px;
+   font-weight: bolder;
+   position:absolute;
+   font-weight:bold;
+   color:#f70838;
+  }
+   .bureau-4 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:155px!important;
+  left:580px;
+   font-weight: bolder;
+   position:absolute;
+   font-weight:bold;
+   color:#f70838;
+  }
+   .bureau-5 {
+  font-size: 16px;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+  top:138px!important;
+  left:880px;
+   font-weight: bolder;
+   position:absolute;
+   font-weight:bold;
+   color:#f70838;
+  }
+  .ele {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   text-align:center;
+   color: #f5f7fb!important;
+   font-weight: bolder;
+   position:relative;
+   font-weight:bold;
+  }
+   .reh {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   border-color:#f70838;
+   height: 30px;
+   text-align:center;
+   color: #f5f7fb!important;
+   font-weight: bolder;
+   position:relative;
+  top:-138px;
+  left:95px;
+  }
+   .rehinput {
+  width: 260px;
+  }
+   .com {
+  position: relative;
+  font-family: "Inter", sans-serif;
+   top: -97px;
+   left: 40px;
+   width: 300px;
+  }
+   .gest {
+  position: relative;
+  font-family: "Inter", sans-serif;
+   top: -147px;
+   left: 235px;
+  }
+   .mise {
+  position: relative;
+  font-family: "Inter", sans-serif;
+   left: 690px;
+   top: -145px;
+    float: left;
+  }
+   .delegue {
+  position: relative;
+  font-family: "Inter", sans-serif;
+   top: -67px;
+   left: 43px;
+  }
+  .vacation {
+  position: relative;
+  font-family: "Inter", sans-serif;
+   left: 160px;
+   top: -143px;
+   float: left;
+  }
+  .courencour {
+  position: relative;
+  font-family: "Inter", sans-serif;
+  font-weight: bold;
+   display: flex;
+   flex-direction: row;
+   float: left;
+   top: -75px;
+   left: 80px;
+  }
+  .btntemp {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 250px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:170px;
+   left:-282px;
+  }
+   .btnsig {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 100px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   top: 38px;
+  }
+  .tableaubord {
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+  display: flex;
+  position: relative;
+  flex-direction: row;
+  float: left;
+  left: 75px;
+  color: #ddd!important;
+  }
+  .btnsig1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 100px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+    left: -30px;
+   top: -10px;
+  }
+  .btnsig2 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 190px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   left: 110px;
+   top: -5px;
+  }
+  .btnmsg {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 150px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:257px;
+   left:-582px;
+  }
+  .btnmsg-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 290px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:57px;
+   left:-482px;
+  }
+  .btntemps {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 250px;
+   height: 44px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:-30px;
+   left:-542px;
+  }
+  .btntemps-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 150px;
+   height: 34px;
+   text-align:center;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   top:-45px;
+   left:-342px;
+  }
+  .form-1 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -9px;
+  }
+  .form-msg {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -9px;
+ padding-bottom: 300px;
+  }
+   .form-2 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -89px;
+  }
+    .form-3 {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -39px;
+  }
+  .idregistre {
+  font-size: 18px;
+  font-weight: bold;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -13px;
+ margin-bottom: 12px;
+  }
+  .registrecivil {
+  font-size: 18px;
+  font-weight: bold;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ float:left;
+ top: -73px;
+ left: 432px;
+  }
+  .actif {
+  font-size: 18px;
+  font-weight: bold;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -43px;
+ left: -160px;
+  }
+  .bgwhite {
+  font-size: 16px;
+  font-style: absolute;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ top: -103px;
+ padding:5px;
+ float:left;
+  }
+  .gouv {
+  font-style: relative;
+  font-weight:bold;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top: -103px!important;
+ left:563px;
+  }
+   .textxs {
+  font-style: relative;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top: -103px!important;
+ width: 290px;
+ left: 99px;
+ text-align:justify;
+  }
+   .pano {
+  font-style: relative;
+  font-weight:bold;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top:-26px;
+ left: -99px;
+ font-size: 18px;
+ color:#f70838;
+  }
+   .textlg {
+  font-style: relative;
+  font-weight:bold;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top: -103px!important;
+ width: 290px;
+ left: 99px;
+ font-size: 14px;
+ color:#f70838;
+  }
+   .textcenter {
+  font-style: relative;
+  font-weight:bold;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top: -33px!important;
+ left: -99px;
+ font-size: 14px;
+  }
+   .textsm {
+  font-style: relative;
+  font-weight:bold;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top: -23px!important;
+ left: -129px;
+ font-size: 14px;
+  }
+     .textocun {
+  font-style: relative;
+  font-weight:bold;
+  font-family: "Inter", sans-serif;
+ text-align: center;
+ position:relative;
+ top: -23px!important;
+ left: -129px;
+ font-size: 14px;
+  }
+  .horaires {
+  font-size: 18px;
+  font-weight: bold;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -133px;
+  }
+  .cycle {
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -233px;
+ left:-480px;
+ text-align:justify;
+  }
+   .chargegroup {
+  font-family: "Inter", sans-serif;
+ position: absolute;
+ text-align: center;
+ text-align:justify;
+ display:flex;
+ flex-direction:row;
+ top:223px;
+ left:290px;
+  }
+  .effet {
+  font-size: 18px;
+  font-weight: bold;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -33px;
+  }
+   .assinfo {
+  font-size: 12px;
+  font-weight: bold;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -113px;
+ left: 353px;
+ float: left;
+  }
+  .assiparti {
+  position: absolute;
+  top: 584px;
+  float: right;
+  left: 556px;
+  }
+   .voirdetail {
+   position: relative;
+   top: 66px;
+   color: #f5f7fb;
+   background-color: black;
+  }
+  .rech-group {
+   position: relative;
+   top: -26px;
+  }
+   .text-delegue {
+   position: relative;
+   left: -320px;
+  }
+    .stact {
+  font-weight: bold;
+  font-style: italic;
+  display: flex;
+  flex-direction: row;
+  font-family: "Inter", sans-serif;
+ position: relative;
+ text-align: center;
+ top: -123px;
+ left: 53px;
+  }
+  .btnfamil {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   text-align:center;
+   color: hwb(240 96% 4%)!important;
+    background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   top:60px;
+   left:270px;
+  }
+/* Aligne le menu, le trait et le contenu sur la même ligne */
+.separateur {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Espace autour du trait */
+}
+
+/* Crée le trait vertical */
+.trait {
+  position:absolute;
+  left:730px;
+  top: 50px;
+    width: 4px;         /* Épaisseur */
+    height: 390px;       /* Hauteur */
+    background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.traite {
+  position:absolute;
+  left:810px;
+  top: 220px;
+  width: 4px;         /* Épaisseur */
+  height: 380px;       /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.traite-pro {
+  position:absolute;
+  left:690px;
+  top: 640px;
+  width: 4px;         /* Épaisseur */
+  height: 680px;       /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.diviseur {
+  position:absolute;
+  left:370px;
+  top: 480px;
+  width: 4px; 
+  float: left;        /* Épaisseur */
+  height: 380px;       /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.traitepricipal {
+  position:absolute;
+  left:740px;
+  top: 220px;
+  width: 4px;         /* Épaisseur */
+  height: 180px;       /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.traitepricipal-1 {
+  position:absolute;
+  left:640px;
+  top: 1060px;
+  width: 4px;         /* Épaisseur */
+  height: 520px;       /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.duca {
+  position:absolute;
+ 
+  top: 540px;
+  width: 4px;         /* Épaisseur */
+  height: 140px; 
+  float: left;      /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.trai {
+  position:absolute;
+  left:710px;
+  top: 200px;
+  width: 4px;         /* Épaisseur */
+  height: 240px;       /* Hauteur */
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+.changerMotDePasse {
+  position:relative;
+  left:0px;
+  top: 200px;
+}
+.photopersonne {
+position: relative;
+top: -105px;
+left: 20px;
+}
+.photoprofil {
+position: relative;
+top: -48px;
+left: 33px;
+}
+.progression {
+position: relative;
+top: -88px;
+left: 184px;
+text-align: justify;
+width: 450px;
+}
+.progression-1 {
+position: absolute;
+top: 508px;
+float: right;
+text-align: justify;
+width: 490px;
+left: 707px;
+}
+.text-pro {
+ font-family: "Inter", sans-serif;
+ font-weight: bold;
+ font-size: 18px;
+ color: #f70838;
+ position: relative;
+ top: 80px;
+}
+.text-pro-1 {
+ font-family: "Inter", sans-serif;
+ font-style: italic;
+ font-size: 13px;
+ color: hsl(345, 25%, 6%);
+ position: relative;
+ top: 70px;
+}
+.text-pro-B {
+ font-family: "Inter", sans-serif;
+ font-weight: bold;
+ font-size: 18px;
+ color: #f70838;
+ position: relative;
+ top: 80px;
+}
+.text-pro-A {
+ font-family: "Inter", sans-serif;
+ font-style: italic;
+ font-size: 13px;
+ color: hsl(345, 25%, 6%);
+ position: relative;
+ top: 60px;
+}
+.nomfamille2 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 400px;
+  top: 176px;
+}
+.nomfamilleA {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 524px;
+  top: -56px;
+  width: 300px;
+}
+.nomfamille3 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 66px;
+  top: 248px;
+}
+.nomfamille4 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+   left: 300px;
+  top: 260px;
+}
+.nomfamille5 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+   left: 540px;
+  top: 260px;
+}
+
+.nomfamille6 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 330px;
+  top: -55px;
+}
+.nomfamille7 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 60px;
+  top: 360px;
+}
+.nomfamille8 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 750px;
+  top: 95px;
+}
+.nomfamille9 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 750px!important;
+  top: 220px;
+}
+.nomfamille10 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 1040px;
+  top: 96px;
+}
+.nomfamille11 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 1060px;
+  top: 190px;
+}
+.nomfamille12 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 750px;
+  top: 190px;
+}
+.nomfamille13 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 750px;
+  top: 377px;
+}
+
+.nomfamille14 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 750px;
+  top: 277px;
+}
+.nomfamille15 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 1060px;
+  top: 277px;
+}
+.nomfamille16 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+   left: 245px;
+  top: 360px;
+}
+.nomfamille17 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+   left: 485px;
+  top: 357px;
+  padding-bottom: 27px!important;
+}
+.nomfamille18 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+   left: 150px;
+  top: 370px;
+  float: left;
+  width: 250px;
+  height: 70px;
+  background-color: #4cddd6;
+}
+.nomfamille19 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+   left: -70px;
+  top: -35px!important;
+  float: left;
+  width: 190px;
+  height: 70px;
+  font-size: 16px;
+   font-weight: bold;
+}
+.nomfamille20 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  font-weight: bold;
+  left: 430px;
+  top: 370px;
+  border-radius: 15px;
+  float: left;
+  width: 200px;
+  height: 70px;
+  color: #f7f4f4;
+  background-color: black;
+}
+.nomfamille21 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 790px;
+  top: 277px;
+}
+.nomfamille22 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 165px;
+  top: 31px;
+}
+.nomfamille23 {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  left: 1030px;
+  top: 280px;
+}
+.nomClasse {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  top: -50px;
+  left: 280px;
+  color:hsl(157, 86%, 35%);
+  font-style:italic;
+}
+.code {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+  top: -30px;
+  left: -160px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codeeducateur {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+  top: -10px;
+  left: -150px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codeProf {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+  top: -10px;
+  left: 190px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codeDélégué {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+  top: -10px;
+  left: -210px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codeDélég {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+  top: 40px;
+  left: -330px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codeeffect {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+  top: -130px;
+  left: 1240px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codeTotal {
+  font-family: "Inter", sans-serif;
+  position:relative;
+  float:left;
+ display: flex;
+  flex-direction:reverse;
+  align-items: center;
+  justify-content: center;
+  float:left;
+  top: -20px;
+  left: 100px;
+  color:hsl(171, 100%, 3%);
+  font-style:italic;
+  font-weight:bold;
+}
+.codepromo {
+ font-family: "Inter", sans-serif;
+  position:relative;
+  top: -110px;
+  font-size:13px!important;
+  left: 260px;
+  font-weight:bold;
+  color:lab(50.95% 76.77 63.03);
+  font-style:italic;
+}
+.toutClasse {
+ display: flex;
+  flex-direction:reverse;
+  align-items: center;
+  justify-content: center;
+}
+.touslesprenom {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: -30px;
+  left: 340px;
+}
+.genresexe {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: -94px;
+  left: 580px;
+}
+.genres {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  top: 294px;
+  left: 440px;
+}
+.fichier {
+  position: relative;
+  width: 350px;
+  top: -27px;
+  left: 770px;
+}
+.expe {
+  position: relative;
+  font-family: "Inter", sans-serif;
+  font-weight: bold;
+  font-style: italic;
+  top: -10px;
+}
+.genreclasse {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  width: 200px;
+  float: left;
+  left: 200px;
+}
+.genrejour {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+width: 200px;
+  float: left;
+  left: 450px;
+}
+.genretoutes {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+width: 300px;
+  float: left;
+  left: 550px;
+  top: 486px;
+}
+.genreenseignant {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  width: 200px;
+  float: left;
+  left: 700px;
+}
+.genrematiere {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  width: 200px;
+  float: left;
+  left: 950px;
+}
+.genrearrive {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+ width: 200px;
+  float: left;
+  left: 850px;
+  top: 50px;
+}
+.genredepart {
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  width: 200px;
+  float: left;
+  left: 1100px;
+  top: 50px;
+}
+.reveil{
+ font-family: "Inter", sans-serif;
+  position: relative;
+  width: 200px;
+  float: left;
+  left: -450px;
+  top: 30px
+}
+.formtemp{
+ font-family: "Inter", sans-serif;
+  position: relative;
+   top: -20px;
+   margin-bottom: 229px;
+}
+.feuille{
+ font-family: "Inter", sans-serif;
+  position: relative;
+   top: -60px;
+}
+.planing{
+ font-family: "Inter", sans-serif;
+  position: relative;
+  float: left;
+  left: 400px;
+}
+.dernier{
+ font-family: "Inter", sans-serif;
+  position: relative;
+  float: left;
+  left: 360px;
+}
+.laclasse{
+ font-family: "Inter", sans-serif;
+  position: absolute;
+  float: left;
+  left: 200px;
+}
+.laclass{
+ font-family: "Inter", sans-serif;
+  position: relative;
+  float: left;
+  left: 200px;
+}
+.revoque{
+ font-family: "Inter", sans-serif;
+  position: relative;
+   top: -20px;
+   left: -67px;
+text-align: justify;
+display: flex;
+justify-content: last baseline;
+}
+.heure{
+ font-family: "Inter", sans-serif;
+  position: relative;
+   left: 20px;
+   font-weight: bold;
+}
+.datenaissance {
+ font-family: "Inter", sans-serif;
+  position: r;
+  top: 40px;
+  left: 420px;
+  width: 380px;
+}
+.datenaissan {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -30px;
+  left: 120px;
+  width: 380px;
+}
+.datenaissaninput {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: -30px;
+  top: 20px;
+  float: left;
+  width: 200px;
+}
+.datenaissan-1 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -30px;
+  left: 290px;
+  width: 380px;
+}
+.datenaissaninput-1 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 20px;
+  top: -38px;
+  float: left;
+  width: 300px;
+}
+.nomp {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 130px!important;
+}
+.datenaissan-2 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ left: -34px;
+
+}
+.datenaissaninput-2 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 365px;
+  top: -67px;
+  float: left;
+  width: 300px;
+}
+.nomp-1 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 700px!important;
+  float: left;
+  top: -45px!important;
+}
+.datenaissan-3 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ left: -34px;
+
+}
+.datenaissaninput-3 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 385px;
+  top: -67px;
+  float: left;
+  width: 300px;
+}
+.nomp-2 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1030px!important;
+  float: left;
+  top: -45px!important;
+}
+.datenaissan-4 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ left: -1194px;
+ top: 50px;
+
+}
+.datenaissaninput-4 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 385px;
+  top: -17px;
+  float: left;
+  width: 300px;
+}
+.nomp-3 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1270px!important;
+  float: left;
+  top: 5px!important;
+   width: 300px;
+}
+.datenaissan-5 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ left: -900px;
+ top: 50px;
+
+}
+.datenaissaninput-5 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1310px;
+  top: -77px;
+  float: left;
+  width: 300px;
+}
+.nomp-4 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1320px!important;
+  float: left;
+  top: 5px!important;
+   width: 300px;
+}
+.datenaissan-6 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ left: -880px;
+ top: 50px;
+
+}
+.datenaissaninput-6 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1310px;
+  top: -77px;
+  float: left;
+  width: 300px;
+}
+.nomp-5 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1599px!important;
+  float: left;
+  top: 5px!important;
+   width: 300px;
+}
+.datenaissan-7 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ left: -880px;
+ top: 50px;
+
+}
+.datenaissaninput-7 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1330px;
+  top: -77px;
+  float: left;
+  width: 200px;
+}
+.nomp-6 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 1860px!important;
+  float: left;
+  top: 5px!important;
+   width: 300px;
+}
+.datenaissan-8 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -30px;
+  left: 120px;
+  width: 380px;
+}
+.nomp-7 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 150px!important;
+  float: left;
+  top: 165px!important;
+}
+.datenaissaninput-8 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 130px;
+  top: 30px;
+  float: left;
+  width: 200px;
+}
+.datenaissan-9 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -30px;
+  left: 120px;
+  width: 380px;
+}
+.nomp-8 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 400px!important;
+  float: left;
+  top: 165px!important;
+}
+.datenaissaninput-9 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 360px;
+  top: -30px;
+  float: left;
+  width: 200px;
+}
+.datenaissan-10 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: -30px;
+  left: 120px;
+  width: 380px;
+}
+.nomp-9 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 600px!important;
+  float: left;
+  width: 300px;
+  top: 165px!important;
+}
+.datenaissaninput-10 {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  left: 600px;
+  top: -90px;
+  float: left;
+  width: 300px;
+}
+.maileleve {
+ font-family: "Inter", sans-serif;
+  position: r;
+  top: 40px;
+  left: -370px;
+  width: 380px;
+}
+.tuteur {
+font-family: "Inter", sans-serif;
+  position: absolute;
+ top: 200px;
+ left: 30px;
+}
+.vitale {
+ font-family: "Inter", sans-serif;
+  position: relative;
+  top: 120px;
+  left: -500px;
+  width: 470px;
+}
+.lycee {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: -13px;
+ font-weight: bolder;
+}
+.console {
+  color: lab(9.84% 0.52 -1.39)!important;
+  position: relative;
+ top: -158px;
+ left: 4px;
+ text-align: center;
+ font-weight: bolder;
+}
+.codeedilink {
+  color: oklab(61.32300000000001% 0.20902 0.11969)!important;
+  position: relative;
+font-style: italic;
+ text-align: center;
+ top: -83px;
+ left: 12px;
+ font-size: x-small;
+ font-weight: bolder;
+}
+.btn-admin {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: -318px;
+   top: -50px!important;
+  }
+  .btn-admin-1 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: -418px;
+   top: -70px!important;
+  }
+  .btn-admin-2 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   top: -70px;
+   left: -460px;
+     }
+     .btn-admin-3 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   top: -140px;
+   left: 10px;
+   margin: 15px;
+     }
+     .imprime {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+  top:-123px;
+  width: 250px;
+  left:-423px;
+     }
+    .tablepromo {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   left: 215px;
+     }
+  .toutable {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   top:-115px;
+     }
+     .monte {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   top:-115px;
+     }
+     .tousvos {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   top:-85px;
+     }
+     .cloture {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   top:-125px;
+     }
+  .table {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   left: 145px;
+     }
+  .table-2 {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   left: 105px;
+     }
+      .tablef {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   float:left;
+   left: 285px;
+   top:-173px;
+     }
+  .table-1 {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   text-align: center;
+   left: 25px;
+   top: -14px;
+     }
+  .periode {
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+   position: relative;
+   left: 54px;
+   top: -12px;
+   margin: 15px;
+  }
+   .Trimestre {
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  }
+  .btn-ad {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   right: 334px;
+   top: -50px!important;
+  }
+   .btn-adl {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color:  lch(0.41% 4.97 299.82);
+   font-weight: bolder;
+   position: relative;
+   right: -108px;
+   top: -50px!important;
+  }
+  .btnadmin {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 320px;
+   color: hwb(0 4% 7%)!important;
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: -388px;
+   top: -200px!important;
+  
+  }
+  .btn-retour {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color:  lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+   position: relative;
+  }
+  .centrale {
+  font-family: "Inter", sans-serif;
+   color: hwb(263 1% 69%)!important;
+   font-weight: bolder;
+   font-style: italic;
+   position: relative;
+   font-size: 15px;
+   top: -26px!important;
+   left: -36px;
+  }
+.menu {
+  font-family: "Inter", sans-serif;
+   color: hsl(220, 84%, 22%)!important;
+   font-weight: bolder;
+   font-size: 24px;
+   font-style: italic;
+   position: relative;
+   top: 46px!important;
+   left: -40px;
+  }
+ /*  .titre-groupe{
+  display: flex;
+ 
+  } */
+.titre-0 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 180px;
+   color: hsl(220, 84%, 22%)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   
+  }
+  .titre-0ca {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   color: hwb(0 7% 7%)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   overflow: initial;
+  right: 200px;
+  top: -230px;
+  }
+  .titre-01 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 180px;
+   color: hsl(220, 84%, 22%)!important;
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   left: -102px;
+   top: -250px!important;
+  }
+  .titre-04 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hwb(0 4% 11%)!important;
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   left: 36px;
+   width: 300px;
+   top: -308px!important;
+  }
+   .titre-04t {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 180px;
+   color: hsl(220, 84%, 22%)!important;
+   font-weight: bolder;
+   position: absolute;
+   float: left;
+   
+  }
+  .titre-01-1 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 200px;
+   color: lch(48.94% 93.89 37.63)!important;
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   left: 20px;
+   top: -248px!important;
+  }
+  .titre-02 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 180px;
+   color: hsl(220, 84%, 22%)!important;
+   font-weight: bolder;
+   position: relative;
+   left: -292px;
+   top: -190px;
+  }
+  .titre-03 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   color: hwb(357 5% 15%)!important;
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   right: 340px;
+   top: -79px;
+  }
+   .titre-05 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   width: 180px;
+   color: hsl(220, 84%, 22%)!important;
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   
+  }
+.titre-1 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   
+  }
+  .titre-1ca1 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   top: -145px;
+  }
+  .titre-1cs {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   right: -665px;
+   top: -39px;
+  }
+  .titre-1cs2{
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: absolute;
+   float: right;
+   right: 185px;
+   top: -165px;
+  }
+   .titre-1ca {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   text-align: justify;
+   left: 680px;
+   top: -46px;
+  }
+  .titre-1c {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+  left: -115px;
+  top: -45px;
+  }
+  .titre-1e {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: absolute;
+   float: left;
+  left: 990px;
+  top: -35px;
+  }
+   .titre-1-1 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: left;
+   left: -150px;
+  text-align: justify;
+   top: -226px!important;
+  }
+  .titre-1-2 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: left;
+   left: -550px;
+  text-align: justify;
+   top: -196px!important;
+  }
+  .titre-2ca {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+  width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   left: 234px;
+   top: -117px;
+  }
+  .titre-2 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+  width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right
+  }
+  .titre-2c {
+   font-size: 16px;
+   font-weight: normal;
+  font-family: "Inter", sans-serif;
+  width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   left: 120px;
+  text-align: justify;
+   top: -10px!important;
+  }
+  .titre-2e {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+  width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+
+   float: right;
+   right: -450px;
+  }
+  .titre-2-2 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+  width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: left;
+   left: -380px;
+  text-align: justify;
+   top: -178px!important;
+  }
+  .titre-3ca {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   left: 435px;
+   top: -90px;
+  }
+  .titre-3 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   
+  }
+  .titre-3-a {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   left: 340px;
+  text-align: justify;
+   top:23px!important;
+  }
+  .titre-3-3 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: left;
+   left: -597px;
+  text-align: justify;
+   top: -148px!important;
+  }
+  
+  .titre-4 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   
+  }
+   .titre-4c {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: right;
+   left: -100px;
+  text-align: justify;
+   top: 32px!important;
+  }
+  .titre-4-4 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: relative;
+   float: left;
+   left: 23px;
+  text-align: justify;
+   top: -120px!important;
+  }
+  .titre-5 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: absolute;
+  float: right;
+  }
+  .titre-5-5 {
+   font-size: larger;
+  font-family: "Inter", sans-serif;
+   width: 220px;
+   font-size: 14px;
+   color: hsl(220, 84%, 22%)!important;
+   position: absolute;
+   top: -85px;
+   left: 25px;
+  }
+   
+   .btn-secre {
+  font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   right: 20px;
+  top: -35px;
+  }
+  .btn-secr {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   left: -200px;
+   top: -98px;
+  }
+  .btn-sec {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   left: 80px;
+   top: 75px;
+  }
+  .btn-secmsg {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   left: 260px;
+   top: 112px;
+  }
+  .btn-secs {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   left: 323px;
+   top: -160px;
+  }
+  .btn-secsc {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+ background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   left: 500px;
+   top: -94px;
+  }
+  .btn-secscc {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   left: 680px;
+   top: -125px;
+  }
+  .btn-secl {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   left: -133px;
+   top: -210px;
+  }
+   .btn-secp {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: left;
+   left: -310px;
+   top: -238px;
+  }
+   .btn-se3 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: 18px;
+   top: -242px;
+  }
+  .btn-emploi {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: 18px;
+   top: -82px;
+  }
+   .btn-class {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: 18px;
+   top: -122px;
+  }
+  .btn-se1 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: absolute;
+   float: right;
+   right: 19px;
+   top: -203px;
+  }
+  .btn-se2 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+   left: -19px;
+   top: -227px;
+  }
+  .btn-sea {
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   color: lab(98.99% 0.18 -0.49)!important;
+   background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   font-size: small;
+ position: relative;
+  top: -105px;
+  left: -170px;
+  }
+   .btn-se {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   width: 170px;
+   color: #f5f7fb!important;
+    background-color: lch(0.27% 3.28 299.91);
+   font-weight: bolder;
+   position: relative;
+   float: right;
+  display: block;
+   flex-direction: column-reverse;
+   top: -200px;
+   left: 369px;
+  }
+  .dasboardSecretariat {
+   position: relative;
+   top:145px;
+   float: left!important;
+  left: 225px;
+  }
+   .dashboardAdmin {
+   position: absolute;
+  left: 40px;
+  top: 660px;
+  overflow: initial;
+  }
+   .Rédigermessage {
+    position: relative;
+    float: left;
+    left: 180px;
+    top: 92px;
+  }
+   .parametre {
+    position: relative;
+    left: -290px;
+    top: -50px;
+  }
+  .corect{
+   overflow: initial;
+   position: relative;
+   float: inherit;
+   top: 160px;
+  }
+   .btn-block {
+    position: relative;
+   float: left;
+    left: -922px;
+    top: 80px;
+  }
+  .btn-block2 {
+    position: relative;
+   float: right;
+    left: -442px;
+    top: 125px;
+  }
+/* admin fin */
 
 /* 2. Suppression des ombres qui imitent des bordures (Tailwind CSS, modales, cartes) */
 div, section, article, table, tr, td, th, input, select, textarea, button, form {
@@ -17,22 +3160,31 @@ div, section, article, table, tr, td, th, input, select, textarea, button, form 
 
 /* 3. Sécurisation de votre typographie (Sans écraser vos couleurs dynamiques) */
 body {
-  font-family: "Open Sans", sans-serif;
+ font-family: "Inter", sans-serif;
   background-color: #f5f7fb; /* Conserve le fond gris clair pour faire ressortir vos fiches blanches */
 }
 
 open-sans {
-  font-family: "Open Sans", sans-serif;
+ font-family: "Inter", sans-serif;
   font-optical-sizing: auto;
   font-variation-settings:
     "wdth" 100;
 }
+
 .barre-bi-couleur {
   width: 100%;
   height: 20px;
   background: linear-gradient(to right, #84d8b5 30%, blue 70%);
 }
-
+.barre-bi-couleurheader {
+  height: 20px;
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+  left: -90px!important;
+  top: -28px;
+  width:1390px;
+   position: relative;
+   left: -190px;
+}
 .hero {
   position: relative;
 
@@ -211,11 +3363,7 @@ open-sans {
     left: -154px;
     top: -32px;
   }
-  .logologin {
-    position: relative;
-    width: 200px!important;
   
-  }
   .parti-footer {
     position: absolute;
     display: flex;
@@ -250,24 +3398,2264 @@ open-sans {
     text-align: justify;
     top: 83px;
   }
-   .form-partie {
-   display: inline-flexbox;
+
+/* login */
+.logologin {
+    position: relative;
+    width: 200px!important;
+    margin: 5px;
+    top: -8px;
+  }
+  .form-partie {
+  position: relative;
   text-align: center;
-    font-family: "Open Sans", sans-serif;
+   font-family: "Inter", sans-serif;
+   top:-12px;
+    left: 2px;
+    height: 430px;
+  }
+
+   .form-class {
+  position: relative;
+  text-align: center;
+   font-family: "Inter", sans-serif;
+   top:-192px;
+  text-align: center;
+  }
+  .form-personnel {
+  position: relative;
+  text-align: center;
+   font-family: "Inter", sans-serif;
+   top:-60px;
+   padding:50px;
+  text-align: center;
+  }
+   .retour {
+    position: relative;
+    text-align: center;
+   font-family: "Inter", sans-serif;
+    font-size: small;
+    font-weight: bolder;
   }
    .text-edulink {
    font-size: 16px;
-   font-family: "Open Sans", sans-serif;
+  font-family: "Inter", sans-serif;
+   color: #14075c!important;
+   position: relative;
+   font-weight: bolder;
+   top: -30px;
+  }
+  .portail {
+   font-size: 16px;
+  font-family: "Inter", sans-serif;
+   color: hsl(182, 40%, 42%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: -35px;
+  }
+  .identifiant {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hsl(180, 82%, 2%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: 26px!important;
+   left: 69px;
+  }
+  .iden {
+   position: relative;
+   top: -37px;
+  float: left;
+ left: 530px;
+  }
+  .iden1 {
+   position: relative;
+   top: -47px;
+   left: -147px;
+  }
+  .identifiantentre {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hsl(180, 82%, 2%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: -30px;
+   left: 8px;
+  }
+  .recup {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hsl(180, 82%, 2%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: -26px;
+  }
+  .clesecurite {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hsl(180, 82%, 2%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: 90px!important;
+   left: 740px!important;
+  }
+  .identifiantinput {
+   font-size: 16px!important;
+  font-family: "Inter", sans-serif;
+   border-radius: 34px;
+   width: 300px;
+   position: relative;
+   font-weight: lighter;
+   border-color: hsl(246, 80%, 48%)!important;
+   text-align: center;
+   left: -90px;
+   top: 52px;
+  }
+  .identifiantinpu {
+   font-size: 16px!important;
+  font-family: "Inter", sans-serif;
+    width: 300px;
+   border-radius: 34px;
+   position: relative;
+   font-weight: lighter;
+   border-color: hsl(246, 80%, 48%)!important;
+   text-align: center;
+   left: -5px;
+   top: -22px;
+  }
+  .identifiantcle {
+   font-size: 16px!important;
+  font-family: "Inter", sans-serif;
+   border-radius: 34px;
+   width: 300px;
+   position: relative;
+   font-weight: lighter;
+   border-color: hsl(246, 80%, 48%)!important;
+   text-align: center;
+   left: -10px;
+   top: 132px;
+  }
+  .yeux {
+position:relative;
+   left: -40px;
+   top: 132px;
+  }
+  .absol {
+   border-radius: 34px;
+   position: relative;
+   font-weight: lighter;
+   text-align: center;
+   left: -130px;
+   top: -12px;
+  }
+  .btnediter {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+   position: relative;
+   left: -5px;
+   top: -5px;
+  }
+  .monttd {
+   position: relative;
+   top: -55px;
   }
    .btn {
    font-size: small;
-   font-family: "Open Sans", sans-serif;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lch(0.37% 4.13 301.8);
+   font-weight: bolder;
+    width: 200px;
+    height: 50px!important;
+  }
+  .btnsup {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   position: relative;
+   background-color:  lch(0.37% 4.13 301.8);
+   font-weight: bolder;
+   height: 50px;
+    color: #ddd;
+    top: 278px;
+    left: -94px;
+  }
+   .btnsup-1 {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   position: relative;
+   background-color:  lch(0.37% 4.13 301.8);
+   font-weight: bolder;
+   height: 50px;
+    color: #ddd;
+    top: 278px;
+    left: -64px;
+  }
+   .matri {
+   font-size: 20px;
+  font-family: "Inter", sans-serif;
+   position: relative;
+   font-weight: bolder;
+   color: #f70838;
+   top: 58px;
+  }
+  .btnlogin {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lch(46.24% 83.93 32.2)!important;
+   font-weight: bolder;
+   position:relative;
+   top: -70px;
+  }
+   .btnsubeleve {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lch(0.74% 6.01 298.13);
+   font-weight: bolder;
+   position: relative;
+  left: -10px;
+  top: -79px;
+  }
+  .btnsub {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lch(1% 9.02 299.02);
+   font-weight: bolder;
+   position: absolute;
+   height: 40px;
+   left: 680px;
+   top: 365px;
+  }
+  .btnrh {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+  position: relative;
+  text-align: center;
+   height: 30px;
+   margin: 15px;
+   left: 180px;
+   top: -53px;
+  }
+  .gestionstature {
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   font-weight: bolder;
+  position: absolute;
+  top: 370px;
+  padding: 15px;
+  }
+   .gestion {
+  font-family: "Inter", sans-serif;
+   font-size: 22px;
+   font-weight: bolder;
+  position: absolute;
+  top: 180px;
+  left: 543px;
+ color: #f70838;
+  }
+  .gestion-1 {
+  font-family: "Inter", sans-serif;
+   font-size: 20px;
+   font-weight: bolder;
+  position: relative;
+  top: -10px;
+  left: 43px;
+ color: #f70838;
+  }
+  .gestion-2 {
+  font-family: "Inter", sans-serif;
+   text-align: justify;
+   font-weight: bolder;
+  position: absolute;
+  float: left;
+  left: 523px;
+  top: 362px;
+  }
+  .gestionlabel {
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   font-weight: bolder;
+  position: absolute;
+  top: 380px;
+  left: 518px;
+  }
+  .gestionform {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+  }
+  .gestionbtnrh {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color: lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+  position: relative;
+  text-align: center;
+   height: 30px;
+   margin: 15px;
+   left: 390px;
+   top: 23px;
+  }
+  .vueglobale {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   font-weight: bolder;
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: row;
+  }
+   .elevegroup {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  position: relative;
+  text-align: center;
+  float: left;
+  display: flex;
+  flex-direction: row;
+  }
+  .promo {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  position: relative;
+  left: 570px;
+  height: 100px;
+  top: 24px;
+  }
+   .promo1 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  position: relative;
+ left: 75px;
+ width: 200px;
+  height: 100px;
+  top: 24px;
+  }
+   .promo2 {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  position: absolute;
+ left: 375px;
+ width: 300px;
+  height: 100px;
+  top: 24px;
+  padding-bottom: 15px!important;
+  }
+  .promo2text {
+   position: relative;
+ text-align: center;
+ top: -15px;
+  }
+  .textable {
+    position: relative;
+   font-size: small;
+   top: 30px;
+  }
+   .modif {
+    font-size: medium;
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  position: relative;
+ top: -25px;
+  }
+   .vueglobalestatu {
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+  position: relative;
+  height: 150px;
+  }
+  .effective {
+   position:absolute;
+  float: left;
+  left: 600px;
+  }
+   .viescolaire {
+   position:relative;
+  float: left;
+  left: 230px;
+  }
+  .bagacces {
+   position:absolute;
+   float: left;
+  left: 930px;
+  }
+  .recherche {
+   position:relative;
+   top: 12px;
+  }
+  .btn-eveil {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  oklab(58.574000000000005% 0.20679 0.11378);
+   font-weight: bolder;
+   color: #ffffff!important;
+   position: relative;
+   top: -37px;
+  }
+   .eveil {
+  font-family: "Inter", sans-serif;
+   font-weight: bolder;
+   position: relative;
+   top: -23px;
+  }
+  .btn-recup {
+   font-size: 16px;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color: lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+   position: relative;
+  }
+  .btn-recuptenp {
+   font-size: 16px;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color: lch(1.07% 10.37 297.86);
+   position: relative;
+   color: #f5f7fb;
+   top: -55px;
+  }
+   .detecte {
+  font-family: "Inter", sans-serif;
+   position: relative;
+   top: -135px;
+   font-style: italic;
+   font-weight: bold;
   }
    .oublie {
    font-size: small;
-   font-family: "Open Sans", sans-serif;
+  font-family: "Inter", sans-serif;
+   position: relative;
+   top: -65px;
+   font-style: italic;
+   font-weight: bold;
   }
-   .bloc {
+   .oublieeveil {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   position: absolute;
+   font-style: italic;
+   font-weight: bold;
+   width: 200px;
+   left: 47px;
+   top: 290px;
+   color: #f5f7fb!important;
+  }
+   .bock-oublie {
+   position: relative;
+   top: -265px!important;
+  }
+   .secretaria {
+   position: relative;
+   top: -115px!important;
+  }
+   .photoeleve {
+   width: 50px!important;
+  }
+  .incorrect {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: small;
+     text-align: justify;
+  }
+   .repu {
+    position: relative;
+    top: -19px;
+  }
+   .tete {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: small;
+  }
+  .entete {
+    font-family: "Inter", sans-serif;
+     font-weight: bolder!important;
+     position: relative;
+     font-size: 11px;
+     float: left;
+     font-style: italic;
+    top: -131px;
+    left: -5px;
+  }
+ .pays {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     float: left;
+     left:10px;
+     position: relative;
+      top: 7px;
+       color: #f7f4f4;
+  }
+   .devise {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+    position: relative;
+    top: 7px;
+    left: 325px;
+  color: #f7f4f4;
+  }
+  .ministereheader {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+      font-size: 11px;
+      top: -19px;
+      left: 905px;
+      color: #f7f4f4;
+  }
+  .vueglobal-1{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+     left: 60px;
+     top: -10px;
+  }
+  .vueglobal-2{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: 80px;
+     top: -10px;
+  }
+  .vueglobal-3{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: 100px;
+     top: -10px;
+  }
+   .vueglobal-4{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: 830px;
+     top: -130px;
+  }
+   .vueglobal-5{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: 840px;
+     top: -130px;
+  }
+   .vueglobal-6{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: -436px;
+    padding: 25px;
+     top: -5px;
+  }
+  .vueglobal-7{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+     float: right;
+   left: -516px;
+    padding: 25px;
+     top: -50px;
+  }
+   .vueglobal-8{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: -396px;
+    padding: 25px;
+    top: -5px;
+  }
+   .vueglobal-9{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+     padding: 25px;
+     float: right;
+    left: -210px;
+    top: -48px;
+  }
+   .vueglobal-10{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    padding: 25px;
+    left: 776px;
+    top: -38px;
+  }
+  .vueglobal-11{
+    font-family: "Inter", sans-serif;
+     position: relative;
+     color: blue!important;
+    left: -116px;
+    top: 68px;
+  }
+  .direction {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: absolute;
+      left: 355px;
+      top: 115px;
+  }
+  .ministere {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+      font-size: 11px;
+      top: -19px;
+      left: 685px;
+  }
+  .tireajoute {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-style: italic;
+     font-size: 12px;
+    position: relative;
+    top: -97px;
+    left: -405px;
+    float: right!important;
+    color: red!important;
+  }
+  
+   .informa {
+  font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: -432px;
+    left: 840px;
+    float:left;
+     color: red!important;
+  }
+   .tireclasse {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 12px;
+    position: relative;
+    top: 17px;
+    left: -535px;
+    float: right!important;
+    color: red!important;
+  }
+   .tireclassee {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 12px;
+    position: relative;
+    top: -17px;
+    left: -575px;
+    float: right!important;
+    color: red!important;
+  }
+  .tirecl {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 12px;
+    position: relative;
+    top: 9px;
+    left: -575px;
+    float: right!important;
+    color: red!important;
+  }
+  .tirecl-text {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 28px;
+    position: relative;
+    top: -13px;
+    font-style: italic;
+    left: -525px;
+    float: right!important;
+    color: red!important;
+  }
+  .tirecl-text2 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 18px;
+    position: relative;
+    top: -19px;
+    font-style: italic;
+    left: -185px;
+    float: right!important;
+  }
+  .tirecl-text3 {
+   position: relative;
+   left: 480px;
+   width: 400px;
+   top: -25px;
+  }
+  .tiretemp {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 12px;
+    position: relative;
+    top: -57px;
+    left: -510px;
+    float: right!important;
+    color: red!important;
+  }
+  .confection {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+    position: absolute;
+    float: right!important;
+    font-style: italic;
+    top: 115px;
+    left: 465px;
+  }
+  .confect {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+    position: absolute;
+    float: right!important;
+    font-style: italic;
+    top: 115px;
+    left: 480px;
+    font-size: 14px;
+  }
+   .confec {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    float: right!important;
+    width: 460px;
+    top: -175px;
+    left: -40px;
+    margin: 180px;
+  }
+   .lestrimestres {
+    font-family: "Inter", sans-serif;
+    display: flex;
+    justify-items: baseline;
+    position: relative;
+    float: right!important;
+    font-style: italic;
+    top: -175px;
+    left: -420px;
+  }
+  .cloisonnement {
+    font-family: "Inter", sans-serif;
+    text-align: justify;
+    position: relative;
+    float: left!important;
+     width: 300px;
+      top: -215px;
+    left: 990px;
+      font-size: 14px;
+  }
+   .cloisonnemen {
+    font-family: "Inter", sans-serif;
+   text-align: justify;
+   position: relative;
+   text-align: center;
+   font-size: 14px;
+  }
+   .cloisonneme {
+    font-family: "Inter", sans-serif;
+   position: relative;
+  float: left;
+   left: -274px;
+   top: -180px;
+  font-size: 14px;
+  font-weight: bold;
+  }
+  .trimestreactive {
+    font-family: "Inter", sans-serif;
+   position: relative;
+  float: left;
+   top: -89px;
+  }
+  .trimestreacti {
+    font-family: "Inter", sans-serif;
+   position: relative;
+   font-weight: bolder;
+  left: 666px;
+   top: 77px;
+   color: #ef4444;
+  }
+  
+  .tiretem {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 12px;
+    position: relative;
+    top: -17px;
+    left: -570px;
+    float: right!important;
+    color: red!important;
+  }
+  .tireeleve {
+    font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: -17px;
+    left: -430px;
+     color: red!important;
+  }
+   .tireeleve-1 {
+    font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 18px!important;
+    position: absolute;
+    top: -47px;
+    left: -130px;
+     color: #130101!important;
+  }
+  .buro {
+    font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 18px!important;
+    position: relative;
+    top: -57px;
+     color: #130101!important;
+  }
+   .disc-group {
+      position: absolute;
+      float: left;
+      left: 959px;
+      top: 90px;
+  }
+  .group-partie {
+      position: relative;
+      float: left;
+      left: 59px;
+      top: 90px;
+  }
+   .discgroup {
+      position: absolute;
+      float: left;
+      left: 959px;
+      top: 90px;
+  }
+   .selec-clas {
+      position: relative;
+      float: left;
+      font-size: 14px;
+      left: -759px;
+      top: -90px;
+      width: 430px;
+      text-align: justify;
+  }
+  .selec-clas-1 {
+      position: relative;
+      float: left;
+      font-size: 14px;
+      left: 59px;
+      top: -120px;
+      width: 430px;
+      text-align: justify;
+  }
+   .change-div {
+      position: relative;
+      float: left;
+      font-size: 14px;
+      left: 9px;
+      top: 5px!important;
+      width: 430px;
+      text-align: justify;
+  }
+  .selec-class {
+      position: absolute;
+      float: left;
+      font-size: 14px;
+      left: 59px;
+      top: 50px;
+      width: 430px;
+      text-align: justify;
+  }
+  .compteur {
+      font-size: 12px;
+      text-align: justify;
+      font-weight: bold;
+      display: flex;
+      width: 700px;
+      flex-direction: row;
+      position: relative;
+      top: -96px;
+      left: 80px;
+  }
+  .actue {
+      font-size: 14px;
+      text-align: justify;
+      font-weight: bold;
+      color: #f70838;
+  }
+   .link-groupe {
+       font-size: 12px;
+      font-weight: bold;
+      position: relative;
+      top: -62px!important;
+       display: flex;
+       flex-direction: row;
+       text-align: justify;
+  }
+  .text-group {
+      position: relative;
+     width: 280px;
+  }
+  .correct {
+      position: relative;
+     width: 400px;
+     left:144px;
+  }
+   .correct-1 {
+      position: relative;
+     width: 250px;
+     left:174px;
+  }
+   .correct-2 {
+      position: relative;
+     width: 250px;
+     left:134px;
+  }
+  .correct-3 {
+      position: relative;
+     width: 250px;
+     left:74px;
+  }
+  .link-group {
+      font-size: 12px;
+      font-weight: bold;
+      position: relative;
+      top: -122px!important;
+       display: flex;
+       flex-direction: row;
+       text-align: justify;
+  }
+   .bgwh {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      color: #f70838;
+  }
+  .bgwhbtn {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 40px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+  .bgwhbtn-2 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 40px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+  .bgwhbtn-3 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 40px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+  .bgwhbtn-4 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 20px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+  .bgwhbtn-5 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 20px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+  .bgwhbtn-6 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 20px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+   .bgwhbtn-7 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 20px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+   .bgwhbtn-8 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 20px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+   .bgwhbtn-9 {
+      font-size: 16px;
+      font-weight: bold;
+      position: relative;
+      top: 20px;
+     background-color: #130101;
+     color: #f0efec;
+  }
+  .inter {
+      font-size: 14px;
+      font-weight: bold;
+      position: absolute;
+      float: left;
+      display: flex;
+      flex-direction: row;
+       top: 170px;
+       left: 94px;
+  }
+  .inter-0 {
+      font-size: 14px;
+      font-weight: bold;
+      position: absolute;
+      float: left;
+      display: flex;
+      flex-direction: row;
+       top: 150px;
+       left:734px ;
+  }
+  .inter-1 {
+      font-size: 14px;
+      font-weight: bold;
+      position: absolute;
+      float: left;
+     top: 150px;
+    left:454px ;
+  }
+   .nou {
+      font-weight: bold;
+      position: relative;
+      top: -60px;
+      font-size: 18px;
+      color: #f70838;
+  }
+   .actipeda {
+      font-size: 14px;
+      font-weight: bold;
+      position: relative;
+      top: -122px!important;
+       color: #f70838;
+  }
+   .eta {
+      font-size: 14px;
+      font-weight: bold;
+      position: relative;
+      left: -3px!important;
+      top: -2px!important;
+  }
+   .actue-text {
+      font-size: 14px;
+      font-weight: bold;
+      width: 330px;
+      text-align: justify;
+  }
+   .discbtn {
+      position: absolute;
+      float: left;
+      left: 1029px;
+      top: 145px;
+      background-color: #130101;
+      color: #f5f7fb;
+  }
+   .disc {
+     font-weight: bold;
+     font-size: 18px!important;
+     color: hsl(0, 97%, 49%)!important;
+  }
+   .disc-1 {
+     font-size: 14px!important;
+     color: hsl(0, 97%, 49%)!important;
+  }
+   .mr {
+     font-weight: bold;
+     font-size: 16px!important;
+     color: hsl(0, 97%, 49%)!important;
+  }
+  .tireeleve-2 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 18px!important;
+    position: relative;
+    top: 21px;
+    left: -0px;
+  }
+   .identite {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    top: -290px;
+    left: -90px;
+    float:right;
+     color: #140101!important;
+  }
+   .confron {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: -67px;
+    left: -220px;
+  }
+   .text-pp {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: 7px;
+    left: -20px;
+    color: #f70838;
+  }
+  .textpp {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: 7px;
+    left: 20px;
+    color: #f70838;
+  }
+   .confron-1 {
+    font-family: "Inter", sans-serif;
+     width: 390px;
+     font-size: 16px!important;
+    position: absolute;
+    top: 977px;
+    left: 720px;
+    float: left;
+    text-align: justify;
+  }
+  .formpp {
+    font-family: "Inter", sans-serif;
+     font-size: 16px!important;
+    position: relative;
+    top: -157px;
+    left: -323px;
+    text-align: justify;
+  }
+   .flexflex {
+    font-family: "Inter", sans-serif;
+     font-size: 16px!important;
+    position: relative;
+    top: -117px;
+    left: -260px;
+    text-align:justify;
+  }
+   .flexflex-1 {
+    font-family: "Inter", sans-serif;
+     font-size: 16px!important;
+    position: absolute;
+    top: 407px;
+    left: 320px;
+    display:flex;
+    flex-direction:row;
+    text-align:justify;
+  }
+  .flexflex-2 {
+    font-family: "Inter", sans-serif;
+     font-size: 16px!important;
+    position: absolute;
+    top: 757px;
+    left: 600px;
+    display:flex;
+    flex-direction:row;
+    text-align:justify;
+  }
+  .valide {
+    font-family: "Inter", sans-serif;
+     font-size: 16px!important;
+    position: relative;
+      font-weight: bold;
+    top: -157px;
+    text-align:justify;
+  }
+   .terminal {
+    font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: 27px;
+    left: -160px;
+     color: red!important;
+  }
+   .termina {
+    font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: 28px;
+    left: -272px;
+  }
+   .termin {
+    font-family: "Inter", sans-serif;
+     font-style: italic;
+     font-weight: bold;
+     font-size: 16px!important;
+    position: relative;
+    top: -107px;
+    float: left;
+    left: 180px;
+    border: #4cddd6;
+    border-radius: 10px;
+    font-size: small;
+  }
+   .tireclasse1 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    top: -65px;
+    left: -275px;
+    float: right!important;
+  }
+  .tireclasse2 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    top: -20px;
+    right: -199px;
+    float: right!important;
+  }
+  .label1 {
+    font-family: "Inter", sans-serif;
+    position: absolute;
+    float:left!important;
+    top: 186px;
+    left: 176px;
+  }
+   .textlabel1 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    top: 6px;
+    left: -30px;
+  }
+  .bas4{
+    position: relative;
+    top: 20px!important;
+  }
+  .bas5{
+    position: relative;
+    top: 30px!important;
+  }
+  .sect1 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    float: right!important;
+    top: 266px;
+    left: -340px;
+  }
+  .sect2 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    float: right!important;
+    top: 296px;
+    left: -390px;
+  }
+   .bureau {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 24px;
+    font-weight: bold;
+    font-style: italic;
+    top: -90px;
+  }
+  .educateur {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+   top: -90px;
+    left: -600px;
+    float: right;
+    color: #f70838;
+  }
+  .toutelesclass {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+   left: 235px;
+   top: -54px;
+    color: #f70838;
+  }
+   .toutelesclass2 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+   left: 35px;
+   top: 54px;
+    color: #f70838;
+  }
+   .lesbtn {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+   top: -54px;
+    color: #f70838;
+  }
+   .lebtn {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+    top: -14px;
+    left:53px;
+    color: hsl(300, 7%, 97%);
+    background-color:hwb(0 1% 94%);
+    height: 40px;
+  }
+  .lebt {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+    top: 14px;
+    left:-3px;
+    color: hsl(300, 7%, 97%);
+    background-color:hwb(0 1% 94%);
+    height: 40px;
+  }
+  .sign {
+    position: relative;
+    top: -10px;
+    left: -234px;
+  }
+  .tab-group {
+    position: relative;
+    top: -10px;
+    left: 344px!important;
+  }
+   .assi-group {
+    position: relative;
+    top: -10px;
+  }
+  .infoclasse {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    font-weight: bold;
+    top: -33px;
+    left: 109px;
+    float: left;
+  }
+  .jour {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    font-size: 16px;
+    font-weight: bold;
+    top: -125px;
+    left: -370px;
+    color: #f70838;
+  }
+  .sect3 {
+    font-family: "Inter", sans-serif;
+    position: absolute;
+    float: left!important;
+    top: 260px;
+    left: 590px;
+  }
+  .sect4 {
+    font-family: "Inter", sans-serif;
+    position: absolute;
+    float: left!important;
+    top: 185px;
+    left: 470px;
+    width: 400px;
+  }
+   .sect5 {
+    font-family: "Inter", sans-serif;
+    position: absolute;
+    float: right!important;
+    top: 126px;
+    left: 900px;
+    padding: 59px!important;
+  }
+  .formclass {
+     height: 450px;
+  }
+  .section2 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    float: right!important;
+  }
+   .section3 {
+    font-family: "Inter", sans-serif;
+    position: relative;
+    float: right!important;
+  }
+   .titreajou {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     float: right;
+     width: 180px;
+     font-size: 12px;
+     left: 160px;
+     top: -96px;
+  }
+  .formajou {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     top: 14px;
+  }
+  .role {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     top: -156px;
+     
+  }
+  .role-2 {
+    font-family: "Inter", sans-serif;
+     position: relative;
+     left: -190px;
+     font-weight: bold;
+     font-size: 14px;
+     float: right;
+     top: -228px;
+  }
+  .tel {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+    left: 15px;
+  }
+  .profil {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+    text-align: center;
+  }
+  .sexe {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+    top: -30px;
+  }
+   .block-1 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: absolute;
+     float: left;
+     top: 235px;
+     left: 10px;
+  }
+  .block-1a {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: absolute;
+     float: left;
+     top: 180px;
+     left: 10px;
+  }
+  /* Votre style d'origine avec le forçage de couleur rouge demandé plus tôt */
+.message {
+ font-family: "Inter", sans-serif;
+  font-size: small;
+  position: absolute;
+  font-weight: bold;
+  float: left;
+  color: #f7f4f4 !important;
+  top: 44px;
+  left: 370px;
+  text-align: justify;
+  background-color: #ef4444; /* Rouge d'alerte */
+  width: 300px;
+  padding: 12px;
+  border-radius: 12px;
+  z-index: 50;
+  /* 📳 DECLENCHEMENT DE LA VIBRATION VISUELLE PENDANT 2 SECONDES */
+  animation: shakeVisual 5s ease-in-out;
+  animation-iteration-count: infinite;
+}
+.messageeleve {
+ font-family: "Inter", sans-serif;
+  font-size: small;
+  position: absolute;
+  font-weight: bold;
+  float: left;
+  color: #f7f4f4 !important;
+  top: 44px;
+  left: 370px;
+  text-align: justify;
+  background-color: #ef4444; /* Rouge d'alerte */
+  width: 600px;
+  padding: 12px;
+  border-radius: 12px;
+  z-index: 50;
+  /* 📳 DECLENCHEMENT DE LA VIBRATION VISUELLE PENDANT 2 SECONDES */
+  animation: shakeVisual 5s ease-in-out;
+  animation-iteration-count: infinite;
+}
+.messageel {
+ font-family: "Inter", sans-serif;
+  font-size: small;
+  position: absolute;
+  font-weight: bold;
+  float: left;
+  color: #f7f4f4 !important;
+  top: 544px;
+  left: 370px;
+  text-align: justify;
+  background-color: #ef4444; /* Rouge d'alerte */
+  width: 600px;
+  padding: 12px;
+  border-radius: 12px;
+  z-index: 50;
+  /* 📳 DECLENCHEMENT DE LA VIBRATION VISUELLE PENDANT 2 SECONDES */
+  animation: shakeVisual 5s ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* Les micro-décalages de gauche à droite pour simuler la vibration */
+@keyframes shakeVisual {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+  .block-2 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     float: right;
+     width: 320px;
+     top: -125px;
+     left: -13px;
+  }
+   .atrensmettre {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     color: #f7f4f4!important;
+  }
+   .block-secu {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+    left: -317px; 
+    top: 43px;
+  }
+  .eta {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+    left: -237px; 
+   top: 10px;
+   padding-bottom: 160px;
+  }
+  .prov {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+   top: 10px;
+  }
+  .block-secu2 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+    left: 187px; 
+    top: -130px;
+  }
+   .block-3 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     float: right;
+     top: 70px!important;
+     left: 74px!important;
+     
+  }
+   .date {
+    font-family: "Inter", sans-serif;
+     position: relative;
+    left: -370px;
+    top: -150px;
+  }
+.titreSpecial {
+    font-family: "Inter", sans-serif;
+     float: right;
+     position: relative;
+     left: -90px;
+     top: 10px;
+  }
+  .titreco {
+    font-family: "Inter", sans-serif;
+     position: absolute;
+     top: 850px;
+     left: 260px;
+     padding-bottom: 200px;
+  }
+  .titresta {
+    font-family: "Inter", sans-serif;
+     position: absolute!important;
+     top: 50px;
+     left: 10px;
+  }
+
+  label {
+    font-family: "Inter", sans-serif;
+     font-size: 12px;
+     opacity: 0.8;
+     font-weight: bolder;
+     position:relative;
+     top: -15px!important;
+  }
+  .affect {
+    font-family: "Inter", sans-serif;
+  position: relative;
+  float:left;
+  top: -394px;
+  left: 200px;
+  }
+   .affectannee {
+    font-family: "Inter", sans-serif;
+  position: relative;
+  float:left;
+  top: -134px;
+  left: 100px;
+  }
+  .nivaeupromo {
+    font-family: "Inter", sans-serif;
+  position: relative;
+  top: -320px;
+  left: 330px;
+  }
+    .nivaeupr {
+    font-family: "Inter", sans-serif;
+  position: relative;
+  float: left;
+  left: 396px;
+  top: -50px;
+  }
+  .divisionpedagogique {
+  font-family: "Inter", sans-serif;
+  position: relative;
+  top: -230px;
+  left: -150px;
+  float:left;
+  }
+  .emettre {
+  font-family: "Inter", sans-serif;
+  position: relative;
+ font-weight: bold;
+ color: #f70838;
+ font-size: 20px;
+ top: -50px;
+  }
+   .divisionpedagogi {
+  font-family: "Inter", sans-serif;
+  position: relative;
+  }
+   .divisionpedamsg {
+  font-family: "Inter", sans-serif;
+  position: relative;
+  top: -88px;
+  left: -94px;
+  }
+  .textare {
+  font-family: "Inter", sans-serif;
+  position: absolute;
+  width: 360px;
+  top:47px ;
+  left: 470px;
+  float: right;
+  height: 200px!important;
+  }
+  .textaremsg {
+  font-family: "Inter", sans-serif;
+  position: absolute;
+  width: 360px;
+  top:47px ;
+  left: 470px;
+  float: right;
+  height: 70px!important;
+  }
+  .textar {
+  font-family: "Inter", sans-serif;
+  position: relative;
+  top: 7px !important;;
+  left: 470px!important;
+  float: right;
+  }
+  .aptitude {
+  font-family: "Inter", sans-serif;
+  position: relative;
+  top: -220px;
+  left: 600px;
+  float:left;
+  }
+  .affecta {
+     position: relative;
+     left: -366px;
+     top: -60px;
+  }
+  .bas {
+     position: relative;
+     top: 5px!important;
+  }
+   .bas1 {
+     position: relative;
+     top: 25px!important;
+  }
+  .bas2 {
+     position: relative;
+     top: 35px!important;
+  }
+  .bas3 {
+     position: relative;
+     top: 20px!important;
+  }
+  input {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: 14px;
+    opacity: 1;
+     color: hsl(0, 93%, 45%)!important;
+     border-color: #14075c;
+     border-width: 20px;
+     box-shadow: #4cddd6;
+     
+  }
+  .grade {
+     position: relative;
+     left: -86px;
+     top: 23px;
+  }
+  .mail {
+     position: absolute;
+     display: flex;
+     flex-direction: row;
+    float: left;
+    left: 300px;
+    top: 890px;
+    margin: 20px;
+  }
+  .sumit {
+     position: absolute;
+     top: 1050px;
+     left: 505px;
+    
+  }
+  .sumitform {
+     position:absolute;
+      top: 370px;
+     left: 565px;
+     height: 30px!important;
+     text-align:center;
+     width: 95px;
+  }
+ .sumit2 {
+     position:absolute;
+      top: 1045px;
+     left: 405px;
+  }
+  .mont {
+     padding: 15px;
+  }
+    
+  .group-btn {
+    position: relative;
+    top: -480px;
+  }
+   .barre {
+    position: relative;
+    top: 257px!important;
+  }
+ .formeveil {
+  float: left;
+  position: absolute;
+     width: 320px;
+     border-radius: 10px;
+     left: 490px;
+     top: 45px;
+     text-align: center;
+  } 
+  .imgeveil {
+ border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px;
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  } 
+  .annonce {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+   top: -154px;
+   
+  } 
+   .annonce1 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+top: 5px;
+   color: hsl(0, 94%, 50%)!important;
+   font-size: 14px;
+  } 
+  .annonce2 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+   text-align: justify;
+   font-size: 14px;
+  }
+  .etabli {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+  left: -30px;
+  top: -23px;
+  } 
+
+/*Espace eleve */
+.compagnon {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+  left: -30px;
+  top: -83px;
+  } 
+  .eleve {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+  left: -30px;
+  top: -83px;
+  font-size: 28px;
+  } 
+  .elevematricul {
+    font-family: "Inter", sans-serif;
+   position: relative;
+  left: -30px;
+  top: -103px;
+  font-size: 18px;
+  font-weight: bolder;
+   color: hsl(0, 92%, 49%)!important;
+  } 
+
+  /* Media query pour les smartphones */
+@media screen and (max-width: 767px) {
+
+  /* login */
+  * {
+    font-family: "Inter", sans-serif;
+  }
+  .logologin {
+    position: relative;
+    width: 100px!important;
+    margin: 5px;
+    top: -3px;
+  }
+  .btnlogin {
+   font-size: small;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color:  lch(46.24% 83.93 32.2)!important;
+   font-weight: bolder;
+   position:relative;
+   top: -20px;
+  }
+
+  .form-partie {
+    position: relative;
+    text-align: center;
+   font-family: "Inter", sans-serif;
+    height: 340px;
+    left: -6px;
+  }
+
+  .text-edulink {
+    font-size: 14px;
+   font-family: "Inter", sans-serif;
+    color: #14075c!important;
+    position: relative;
+    font-weight: bolder;
+    top: -25px;
+    left: 23px;
+    width: 280px;
+  }
+
+  .portail {
+    font-size: 16px;
+   font-family: "Inter", sans-serif;
+    color: hsl(182, 40%, 42%)!important;
+    position: relative;
+    font-weight: bolder;
+    top: -30px;
+  }
+
+  .identifiant {
+    font-size: 16px!important;
+   font-family: "Inter", sans-serif;
+    color: lch(2.23% 6.56 12.34)!important;
+    position: absolute;
+    font-weight: bolder;
+    top: -40px!important;
+    left: 100px; /* Ajusté pour mobile (au lieu de 129px) */
+  }
+
+  .clesecurite {
+    font-size: 16px;
+   font-family: "Inter", sans-serif;
+    color: hsl(180, 82%, 2%)!important;
+    position: absolute;
+    font-weight: bolder;
+    top: 125px!important;
+    width:300px;
+    float:right;
+    left: 160px!important; /* Ajusté pour mobile (au lieu de -10px) */
+  }
+
+  .yeux {
+   position:relative;
+   left: 130px!important;
+   top: 57px!important;
+  }
+
+  .identifiantinput {
+    font-size: 16px!important;
+   font-family: "Inter", sans-serif;
+    border-radius: 34px;
+    width: 300px; /* Adapté pour mobile (au lieu de 300px) */
+    position: relative;
+    font-weight: lighter;
+    background-color:#f7f4f4;
+    border-color: hsl(246, 80%, 48%)!important;
+    text-align: center;
+    left: -10px; /* Ajusté pour mobile (au lieu de -75px) */
+    top: -62px;
+  }
+
+  .identifiantcle {
+    font-size: 14px!important;
+   font-family: "Inter", sans-serif;
+    border-radius: 34px;
+    width: 90%; /* Adapté pour mobile (au lieu de 300px) */
+    position: relative;
+    font-weight: lighter;
+    border-color: hsl(246, 80%, 48%)!important;
+    text-align: center;
+    left: 160px; /* Ajusté pour mobile (au lieu de 10px) */
+    top: 56px!important;
+    background-color: #f5f7fb;
+    width: 300px!important;
+  }
+  .absol {
+    border-radius: 34px;
+    position: relative;
+    font-weight: lighter;
+    text-align: center;
+    left: 0; /* Ajusté pour mobile */
+    top: -12px;
+  }
+  .tete {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     font-size: small;
+  }
+  .btn {
+    font-size: large;
+   font-family: "Inter", sans-serif;
+    border-radius: 32px;
+   color: #ffffff;
+    font-weight: bolder;
+    width: auto;
+  }
+   
+
+  .oublie {
+    font-size: small;
+   font-family: "Inter", sans-serif;
+    position: relative;
+    top: -15px;
+    font-style: italic;
+    font-weight: bold;
+  }
+  /* footer smartphone */
+   footer{
+    font-size:18px ;
+   font-family: "Inter", sans-serif;
+    font-weight: bold;
+  }
+  .logoedulink {
+    position: static;
+    width: 60px !important;
+    left: 0;
+  }
+
+  .luhamcode {
+    position: static;
+    width: 80px !important;
+    left: 0;
+    top: 0;
+  }
+  
+  .parti-footer {
+    position: static; /* Annule l'absolute pour laisser Tailwind gérer la grille */
+    display: flex;
+    flex-direction: column; /* Aligne les colonnes verticalement */
+    right: auto !important;
+    gap: 1.5rem;
+  }
+
+  .footer-tex {
+    position: relative;
+    font-size: 11px;
+    font-style: italic;
+    text-align: center; /* Centré pour une meilleure lecture sur mobile */
+    top: 0;
+    left: 0;
+  }
+
+  .lyceheader {
+ font-family: "Inter", sans-serif;
+  position: relative;
+ top: -20px;
+ left: -25px;
+ font-size: 24px!important;
+ font-weight: bold;
+}
+ .entete {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+     font-size: 11px;
+     float: left;
+     font-style: italic;
+  }
+  .barre {
+    position: absolute;
+    top: 357px!important;
+  }
+  .barre-bi-couleurheader {
+  width: 100%;
+  height: 20px;
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+  position: relative;
+  top: -23px;
+  left: -24px;
+  width: 390px;
+}
+.pays {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     color: hwb(349 0% 95%)!important;
+     position: relative;
+     top: 45px!important;
+     left: 6px;
+     font-size: 8px;
+  }
+   .devise {
+     font-family: "Inter", sans-serif;
+     font-weight: bold;
+     color: hsl(348, 45%, 98%)!important;
+     position: relative;
+     top: 45px!important;
+     left: 60px;
+     font-size: 8px;
+  }
+  .ministereheader {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     color: hwb(351 0% 95%)!important;
+     position: relative;
+     top: 45px!important;
+     left: -3px;
+     font-size: 9px;
+  }
+  .direction {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: absolute;
+      left: 315px;
+      top: 85px;
+  }
+  .ministere {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+     position: relative;
+      font-size: 11px;
+      top: -19px;
+      left: 685px;
+  }
+  
+  .eleve {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+  left: -30px;
+  top: -163px;
+  font-size: 20px;
+  } 
+  .manager {
+ visibility: hidden;
+}
+ .compagnon {
+ visibility: hidden;
+}
+ .elevematricul {
+    font-family: "Inter", sans-serif;
+   position: relative;
+  left: 40px!important;
+  top: -173px;
+  font-size: 11px;
+  font-weight: bolder;
+  width: 260px;
+  color: hsl(0, 92%, 49%)!important;
+  } 
+
+  .menu-footer {
+    position: relative;
+    font-size: 11px;
+    font-style: italic;
+    text-align: center;
+    top: 0;
+    display: flex;
+    flex-direction: column; /* Aligne les liens de conformité les uns sous les autres */
+    gap: 8px;
+    padding: 0;
+  }
+
+  li, a {
+    text-decoration: none;
+    list-style-type: none; 
+    display: block; /* Permet un clic plus facile sur mobile */
+    margin: 0;
+    text-align: center;
+  }
+
+  .bas-footer {
+    position: relative;
+    font-size: 10px;
+    font-style: italic;
+    text-align: center;
+    top: 0; /* Annule le gros décalage vers le bas */
+    display: flex;
+    flex-direction: column; /* Superpose les blocs de mentions légales */
+    gap: 12px;
+  }
+  .vue {
+  visibility:hidden
+  }
+  .bloc {
   position: relative;
   top: -20px;
   }
+  .barre-bi-couleur {
+  width: 360px!important;
+  height: 20px;
+  left: -14px;
+  position: relative;
+  background: linear-gradient(to right, #84d8b5 30%, blue 70%);
+}
+ .identifiantentre {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hsl(180, 82%, 2%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: -30px;
+   left: -0px;
+  }
+  .recup {
+   font-size: 14px;
+  font-family: "Inter", sans-serif;
+   color: hsl(180, 82%, 2%)!important;
+   position: relative;
+   font-weight: bolder;
+   top: -26px;
+  }
+  .identifiantinpu {
+   font-size: 16px!important;
+  font-family: "Inter", sans-serif;
+   border-radius: 34px;
+   position: relative;
+   font-weight: lighter;
+   border-color:  lab(69.62% 2.24 -3.86);
+   text-align: center;
+   top: -22px;
+  }
+  .iden {
+   position: relative;
+   top: 57px;
+  float: left;
+ left: 30px;
+  }
+  .btn-recup {
+   font-size: 16px;
+  font-family: "Inter", sans-serif;
+   border-radius: 32px;
+   background-color: lab(69.62% 2.24 -3.86);
+   font-weight: bolder;
+   position: relative;
+  }
+ .retour {
+    position: relative;
+    text-align: center;
+   font-family: "Inter", sans-serif;
+    font-size: small;
+    font-weight: bolder;
+  }
+  .formeveil {
+  float: left;
+  position: initial;
+     width: 320px;
+     border-radius: 10px;
+     left: 490px;
+     top: 445px;
+     text-align: center;
+  } 
+  .imgeveil {
+ border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: -5px;
+  width: 87%;
+  height: 170px;
+  object-fit: cover;
+  } 
+  .annonce1 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+top: 5px;
+width: 80%;
+   color: hsl(0, 94%, 50%)!important;
+   font-size: 12px;
+   left: 50px;
+  } 
+  .annonce2 {
+    font-family: "Inter", sans-serif;
+     font-weight: bold;
+   position: relative;
+   text-align: justify;
+   font-size: 12px;
+   width: 80%;
+   left: 50px;
+  }
+}

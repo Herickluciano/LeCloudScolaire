@@ -1,238 +1,275 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../services/api';
 
-/**
- * 🇨🇮 GÉNÉRATEUR CLOUD :
- * Fiche d'identification + Badge d'accès dynamique temps réel
- */
-export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
-  const doc = new jsPDF();
+const texte = (value) =>
+  value === null || value === undefined
+    ? ''
+    : String(value).trim();
 
-  // ============================================================
-  // 🔐 NORMALISATION DES DONNÉES
-  // Compatible avec les anciens et nouveaux profils Firebase
-  // ============================================================
-
-  const nomCivil = data?.nom?.trim()
-    ? data.nom.trim().toUpperCase()
-    : 'NON SPÉCIFIÉ';
-
-  // 🟢 CORRECTION PRINCIPALE :
-  // AjouterPersonnel enregistre "prenoms"
-  // On garde "prenom" en secours pour les anciens profils.
-  const prenomCivil =
-    data?.prenoms?.trim() ||
-    data?.prenom?.trim() ||
-    'Non spécifié';
-
-  // 🟢 CORRECTION :
-  // AjouterPersonnel enregistre "role"
-  // On garde "typePersonnel" pour compatibilité.
-  const rolePersonnel =
-    data?.role?.trim() ||
-    data?.typePersonnel?.trim() ||
+const recupererEtablissement = async (data = {}) => {
+  const schoolId =
+    texte(data?.schoolId) ||
+    sessionStorage.getItem('sgs_school_id') ||
     '';
 
-  const civilDate =
-    data?.dateNaissance?.trim() ||
-    'Non spécifiée';
-
-  const cmuNumber =
-    data?.numSecuriteSociale?.trim() ||
-    'Non spécifié';
-
-  const contactDirect =
-    data?.telephone?.trim() ||
-    'Non renseigné';
-
-  const currentStatus =
-    data?.statut?.trim() ||
-    'actif';
-
-  const etatScolaireTexte =
-    currentStatus.toUpperCase().replace(/\_/g, ' ');
-
-  // ============================================================
-  // 🏫 ÉTABLISSEMENT
-  // ============================================================
-
-  const nomEtablissementOfficiel =
-    data?.schoolName ||
-    (
-      data?.schoolId
-        ? data.schoolId.replace(/\_/g, ' ').toUpperCase()
-        : 'ÉTABLISSEMENT SAAS'
-    );
-
-  // ============================================================
-  // 👮 FONCTION DU PERSONNEL
-  // ============================================================
-
-  const fonctionPersonnel =
-    rolePersonnel === 'professeur'
-      ? 'Professeur Enseignant'
-      : rolePersonnel === 'prof_principal'
-        ? 'Professeur Principal'
-        : rolePersonnel === 'educateur'
-          ? 'Éducateur de Niveau'
-          : rolePersonnel
-            ? rolePersonnel.toUpperCase()
-            : 'Personnel';
-
-  // ============================================================
-  // 📱 QR CODE
-  // ============================================================
-
-  let texteDuQRCode = '';
-
-  if (type === 'eleve') {
-
-    texteDuQRCode =
-      `🏛️ ÉCOLE : ${nomEtablissementOfficiel}\n` +
-      `PORTAIL SCOLAIRE - ACCÈS ÉLÈVE\n` +
-      `Matricule: ${data?.matricule || 'N/A'}\n` +
-      `Nom: ${nomCivil}\n` +
-      `Prénom: ${prenomCivil}\n` +
-      `Classe: ${data?.classeId || 'N/A'}\n` +
-      `SITUATION : ${etatScolaireTexte}`;
-
-  } else {
-
-    texteDuQRCode =
-      `🏛️ Établissement : ${nomEtablissementOfficiel}\n` +
-      `PORTAIL SCOLAIRE - ACCÈS PERSONNEL\n` +
-      `Type: ${rolePersonnel ? rolePersonnel.toUpperCase() : 'N/A'}\n` +
-      `Nom: ${nomCivil}\n` +
-      `Prénom: ${prenomCivil}\n` +
-      `Grade: ${data?.grade || 'N/A'}\n` +
-      `SITUATION : ${etatScolaireTexte}`;
+  if (!schoolId) {
+    throw new Error("Identifiant de l'établissement introuvable.");
   }
 
-  try {
+  const snap = await getDoc(
+    doc(db, 'schools', schoolId)
+  );
 
-    // ============================================================
-    // 🔳 GÉNÉRATION QR CODE
-    // ============================================================
+  if (!snap.exists()) {
+    throw new Error("Établissement introuvable.");
+  }
+
+  return {
+    ...snap.data(),
+    id: snap.id
+  };
+};
+
+export const genererFicheAvecQRCodePDF = async (
+  data = {},
+  type = 'eleve'
+) => {
+  try {
+    const etablissement =
+      await recupererEtablissement(data);
+
+    const nomCivil =
+      texte(data?.nom).toUpperCase() ||
+      'NON SPÉCIFIÉ';
+
+    const prenomCivil =
+      texte(data?.prenoms) ||
+      texte(data?.prenom) ||
+      'Non spécifié';
+
+    const rolePersonnel =
+      texte(data?.role) ||
+      texte(data?.typePersonnel);
+
+    const civilDate =
+      texte(data?.dateNaissance) ||
+      'Non spécifiée';
+
+    const cmuNumber =
+      texte(data?.numSecuriteSociale) ||
+      'Non spécifié';
+
+    const contactDirect =
+      texte(data?.telephone) ||
+      'Non renseigné';
+
+    const currentStatus =
+      texte(data?.statut) ||
+      'actif';
+
+    const nomEtablissement =
+      texte(etablissement?.nom) ||
+      texte(data?.schoolName) ||
+      etablissement?.id ||
+      'Établissement';
+
+    const pays =
+      texte(etablissement?.pays);
+
+    const devise =
+      texte(etablissement?.devise);
+
+    const ministere =
+      texte(etablissement?.ministere);
+
+    const premierResponsable =
+      texte(etablissement?.premierResponsable);
+
+    const anneeScolaire =
+      texte(data?.anneeScolaire) ||
+      texte(data?.annee_scolaire);
+
+    const fonctionPersonnel =
+      rolePersonnel === 'professeur'
+        ? 'Professeur Enseignant'
+        : rolePersonnel === 'prof_principal'
+          ? 'Professeur Principal'
+          : rolePersonnel === 'educateur'
+            ? 'Éducateur de Niveau'
+            : rolePersonnel
+              ? rolePersonnel
+              : 'Personnel';
+
+    const situation =
+      currentStatus.replace(/_/g, ' ');
+
+    const texteDuQRCode =
+      type === 'eleve'
+        ? [
+            nomEtablissement,
+            'ACCÈS ÉLÈVE',
+            `Matricule : ${texte(data?.matricule) || 'N/A'}`,
+            `Nom : ${nomCivil}`,
+            `Prénom : ${prenomCivil}`,
+            `Classe : ${texte(data?.classeId) || 'N/A'}`,
+            `Situation : ${situation}`
+          ].join('\n')
+        : [
+            nomEtablissement,
+            'ACCÈS PERSONNEL',
+            `Identifiant : ${texte(data?.matricule) || 'N/A'}`,
+            `Nom : ${nomCivil}`,
+            `Prénom : ${prenomCivil}`,
+            `Fonction : ${fonctionPersonnel}`,
+            `Situation : ${situation}`
+          ].join('\n');
 
     const qrColor =
       currentStatus === 'actif'
         ? '#003366'
-        : '#990000';
+        : 'rgb(35, 231, 215)';
 
-    const qrCodeDataUrl = await QRCode.toDataURL(
-      texteDuQRCode,
-      {
-        margin: 1,
-        width: 150,
-        color: {
-          dark: qrColor,
-          light: '#FFFFFF'
+    const qrCodeDataUrl =
+      await QRCode.toDataURL(
+        texteDuQRCode,
+        {
+          margin: 1,
+          width: 150,
+          color: {
+            dark: qrColor,
+            light: '#FFFFFF'
+          }
         }
-      }
-    );
+      );
 
-    // ============================================================
-    // PARTIE 1
-    // 📄 FICHE ADMINISTRATIVE
-    // ============================================================
+    const pdf = new jsPDF();
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(10);
 
-    doc.text(
-      "RÉPUBLIQUE DE CÔTE D'IVOIRE",
-      15,
+    if (pays) {
+      pdf.text(
+        pays,
+        15,
+        15
+      );
+    }
+
+    pdf.setFont('Helvetica', 'normal');
+    pdf.setFontSize(8);
+
+    if (devise) {
+      pdf.text(
+        devise,
+        21,
+        19
+      );
+    }
+
+    if (ministere) {
+      pdf.setFont('Helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.text(
+        ministere,
+        15,
+        27
+      );
+    }
+
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(10);
+
+    pdf.text(
+      nomEtablissement,
+      140,
       15
     );
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
+    if (anneeScolaire) {
+      pdf.setFont('Helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text(
+        anneeScolaire,
+        140,
+        20
+      );
+    }
 
-    doc.text(
-      "Union - Discipline - Travail",
-      21,
-      19
-    );
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(8);
 
-    doc.text(
-      "-------------",
-      32,
-      23
-    );
-
-    doc.setFont('Helvetica', 'bold');
-
-    doc.text(
-      "MINISTÈRE DE L'ÉDUCATION NATIONALE ET DE L'ALPHABÉTISATION",
-      15,
+    pdf.text(
+      type === 'eleve'
+        ? `MATRICULE : ${texte(data?.matricule) || 'N/A'}`
+        : `ID PERSONNEL : ${texte(data?.matricule) || 'N/A'}`,
+      140,
       27
     );
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(10);
-
-    doc.text(
-      `ANNÉE SCOLAIRE : 2025-2026`,
-      140,
-      15
+    pdf.setDrawColor(
+      200,
+      200,
+      200
     );
 
-    doc.setFont('Helvetica', 'bold');
-
-    doc.text(
-      type === 'eleve'
-        ? `MATRICULE : ${data?.matricule || 'N/A'}`
-        : `ID PERSONNEL : ${data?.matricule || 'N/A'}`,
-      140,
-      22
-    );
-
-    doc.setDrawColor(200, 200, 200);
-
-    doc.line(
+    pdf.line(
       15,
       33,
       195,
       33
     );
 
-    // ============================================================
-    // TITRE
-    // ============================================================
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(13);
+    pdf.setTextColor(
+      15,
+      118,
+      110
+    );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(211, 84, 0);
-
-    doc.text(
+    pdf.text(
       type === 'eleve'
         ? "FICHE D'IDENTIFICATION & BADGE ÉLÈVE"
-        : "DOSSIER RH & ENREGISTREMENT PERSONNEL",
+        : 'DOSSIER RH & BADGE PERSONNEL',
       15,
       42
     );
 
-    // ============================================================
-    // 1. INFORMATIONS CIVILES
-    // ============================================================
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(
+      15,
+      118,
+      110
+    );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0, 51, 102);
-
-    doc.text(
-      "1. Informations Civiles",
+    pdf.text(
+      '1. Informations Civiles',
       15,
       52
     );
 
     const bodyTableauCivil = [
-      ['Nom de famille :', nomCivil],
-      ['Prénoms :', prenomCivil],
-      ['Date de Naissance :', civilDate],
-      ['N° Sécurité Sociale (CMU) :', cmuNumber],
+      [
+        'Nom de famille :',
+        nomCivil
+      ],
+      [
+        'Prénoms :',
+        prenomCivil
+      ],
+      [
+        'Date de Naissance :',
+        civilDate
+      ],
+      [
+        'N° Sécurité Sociale :',
+        cmuNumber
+      ],
       [
         type === 'eleve'
           ? 'Contact Parent / Tuteur :'
@@ -241,7 +278,7 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       ]
     ];
 
-    autoTable(doc, {
+    autoTable(pdf, {
       startY: 55,
       margin: {
         left: 15
@@ -255,52 +292,49 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       columnStyles: {
         0: {
           fontStyle: 'bold',
-          width: 45
+          width: 50
         },
         1: {
-          width: 90
+          width: 100
         }
       }
     });
 
     const currentY =
-      doc.lastAutoTable.finalY + 6;
+      pdf.lastAutoTable.finalY + 6;
 
-    // ============================================================
-    // 2. STATUT / AFFECTATION
-    // ============================================================
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(
+      15,
+      118,
+      110
+    );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setTextColor(0, 51, 102);
-
-    doc.text(
+    pdf.text(
       type === 'eleve'
-        ? "2. Structure & Affectation"
-        : "2. Statut Professionnel",
+        ? '2. Structure & Affectation'
+        : '2. Statut Professionnel',
       15,
       currentY
     );
 
     const bodyTableauStatut =
       type === 'eleve'
-
         ? [
             [
               'Promotion / Niveau',
-              data?.promotion
-                ? data.promotion.toUpperCase()
-                : 'NON SPÉCIFIÉ'
+              texte(data?.promotion) ||
+                'Non spécifié'
             ],
-
             [
               'Classe Affectée',
-              data?.classeId
-                ? data.classeId
+              texte(data?.classeId)
+                ? texte(data.classeId)
                     .replace(/_/g, ' ')
                     .toUpperCase()
                 : 'Non assignée'
             ],
-
             [
               'Aptitude Éducation Physique',
               data?.dispensePhysique === 'Oui'
@@ -308,31 +342,28 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
                 : 'Apte'
             ]
           ]
-
         : [
             [
               'Fonction occupée',
               fonctionPersonnel
             ],
-
             [
               'Discipline / Matière',
-              data?.matiereEnseignee ||
-                'Gestion administrative'
+              texte(data?.matiereEnseignee) ||
+                'Administration'
             ],
-
             [
-              'Grade Fonction Publique',
-              data?.grade || 'N/A'
+              'Grade',
+              texte(data?.grade) ||
+                'Non renseigné'
             ],
-
             [
               "Années d'expérience",
-              `${data?.anneesExperience || 0} ans`
+              `${texte(data?.anneesExperience) || '0'} ans`
             ]
           ];
 
-    autoTable(doc, {
+    autoTable(pdf, {
       startY: currentY + 3,
       margin: {
         left: 15,
@@ -343,48 +374,47 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
         cellPadding: 2
       },
       theme: 'grid',
-
       headStyles: {
-        fillColor: [211, 84, 0],
-        textColor: [255, 255, 255]
+        fillColor: [
+          15,
+          118,
+          110
+        ],
+        textColor: [
+          255,
+          255,
+          255
+        ]
       },
-
       head: [
         [
           type === 'eleve'
             ? 'Critère Scolaire'
             : 'Critère RH',
-
           'Valeur Officielle'
         ]
       ],
-
-      body: bodyTableauStatut,
-
-      columnStyles: {
-        0: {
-          fontStyle: 'bold',
-          width: 55
-        },
-        1: {
-          width: 110
-        }
-      }
+      body: bodyTableauStatut
     });
 
-    // ============================================================
-    // PARTIE 2
-    // 🪪 BADGE
-    // ============================================================
-
     const badgeStartY =
-      doc.lastAutoTable.finalY + 12;
+      pdf.lastAutoTable.finalY + 12;
 
-    doc.setDrawColor(15, 23, 42);
-    doc.setLineWidth(0.5);
-    doc.setFillColor(255, 255, 255);
+    pdf.setDrawColor(
+      15,
+      118,
+      110
+    );
 
-    doc.rect(
+    pdf.setLineWidth(0.5);
+
+    pdf.setFillColor(
+      255,
+      255,
+      255
+    );
+
+    pdf.rect(
       55,
       badgeStartY,
       100,
@@ -392,38 +422,32 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       'FD'
     );
 
-    // ============================================================
-    // COULEUR DU BADGE
-    // ============================================================
-
-    if (currentStatus === 'actif') {
-
-      doc.setFillColor(
-        211,
-        84,
-        0
-      );
-
-    } else if (
-      currentStatus === 'suspendu_scolarite'
+    if (
+      currentStatus === 'actif'
     ) {
-
-      doc.setFillColor(
-        219,
-        140,
-        0
+      pdf.setFillColor(
+        15,
+        118,
+        110
       );
-
+    } else if (
+      currentStatus ===
+      'suspendu_scolarite'
+    ) {
+      pdf.setFillColor(
+        15,
+        118,
+        110
+      );
     } else {
-
-      doc.setFillColor(
-        180,
-        0,
-        0
+      pdf.setFillColor(
+        15,
+        118,
+        110
       );
     }
 
-    doc.rect(
+    pdf.rect(
       55.25,
       badgeStartY + 0.25,
       99.5,
@@ -431,18 +455,23 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       'F'
     );
 
-    // ============================================================
-    // TITRE BADGE
-    // ============================================================
+    pdf.setFont(
+      'Helvetica',
+      'bold'
+    );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
+    pdf.setFontSize(10);
 
-    doc.text(
+    pdf.setTextColor(
+      255,
+      255,
+      255
+    );
+
+    pdf.text(
       currentStatus === 'actif'
-        ? "BADGE D'ACCÈS SCOLAIRE"
-        : "ACCÈS INTERDIT",
+        ? "BADGE D'ACCÈS"
+        : 'ACCÈS INTERDIT',
       105,
       badgeStartY + 8,
       {
@@ -450,15 +479,20 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       }
     );
 
-    // ============================================================
-    // NOM + PRÉNOMS
-    // ============================================================
+    pdf.setFont(
+      'Helvetica',
+      'bold'
+    );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(15, 23, 42);
+    pdf.setFontSize(11);
 
-    doc.text(
+    pdf.setTextColor(
+      15,
+      23,
+      42
+    );
+
+    pdf.text(
       nomCivil,
       105,
       badgeStartY + 22,
@@ -467,10 +501,14 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       }
     );
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(10);
+    pdf.setFont(
+      'Helvetica',
+      'normal'
+    );
 
-    doc.text(
+    pdf.setFontSize(10);
+
+    pdf.text(
       prenomCivil,
       105,
       badgeStartY + 27,
@@ -479,17 +517,22 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       }
     );
 
-    // ============================================================
-    // FONCTION / MATRICULE
-    // ============================================================
+    pdf.setFont(
+      'Helvetica',
+      'bold'
+    );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
+    pdf.setFontSize(8);
 
-    doc.text(
+    pdf.setTextColor(
+      100,
+      116,
+      139
+    );
+
+    pdf.text(
       type === 'eleve'
-        ? `MATRICULE : ${data?.matricule || 'N/A'}`
+        ? `MATRICULE : ${texte(data?.matricule) || 'N/A'}`
         : `FONCTION : ${fonctionPersonnel}`,
       105,
       badgeStartY + 33,
@@ -498,20 +541,26 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       }
     );
 
-    // ============================================================
-    // INFORMATIONS COMPLÉMENTAIRES
-    // ============================================================
+    pdf.setFont(
+      'Helvetica',
+      'normal'
+    );
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(51, 65, 85);
+    pdf.setFontSize(8);
 
-    if (type === 'eleve') {
+    pdf.setTextColor(
+      51,
+      65,
+      85
+    );
 
-      doc.text(
+    if (
+      type === 'eleve'
+    ) {
+      pdf.text(
         `Classe : ${
-          data?.classeId
-            ? data.classeId
+          texte(data?.classeId)
+            ? texte(data.classeId)
                 .replace(/_/g, ' ')
                 .toUpperCase()
             : 'N/A'
@@ -523,20 +572,18 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
         }
       );
 
-      doc.text(
-        `Urgence Parent : ${contactDirect}`,
+      pdf.text(
+        `Contact : ${contactDirect}`,
         105,
         badgeStartY + 44,
         {
           align: 'center'
         }
       );
-
     } else {
-
-      doc.text(
+      pdf.text(
         `Discipline : ${
-          data?.matiereEnseignee ||
+          texte(data?.matiereEnseignee) ||
           'Administration'
         }`,
         105,
@@ -546,7 +593,7 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
         }
       );
 
-      doc.text(
+      pdf.text(
         `Contact : ${contactDirect}`,
         105,
         badgeStartY + 44,
@@ -556,11 +603,7 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       );
     }
 
-    // ============================================================
-    // QR CODE
-    // ============================================================
-
-    doc.addImage(
+    pdf.addImage(
       qrCodeDataUrl,
       'PNG',
       85,
@@ -569,40 +612,35 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       40
     );
 
-    // ============================================================
-    // NOTICE DE SÉCURITÉ
-    // ============================================================
-
-    if (currentStatus === 'actif') {
-
-      doc.setFillColor(
-        254,
-        249,
-        195
+    if (
+      currentStatus === 'actif'
+    ) {
+      pdf.setFillColor(
+        15,
+        118,
+        110
       );
 
-      doc.setDrawColor(
-        254,
-        240,
-        138
+      pdf.setDrawColor(
+       15,
+        118,
+        110
       );
-
     } else {
-
-      doc.setFillColor(
-        254,
-        226,
-        226
+      pdf.setFillColor(
+        15,
+        118,
+        110
       );
 
-      doc.setDrawColor(
-        254,
-        202,
-        202
+      pdf.setDrawColor(
+        15,
+        118,
+        110
       );
     }
 
-    doc.rect(
+    pdf.rect(
       60,
       badgeStartY + 96,
       90,
@@ -610,30 +648,29 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       'FD'
     );
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(7);
+    pdf.setFont(
+      'Helvetica',
+      'bold'
+    );
 
-    if (currentStatus === 'actif') {
+    pdf.setFontSize(7);
 
-      doc.setTextColor(
-        146,
-        64,
-        14
-      );
-
-    } else {
-
-      doc.setTextColor(
-        153,
-        27,
-        27
-      );
-    }
-
-    doc.text(
+    pdf.setTextColor(
       currentStatus === 'actif'
-        ? "NOTICE DE SÉCURITÉ OBLIGATOIRE"
-        : "SIGNALEMENT : COMPTE SUSPENDU",
+        ?225
+        : 225,
+      currentStatus === 'actif'
+        ? 225
+        : 225,
+      currentStatus === 'actif'
+        ? 225
+        : 225
+    );
+
+    pdf.text(
+      currentStatus === 'actif'
+        ? 'NOTICE DE SÉCURITÉ'
+        : 'COMPTE SUSPENDU',
       105,
       badgeStartY + 101,
       {
@@ -641,80 +678,71 @@ export const genererFicheAvecQRCodePDF = async (data, type = 'eleve') => {
       }
     );
 
-    doc.setFont('Helvetica', 'normal');
+    pdf.setFont(
+      'Helvetica',
+      'normal'
+    );
 
-    if (currentStatus === 'actif') {
+    pdf.setFontSize(7);
 
-      doc.text(
-        "Ce badge est strictement personnel. Le titulaire",
+    if (
+      premierResponsable
+    ) {
+      pdf.text(
+        `Responsable : ${premierResponsable}`,
         105,
         badgeStartY + 106,
-        {
-          align: 'center'
-        }
-      );
-
-      doc.text(
-        "doit présenter ce QR Code aux portiques de contrôle",
-        105,
-        badgeStartY + 110,
-        {
-          align: 'center'
-        }
-      );
-
-      doc.text(
-        "sous peine de refus d'accès immédiat.",
-        105,
-        badgeStartY + 114,
-        {
-          align: 'center'
-        }
-      );
-
-    } else {
-
-      doc.text(
-        "L'accès à cet établissement est refusé en direct.",
-        105,
-        badgeStartY + 106,
-        {
-          align: 'center'
-        }
-      );
-
-      doc.text(
-        `Motif : ${etatScolaireTexte}.`,
-        105,
-        badgeStartY + 110,
-        {
-          align: 'center'
-        }
-      );
-
-      doc.text(
-        "Veuillez vous diriger vers le secrétariat.",
-        105,
-        badgeStartY + 114,
         {
           align: 'center'
         }
       );
     }
 
-    // ============================================================
-    // 💾 NOM DU FICHIER
-    // ============================================================
-
-    doc.save(
-      `Fiche_Badge_${type}_${nomCivil}.pdf`
+    pdf.text(
+      `Établissement : ${nomEtablissement}`,
+      105,
+      badgeStartY + 110,
+      {
+        align: 'center'
+      }
     );
 
-  } catch (err) {
+    pdf.text(
+      `Situation : ${situation}`,
+      105,
+      badgeStartY + 114,
+      {
+        align: 'center'
+      }
+    );
+     pdf.text(
+      `EDULINK : v2.0.26 — Cloud Connected`,
+      105,
+      badgeStartY + 114,
+      {
+        align: 'center'
+      }
+    );
 
+    const nomFichier =
+      `Fiche_Badge_${type}_${nomCivil
+        .replace(/[^\p{L}\p{N}_-]/gu, '_')}.pdf`;
+
+    pdf.save(
+      nomFichier
+    );
+
+    return {
+      success: true,
+      fileName: nomFichier,
+      schoolId: etablissement.id
+    };
+  } catch (error) {
     console.error(
-      "Erreur de compilation du document PDF :",
-      err
+      'Erreur génération fiche/badge PDF :',
+      error
     );
+
+    throw error;
   }
 };

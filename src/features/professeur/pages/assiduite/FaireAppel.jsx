@@ -3,6 +3,7 @@ import { db } from '../../../../services/api';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { useAuth } from '../../../../context/AuthContext';
 import { Link } from 'react-router-dom';
+import Header from '../../../../pages/Header';
 
 const FaireAppel = () => {
   const { user, schoolId, schoolName } = useAuth();
@@ -71,17 +72,18 @@ const FaireAppel = () => {
   if (loading) return <div className="p-8 text-center text-xs font-bold text-purple-600 animate-pulse uppercase">Ouverture du terminal...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 font-sans bg-gray-50 min-h-screen relative animate-fadeIn">
+    <div className="max-w-4xl mx-auto  sm:p-6 font-sans bg-white min-h-screen relative animate-fadeIn">
+      <Header/>
       {toast.text && (
         <div className="fixed top-6 right-6 z-50 p-4 rounded-xl shadow-2xl border-l-4 flex items-center justify-between gap-4 max-w-sm w-full bg-slate-900 border-emerald-500 text-emerald-400 text-xs font-bold animate-fadeIn">
           <p className="whitespace-pre-line text-left">⏱️ {toast.text}</p>
-          <button type="button" onClick={() => setToast({ type: '', text: '' })} className="text-slate-500 hover:text-white text-sm cursor-pointer">✕</button>
+          <button type="button" onClick={() => setToast({ type: '', text: '' })} className="text-slate-500 hover: text-sm cursor-pointer">✕</button>
         </div>
       )}
       <div className="mb-4">
         <Link to="/prof/dashboardProf" className="inline-flex items-center text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition shadow-2xs">⬅️ Bureau Enseignant</Link>
       </div>
-      <div className="bg-purple-900 text-white p-6 rounded-2xl shadow-md mb-8">
+      <div className="bg-purple-900  p-6 rounded-2xl shadow-md mb-8">
         <h1 className="text-xl md:text-2xl font-black">⏱️ Émargement Virtuel Libéré</h1>
         <p className="text-xs text-purple-200">Établissement : <span className="font-bold text-orange-400 uppercase">{schoolName || currentSchool}</span></p>
       </div>
@@ -92,7 +94,7 @@ const FaireAppel = () => {
             <p className="text-sm font-black text-gray-800">Classe : {classeAssignee}</p>
             <p className="text-xs text-gray-500 font-medium mt-4 bg-purple-50 p-3 rounded-xl border border-purple-100">💡 Mode Démo : Pointage ouvert sans restriction matérielle ou GPS.</p>
           </div>
-          <button type="button" onClick={handleValiderEmargementVacation} disabled={sending} className="w-full bg-purple-700 hover:bg-purple-800 text-white font-black py-4 rounded-xl uppercase text-xs tracking-wider shadow-md transition mt-6 cursor-pointer">
+          <button type="button" onClick={handleValiderEmargementVacation} disabled={sending} className="w-full bg-purple-700 hover:bg-purple-800  font-black py-4 rounded-xl uppercase text-xs tracking-wider shadow-md transition mt-6 cursor-pointer">
             {sending ? "Certification Cloud..." : "🛫 Émarger ma Présence"}
           </button>
         </div>
